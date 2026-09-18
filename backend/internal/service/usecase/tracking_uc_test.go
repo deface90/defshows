@@ -56,6 +56,18 @@ func TestTrackingUsecase_Flow(t *testing.T) {
 		t.Fatalf("unexpected initial progress: %+v", prog)
 	}
 
+	// Episodes can be watched out of order; progress must retain the exact IDs.
+	if err := uc.SetEpisodeWatched(ctx, user.ID, us.ShowID, episodes[1].ID, true); err != nil {
+		t.Fatal(err)
+	}
+	prog, err = uc.GetProgress(ctx, user.ID, us.ShowID)
+	if err != nil || prog.Watched != 1 || len(prog.WatchedEpisodeIDs) != 1 || prog.WatchedEpisodeIDs[0] != episodes[1].ID || prog.NextUnwatched == nil || prog.NextUnwatched.ID != episodes[0].ID {
+		t.Fatalf("out-of-order progress: %+v, %v", prog, err)
+	}
+	if err := uc.SetEpisodeWatched(ctx, user.ID, us.ShowID, episodes[1].ID, false); err != nil {
+		t.Fatal(err)
+	}
+
 	// Mark episode 1 watched → 1/2, next = episode 2.
 	if err := uc.SetEpisodeWatched(ctx, user.ID, us.ShowID, episodes[0].ID, true); err != nil {
 		t.Fatalf("mark watched: %v", err)

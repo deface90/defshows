@@ -3,6 +3,59 @@ info:
   title: defShows Catalog API
   version: 0.1.0
 paths:
+  /shows/discover/filters:
+    get:
+      operationId: getDiscoveryFilters
+      summary: TV genres and countries from TMDB
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiscoveryFilters' }
+        '502': { $ref: '#/components/responses/Error' }
+  /shows/discover:
+    get:
+      operationId: discoverShows
+      summary: Discover TV shows by country, genres, TMDB rating and premiere dates
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: country
+          in: query
+          schema: { type: string, pattern: "^[A-Z]{2}$" }
+        - name: genres
+          in: query
+          schema: { type: string, description: "Genre IDs joined by commas (all) or pipes (any)" }
+        - name: rating_min
+          in: query
+          schema: { type: number, format: double, minimum: 0, maximum: 10 }
+        - name: rating_max
+          in: query
+          schema: { type: number, format: double, minimum: 0, maximum: 10 }
+        - name: votes_min
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: date_from
+          in: query
+          schema: { type: string, description: "First air date, YYYY-MM-DD" }
+        - name: date_to
+          in: query
+          schema: { type: string, description: "First air date, YYYY-MM-DD" }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 1 }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [popularity.desc, vote_average.desc, first_air_date.desc], default: popularity.desc }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiscoveryResults' }
+        '400': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
   /shows/search:
     get:
       operationId: searchShows
@@ -20,6 +73,25 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SearchResults' }
         '401': { $ref: '#/components/responses/Error' }
+  /shows/tmdb/{tmdb_id}:
+    get:
+      operationId: getShowByTMDB
+      summary: Show detail by TMDB ID, importing into the catalog on first view
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: tmdb_id
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Show' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
   /shows/import:
     post:
       operationId: importShow
@@ -83,6 +155,36 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
   schemas:
+    DiscoveryFilters:
+      type: object
+      required: [genres, countries]
+      properties:
+        genres:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: integer, format: int64 }
+              name: { type: string }
+        countries:
+          type: array
+          items:
+            type: object
+            required: [code, name]
+            properties:
+              code: { type: string }
+              name: { type: string }
+    DiscoveryResults:
+      type: object
+      required: [results, page, total_pages, total_results]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/ShowSummary' }
+        page: { type: integer }
+        total_pages: { type: integer }
+        total_results: { type: integer }
     Error:
       type: object
       required: [message]

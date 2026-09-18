@@ -1,3 +1,5 @@
+import { DiscoverPage } from '@/pages/DiscoverPage'
+import { CatalogShowPage } from '@/pages/CatalogShowPage'
 import { createBrowserRouter } from 'react-router-dom'
 import { AdminDubbingPage } from '@/pages/admin/AdminDubbingPage'
 import { LoginPage } from '@/pages/LoginPage'
@@ -27,6 +29,8 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <MyShowsPage /> },
           { path: 'search', element: <SearchPage /> },
+          { path: 'discover', element: <DiscoverPage /> },
+          { path: 'catalog/:tmdbId', element: <CatalogShowPage /> },
           { path: 'shows/:id', element: <ShowDetailPage /> },
           { path: 'users', element: <UsersPage /> },
           { path: 'users/:id', element: <UserProfilePage /> },

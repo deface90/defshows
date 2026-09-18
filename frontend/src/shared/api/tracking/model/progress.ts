@@ -6,6 +6,7 @@
  */
 
 export interface Progress {
+  watched_episode_ids: number[];
   watched: number;
   total: number;
   /** @nullable */

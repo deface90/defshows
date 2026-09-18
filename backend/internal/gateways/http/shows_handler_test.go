@@ -109,3 +109,30 @@ func TestShowsHandler_ImportGetListSearch(t *testing.T) {
 		t.Fatalf("want 1 local show, got %d", len(list.Shows))
 	}
 }
+
+func TestShowsHandler_DetailByTMDB(t *testing.T) {
+	e := newShowsServer(t)
+	var first showsapi.Show
+	for i := 0; i < 2; i++ {
+		rec := doJSON(t, e, http.MethodGet, "/shows/tmdb/1399", "", nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("detail: %d (%s)", rec.Code, rec.Body.String())
+		}
+		var detail showsapi.Show
+		if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil {
+			t.Fatal(err)
+		}
+		if detail.TmdbId != 1399 || detail.Seasons == nil || len(*detail.Seasons) != 1 || len((*detail.Seasons)[0].Episodes) != 2 {
+			t.Fatalf("unexpected detail: %+v", detail)
+		}
+		if i == 0 {
+			first = detail
+		} else if detail.Id != first.Id {
+			t.Fatal("repeat view created a different catalog entry")
+		}
+	}
+	rec := doJSON(t, e, http.MethodGet, "/shows/tmdb/0", "", nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid ID: %d", rec.Code)
+	}
+}

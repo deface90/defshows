@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -44,7 +45,7 @@ describe('ShowDetailPage', () => {
         HttpResponse.json({
           user_show: { id: 5, show_id: 10, status: 'watching', favorite: false },
           show: { id: 10, tmdb_id: 1399, title: 'Game of Thrones', airing_status: 'ended' },
-          progress: { watched: 1, total: 2, next_unwatched_episode_id: 101 },
+          progress: { watched: 1, total: 2, watched_episode_ids: [100], next_unwatched_episode_id: 101 },
         }),
       ),
     )
@@ -75,4 +76,80 @@ describe('ShowDetailPage', () => {
     expect(await screen.findByText('Game of Thrones')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Добавить' })).toBeInTheDocument()
   })
+})
+
+it('keeps a later season checked independently of the first and updates episode checkboxes', async () => {
+  const user = userEvent.setup()
+  const watched = new Set<number>()
+  const detailed = { ...show, seasons: [show.seasons[0], {
+    id: 2, season_number: 2, name: 'Сезон 2',
+    episodes: [{ id: 200, season_number: 2, episode_number: 1, name: 'Later episode' }],
+  }] }
+  server.use(
+    http.get(`${base}/shows/10`, () => HttpResponse.json(detailed)),
+    http.get(`${base}/me/shows/10`, () => HttpResponse.json({
+      user_show: { id: 5, show_id: 10, status: 'watching', favorite: false },
+      show,
+      progress: { watched: watched.size, total: 3, watched_episode_ids: [...watched], next_unwatched_episode_id: 100 },
+    })),
+    http.post(`${base}/me/shows/10/episodes/200/watch`, () => {
+      watched.add(200)
+      return new HttpResponse(null, { status: 204 })
+    }),
+    http.delete(`${base}/me/shows/10/episodes/200/watch`, () => {
+      watched.delete(200)
+      return new HttpResponse(null, { status: 204 })
+    }),
+  )
+  renderDetail()
+  const seasons = await screen.findAllByRole('checkbox', { name: 'Отметить сезон просмотренным' })
+  await user.click(screen.getByRole('button', { name: /Сезон 2/ }))
+  await user.click(seasons[1])
+  await waitFor(() => expect(seasons[1]).toBeChecked())
+  expect(seasons[0]).not.toBeChecked()
+  const episodes = screen.getAllByRole('checkbox', { name: 'Просмотрено' })
+  expect(episodes[0]).not.toBeChecked()
+  expect(episodes[2]).toBeChecked()
+  await user.click(seasons[1])
+  await waitFor(() => expect(episodes[2]).not.toBeChecked())
+  expect(seasons[1]).not.toBeChecked()
+})
+
+it('marks the entire show with one write request and refreshes all checkboxes', async () => {
+  let completed = false
+  let requests = 0
+  server.use(
+    http.get(`${base}/shows/10`, () => HttpResponse.json(show)),
+    http.get(`${base}/me/shows/10`, () => HttpResponse.json({
+      user_show: { id: 5, show_id: 10, status: completed ? 'completed' : 'watching', favorite: false },
+      show,
+      progress: { watched: completed ? 2 : 0, total: 2, watched_episode_ids: completed ? [100, 101] : [], next_unwatched_episode_id: completed ? null : 100 },
+    })),
+    http.post(`${base}/me/shows/10/watch`, () => {
+      requests++
+      completed = true
+      return new HttpResponse(null, { status: 204 })
+    }),
+  )
+  renderDetail()
+  await userEvent.click(await screen.findByRole('button', { name: 'Отметить весь сериал просмотренным' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Весь сериал просмотрен ✓' })).toBeDisabled())
+  expect(requests).toBe(1)
+  for (const box of screen.getAllByRole('checkbox')) expect(box).toBeChecked()
+})
+
+it('keeps watch state unchanged when bulk marking fails', async () => {
+  server.use(
+    http.get(`${base}/shows/10`, () => HttpResponse.json(show)),
+    http.get(`${base}/me/shows/10`, () => HttpResponse.json({
+      user_show: { id: 5, show_id: 10, status: 'watching', favorite: false },
+      show, progress: { watched: 0, total: 2, watched_episode_ids: [], next_unwatched_episode_id: 100 },
+    })),
+    http.post(`${base}/me/shows/10/watch`, () => new HttpResponse(null, { status: 500 })),
+  )
+  renderDetail()
+  await userEvent.click(await screen.findByRole('button', { name: 'Отметить весь сериал просмотренным' }))
+  expect(await screen.findByText('Не удалось отметить сериал просмотренным')).toBeInTheDocument()
+  for (const box of screen.getAllByRole('checkbox')) expect(box).not.toBeChecked()
+  expect(screen.getByRole('button', { name: 'Отметить весь сериал просмотренным' })).toBeEnabled()
 })

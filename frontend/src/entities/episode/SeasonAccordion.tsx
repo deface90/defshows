@@ -31,8 +31,7 @@ export function SeasonAccordion({
             <Accordion.Control>
               {season.name || `Сезон ${season.season_number}`}{' '}
               <Text span c="dimmed" size="sm">
-                {watchedCount} / {season.episodes.length}
-                {allWatched ? ' ✓' : ''}
+                {tracked ? `${watchedCount} / ${season.episodes.length}${allWatched ? ' ✓' : ''}` : `${season.episodes.length} эпизодов`}
               </Text>
             </Accordion.Control>
             {tracked && (

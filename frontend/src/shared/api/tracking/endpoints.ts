@@ -29,6 +29,7 @@ import type {
   Settings,
   TrackedShow,
   TrackedShowList,
+  UpdateLinkRequest,
   UpdateSettingsRequest,
   UpdateShowRequest,
   UserShow
@@ -532,6 +533,100 @@ export function useRemoveShow<TData = Awaited<ReturnType<typeof removeShow>>, TE
 
 
 /**
+ * Atomic and idempotent. Preserves existing episode ratings and watch dates. Episodes added to the catalog later are not automatically watched.
+ * @summary Mark all catalogued episodes watched and set tracking status to completed
+ */
+export const watchShow = (
+    showId: number,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me/shows/${showId}/watch`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getWatchShowQueryKey = (showId: number,) => {
+    return [
+    'POST', `/me/shows/${showId}/watch`
+    ] as const;
+    }
+
+
+export const getWatchShowQueryOptions = <TData = Awaited<ReturnType<typeof watchShow>>, TError = ErrorResponse>(showId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getWatchShowQueryKey(showId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof watchShow>>> = ({ signal }) => watchShow(showId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: showId !== null && showId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof watchShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type WatchShowQueryResult = NonNullable<Awaited<ReturnType<typeof watchShow>>>
+export type WatchShowQueryError = ErrorResponse
+
+
+export function useWatchShow<TData = Awaited<ReturnType<typeof watchShow>>, TError = ErrorResponse>(
+ showId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof watchShow>>,
+          TError,
+          Awaited<ReturnType<typeof watchShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useWatchShow<TData = Awaited<ReturnType<typeof watchShow>>, TError = ErrorResponse>(
+ showId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof watchShow>>,
+          TError,
+          Awaited<ReturnType<typeof watchShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useWatchShow<TData = Awaited<ReturnType<typeof watchShow>>, TError = ErrorResponse>(
+ showId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Mark all catalogued episodes watched and set tracking status to completed
+ */
+
+export function useWatchShow<TData = Awaited<ReturnType<typeof watchShow>>, TError = ErrorResponse>(
+ showId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getWatchShowQueryOptions(showId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
  * @summary Mark an episode watched
  */
 export const watchEpisode = (
@@ -914,6 +1009,115 @@ export function useAddLink<TData = Awaited<ReturnType<typeof addLink>>, TError =
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getAddLinkQueryOptions(showId,addLinkRequest,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Update a reference link value (URL or plain text)
+ */
+export const updateLink = (
+    showId: number,
+    linkId: number,
+    updateLinkRequest: UpdateLinkRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me/shows/${showId}/links/${linkId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: updateLinkRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getUpdateLinkQueryKey = (showId: number,
+    linkId: number,
+    updateLinkRequest?: UpdateLinkRequest,) => {
+    return [
+    'PATCH', `/me/shows/${showId}/links/${linkId}`, updateLinkRequest
+    ] as const;
+    }
+
+
+export const getUpdateLinkQueryOptions = <TData = Awaited<ReturnType<typeof updateLink>>, TError = ErrorResponse>(showId: number,
+    linkId: number,
+    updateLinkRequest: UpdateLinkRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateLink>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getUpdateLinkQueryKey(showId,linkId,updateLinkRequest);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof updateLink>>> = ({ signal }) => updateLink(showId,linkId,updateLinkRequest, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: showId !== null && showId !== undefined && linkId !== null && linkId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof updateLink>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type UpdateLinkQueryResult = NonNullable<Awaited<ReturnType<typeof updateLink>>>
+export type UpdateLinkQueryError = ErrorResponse
+
+
+export function useUpdateLink<TData = Awaited<ReturnType<typeof updateLink>>, TError = ErrorResponse>(
+ showId: number,
+    linkId: number,
+    updateLinkRequest: UpdateLinkRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateLink>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof updateLink>>,
+          TError,
+          Awaited<ReturnType<typeof updateLink>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useUpdateLink<TData = Awaited<ReturnType<typeof updateLink>>, TError = ErrorResponse>(
+ showId: number,
+    linkId: number,
+    updateLinkRequest: UpdateLinkRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateLink>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof updateLink>>,
+          TError,
+          Awaited<ReturnType<typeof updateLink>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useUpdateLink<TData = Awaited<ReturnType<typeof updateLink>>, TError = ErrorResponse>(
+ showId: number,
+    linkId: number,
+    updateLinkRequest: UpdateLinkRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateLink>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Update a reference link value (URL or plain text)
+ */
+
+export function useUpdateLink<TData = Awaited<ReturnType<typeof updateLink>>, TError = ErrorResponse>(
+ showId: number,
+    linkId: number,
+    updateLinkRequest: UpdateLinkRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateLink>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getUpdateLinkQueryOptions(showId,linkId,updateLinkRequest,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

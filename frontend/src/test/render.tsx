@@ -10,7 +10,7 @@ import { theme } from '@/app/theme'
 export function renderWithProviders(ui: ReactElement, { route = '/' }: { route?: string } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <MantineProvider theme={theme} defaultColorScheme="dark">
+    <MantineProvider env="test" theme={theme} defaultColorScheme="dark">
       <Notifications />
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>

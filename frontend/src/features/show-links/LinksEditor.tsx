@@ -1,4 +1,4 @@
-import { ActionIcon, Anchor, Button, Group, Select, Stack, Text, TextInput } from '@mantine/core'
+import { ActionIcon, Anchor, Button, Group, Stack, Text, TextInput } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -7,12 +7,13 @@ import {
   deleteLink,
   getGetTrackedQueryKey,
   getListLinksQueryKey,
+  updateLink,
   updateShow,
   useListLinks,
 } from '@/shared/api/tracking/endpoints'
-import type { AddLinkRequestKind } from '@/shared/api/tracking/model'
+import type { AddLinkRequestKind, Link } from '@/shared/api/tracking/model'
 
-const kindOptions = [
+const kinds: { value: AddLinkRequestKind; label: string }[] = [
   { value: 'download', label: 'Скачать' },
   { value: 'streaming', label: 'Смотреть' },
   { value: 'wiki', label: 'Wiki' },
@@ -20,154 +21,130 @@ const kindOptions = [
   { value: 'kinopoisk', label: 'Kinopoisk' },
 ]
 
-function kindLabel(kind: string): string {
-  return kindOptions.find((o) => o.value === kind)?.label ?? kind
+function webURL(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'https:' || url.protocol === 'http:') && !!url.hostname
+  } catch {
+    return false
+  }
 }
 
-/**
- * LinksEditor shows the show's "where to watch / download / reference" links and
- * the preferred dubbing. It mirrors the prototype: a read-only view with an
- * "Edit" button that reveals the add/remove form and dubbing input.
- */
+function EditableRow({ label, value, isLink = false, onSave }: {
+  label: string
+  value: string
+  isLink?: boolean
+  onSave: (value: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const mutation = useMutation({
+    mutationFn: onSave,
+    onSuccess: () => setEditing(false),
+    onError: () => notifications.show({ message: `Не удалось сохранить: ${label}`, color: 'red' }),
+  })
+
+  return (
+    <Group gap="xs" align="center" wrap="wrap">
+      <Text size="sm" fw={600} w={100}>{label}</Text>
+      {editing ? (
+        <Group
+          component="form"
+          gap="xs"
+          style={{ flex: 1, minWidth: 200 }}
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!mutation.isPending) mutation.mutate(draft.trim())
+          }}
+        >
+          <TextInput
+            aria-label={label}
+            value={draft}
+            autoFocus
+            disabled={mutation.isPending}
+            style={{ flex: 1, minWidth: 120 }}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !mutation.isPending) setEditing(false)
+            }}
+          />
+          <ActionIcon type="submit" variant="light" loading={mutation.isPending} aria-label={`Сохранить: ${label}`} title="Сохранить">✓</ActionIcon>
+          <ActionIcon variant="subtle" disabled={mutation.isPending} onClick={() => setEditing(false)} aria-label={`Отменить: ${label}`} title="Отменить">✕</ActionIcon>
+        </Group>
+      ) : (
+        <>
+          {isLink && webURL(value) ? (
+            <Anchor href={value} target="_blank" rel="noopener noreferrer" size="sm" style={{ overflowWrap: 'anywhere', minWidth: 0 }}>
+              {value}
+            </Anchor>
+          ) : (
+            <Text size="sm" c={value ? undefined : 'dimmed'} style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{value || 'нет'}</Text>
+          )}
+          <ActionIcon
+            variant="subtle"
+            aria-label={`Редактировать: ${label}`}
+            title="Редактировать"
+            onClick={() => { setDraft(value); setEditing(true) }}
+          >✎</ActionIcon>
+        </>
+      )}
+    </Group>
+  )
+}
+
 export function LinksEditor({ showId, dubbing }: { showId: number; dubbing?: string }) {
   const queryClient = useQueryClient()
   const listQuery = useListLinks(showId)
-  const links = listQuery.data?.links ?? []
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListLinksQueryKey(showId) })
 
-  const [editing, setEditing] = useState(false)
-  const [kind, setKind] = useState<string>('download')
-  const [label, setLabel] = useState('')
-  const [url, setUrl] = useState('')
-  const [dub, setDub] = useState(dubbing ?? '')
+  const saveLink = async (kind: AddLinkRequestKind | undefined, link: Link | undefined, value: string) => {
+    if (link) {
+      if (value) await updateLink(showId, link.id, { url: value })
+      else await deleteLink(showId, link.id)
+    } else if (value && kind) {
+      await addLink(showId, { kind, url: value })
+    }
+    await queryClient.invalidateQueries({ queryKey: getListLinksQueryKey(showId) })
+  }
 
-  const add = useMutation({
-    mutationFn: () => addLink(showId, { kind: kind as AddLinkRequestKind, label, url }),
-    onSuccess: () => {
-      setLabel('')
-      setUrl('')
-      invalidate()
-    },
-    onError: () => notifications.show({ message: 'Не удалось добавить ссылку', color: 'red' }),
-  })
-
-  const remove = useMutation({
-    mutationFn: (linkId: number) => deleteLink(showId, linkId),
-    onSuccess: invalidate,
-  })
-
-  const saveDubbing = useMutation({
-    mutationFn: () => updateShow(showId, { preferred_dubbing: dub }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: getGetTrackedQueryKey(showId) })
-      notifications.show({ message: 'Озвучка сохранена', color: 'teal' })
-    },
-    onError: () => notifications.show({ message: 'Не удалось сохранить', color: 'red' }),
-  })
-
-  if (!editing) {
-    return (
-      <Stack gap="sm">
-        <Group justify="space-between">
-          <Text fw={600}>Ссылки</Text>
-          <Button variant="default" size="xs" onClick={() => setEditing(true)}>
-            Редактировать
-          </Button>
-        </Group>
-        {links.length === 0 && !dubbing ? (
-          <Text c="dimmed" size="sm">
-            Ссылки не добавлены
-          </Text>
-        ) : (
-          <>
-            {links.length > 0 && (
-              <Group gap="xs">
-                {links.map((link) => (
-                  <Anchor
-                    key={link.id}
-                    href={link.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    size="sm"
-                    style={{
-                      padding: '6px 11px',
-                      borderRadius: 9,
-                      background: 'var(--mantine-color-default-hover)',
-                    }}
-                  >
-                    {link.label || kindLabel(link.kind)} ↗
-                  </Anchor>
-                ))}
-              </Group>
-            )}
-            {dubbing && (
-              <Text size="sm" c="dimmed">
-                Озвучка: {dubbing}
-              </Text>
-            )}
-          </>
-        )}
-      </Stack>
-    )
+  const saveDubbing = async (value: string) => {
+    await updateShow(showId, { preferred_dubbing: value })
+    await queryClient.invalidateQueries({ queryKey: getGetTrackedQueryKey(showId) })
   }
 
   return (
     <Stack gap="sm">
-      <Group justify="space-between">
-        <Text fw={600}>Ссылки</Text>
-        <Button size="xs" onClick={() => setEditing(false)}>
-          Готово
-        </Button>
-      </Group>
-
-      {links.map((link) => (
-        <Group key={link.id} justify="space-between">
-          <Anchor href={link.url} target="_blank" rel="noreferrer" size="sm">
-            [{link.kind}] {link.label || link.url}
-          </Anchor>
-          <ActionIcon
-            variant="subtle"
-            color="red"
-            onClick={() => remove.mutate(link.id)}
-            aria-label="Удалить"
-          >
-            ✕
-          </ActionIcon>
+      {listQuery.isLoading ? <Text size="sm" c="dimmed">Загрузка ссылок…</Text> : listQuery.isError ? (
+        <Group>
+          <Text size="sm" c="red">Не удалось загрузить ссылки</Text>
+          <Button size="xs" variant="subtle" onClick={() => listQuery.refetch()}>Повторить</Button>
         </Group>
-      ))}
-
-      <Group align="flex-end" gap="xs">
-        <Select
-          w={130}
-          data={kindOptions}
-          value={kind}
-          onChange={(v) => v && setKind(v)}
-          aria-label="Тип ссылки"
-        />
-        <TextInput placeholder="Название" value={label} onChange={(e) => setLabel(e.currentTarget.value)} />
-        <TextInput
-          placeholder="URL"
-          style={{ flex: 1 }}
-          value={url}
-          onChange={(e) => setUrl(e.currentTarget.value)}
-        />
-        <Button onClick={() => add.mutate()} loading={add.isPending} disabled={!url}>
-          Добавить
-        </Button>
-      </Group>
-
-      <Group align="flex-end" gap="xs">
-        <TextInput
-          label="Озвучка"
-          placeholder="напр. LostFilm"
-          style={{ flex: 1 }}
-          value={dub}
-          onChange={(e) => setDub(e.currentTarget.value)}
-        />
-        <Button variant="default" onClick={() => saveDubbing.mutate()} loading={saveDubbing.isPending}>
-          Сохранить озвучку
-        </Button>
-      </Group>
+      ) : kinds.flatMap((kind) => {
+        const links = listQuery.data?.links.filter((link) => link.kind === kind.value) ?? []
+        if (links.length === 0) return [
+          <EditableRow key={kind.value} label={kind.label} value="" isLink onSave={(value) => saveLink(kind.value, undefined, value)} />,
+        ]
+        return links.map((link) => (
+          <EditableRow
+            key={link.id}
+            label={link.label ? `${kind.label} · ${link.label}` : kind.label}
+            value={link.url}
+            isLink
+            onSave={(value) => saveLink(kind.value, link, value)}
+          />
+        ))
+      })}
+      {!listQuery.isError && listQuery.data?.links
+        .filter((link) => !kinds.some((kind) => kind.value === link.kind))
+        .map((link) => (
+          <EditableRow
+            key={link.id}
+            label={link.label || link.kind}
+            value={link.url}
+            isLink
+            onSave={(value) => saveLink(undefined, link, value)}
+          />
+        ))}
+      <EditableRow label="Озвучка" value={dubbing ?? ''} onSave={saveDubbing} />
     </Stack>
   )
 }

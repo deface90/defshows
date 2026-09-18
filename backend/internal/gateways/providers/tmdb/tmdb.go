@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	tmdbclient "github.com/deface90/defshows/backend/pkg/clients/tmdb"
@@ -21,9 +22,12 @@ const (
 
 // Provider is the TMDB-backed ShowProvider.
 type Provider struct {
-	client   *tmdbclient.ClientWithResponses
-	apiKey   string
-	language string
+	filtersMu     sync.Mutex
+	filters       provider.DiscoveryFilters
+	filtersExpiry time.Time
+	client        *tmdbclient.ClientWithResponses
+	apiKey        string
+	language      string
 }
 
 var _ provider.ShowProvider = (*Provider)(nil)
@@ -69,23 +73,7 @@ func (p *Provider) SearchShows(ctx context.Context, query string) ([]provider.Sh
 	if resp.JSON200 == nil {
 		return nil, fmt.Errorf("tmdb: search: unexpected status %d", resp.StatusCode())
 	}
-	var out []provider.ShowSummary
-	if resp.JSON200.Results != nil {
-		for _, r := range *resp.JSON200.Results {
-			out = append(out, provider.ShowSummary{
-				TMDBID:        val(r.Id),
-				Title:         val(r.Name),
-				OriginalTitle: val(r.OriginalName),
-				Overview:      val(r.Overview),
-				PosterURL:     imageURL(r.PosterPath),
-				FirstAirDate:  parseDate(r.FirstAirDate),
-				Popularity:    float64(val(r.Popularity)),
-				VoteAverage:   float64(val(r.VoteAverage)),
-				VoteCount:     val(r.VoteCount),
-			})
-		}
-	}
-	return out, nil
+	return summaries(resp.JSON200.Results), nil
 }
 
 // GetShow fetches full series detail.

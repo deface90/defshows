@@ -15,6 +15,13 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Country defines model for Country.
+type Country struct {
+	EnglishName string  `json:"english_name"`
+	Iso31661    string  `json:"iso_3166_1"`
+	NativeName  *string `json:"native_name,omitempty"`
+}
+
 // Genre defines model for Genre.
 type Genre struct {
 	Id   *int64  `json:"id,omitempty"`
@@ -31,6 +38,14 @@ type TvEpisode struct {
 	Runtime       *int    `json:"runtime,omitempty"`
 	SeasonNumber  *int    `json:"season_number,omitempty"`
 	StillPath     *string `json:"still_path,omitempty"`
+}
+
+// TvGenreList defines model for TvGenreList.
+type TvGenreList struct {
+	Genres []struct {
+		Id   int64  `json:"id"`
+		Name string `json:"name"`
+	} `json:"genres"`
 }
 
 // TvSearchPage defines model for TvSearchPage.
@@ -178,6 +193,15 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// Countries performs a GET /configuration/countries (the `Countries` operationId) request.
+	Countries(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DiscoverTv performs a GET /discover/tv (the `DiscoverTv` operationId) request.
+	DiscoverTv(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TvGenres performs a GET /genre/tv/list (the `TvGenres` operationId) request.
+	TvGenres(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SearchTv performs a GET /search/tv (the `SearchTv` operationId) request.
 	SearchTv(ctx context.Context, params *SearchTvParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -186,6 +210,45 @@ type ClientInterface interface {
 
 	// GetTvSeason performs a GET /tv/{series_id}/season/{season_number} (the `GetTvSeason` operationId) request.
 	GetTvSeason(ctx context.Context, seriesId int64, seasonNumber int, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// Countries performs a GET /configuration/countries (the `Countries` operationId) request.
+func (c *Client) Countries(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCountriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DiscoverTv performs a GET /discover/tv (the `DiscoverTv` operationId) request.
+func (c *Client) DiscoverTv(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDiscoverTvRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TvGenres performs a GET /genre/tv/list (the `TvGenres` operationId) request.
+func (c *Client) TvGenres(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTvGenresRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // SearchTv performs a GET /search/tv (the `SearchTv` operationId) request.
@@ -225,6 +288,87 @@ func (c *Client) GetTvSeason(ctx context.Context, seriesId int64, seasonNumber i
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewCountriesRequest constructs an http.Request for the Countries method
+func NewCountriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/configuration/countries")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDiscoverTvRequest constructs an http.Request for the DiscoverTv method
+func NewDiscoverTvRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/discover/tv")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewTvGenresRequest constructs an http.Request for the TvGenres method
+func NewTvGenresRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/genre/tv/list")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewSearchTvRequest constructs an http.Request for the SearchTv method
@@ -408,6 +552,21 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// CountriesWithResponse performs a GET /configuration/countries (the `Countries` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	CountriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CountriesResponse, error)
+
+	// DiscoverTvWithResponse performs a GET /discover/tv (the `DiscoverTv` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	DiscoverTvWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DiscoverTvResponse, error)
+
+	// TvGenresWithResponse performs a GET /genre/tv/list (the `TvGenres` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	TvGenresWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*TvGenresResponse, error)
+
 	// SearchTvWithResponse performs a GET /search/tv (the `SearchTv` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -422,6 +581,129 @@ type ClientWithResponsesInterface interface {
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetTvSeasonWithResponse(ctx context.Context, seriesId int64, seasonNumber int, reqEditors ...RequestEditorFn) (*GetTvSeasonResponse, error)
+}
+
+type CountriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]Country
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CountriesResponse) GetJSON200() *[]Country {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r CountriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CountriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CountriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CountriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DiscoverTvResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TvSearchPage
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DiscoverTvResponse) GetJSON200() *TvSearchPage {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r DiscoverTvResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DiscoverTvResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DiscoverTvResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DiscoverTvResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type TvGenresResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TvGenreList
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r TvGenresResponse) GetJSON200() *TvGenreList {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r TvGenresResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TvGenresResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TvGenresResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TvGenresResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type SearchTvResponse struct {
@@ -547,6 +829,39 @@ func (r GetTvSeasonResponse) ContentType() string {
 	return ""
 }
 
+// CountriesWithResponse performs a GET /configuration/countries (the `Countries` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) CountriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CountriesResponse, error) {
+	rsp, err := c.Countries(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCountriesResponse(rsp)
+}
+
+// DiscoverTvWithResponse performs a GET /discover/tv (the `DiscoverTv` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) DiscoverTvWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DiscoverTvResponse, error) {
+	rsp, err := c.DiscoverTv(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDiscoverTvResponse(rsp)
+}
+
+// TvGenresWithResponse performs a GET /genre/tv/list (the `TvGenres` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) TvGenresWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*TvGenresResponse, error) {
+	rsp, err := c.TvGenres(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTvGenresResponse(rsp)
+}
+
 // SearchTvWithResponse performs a GET /search/tv (the `SearchTv` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -578,6 +893,84 @@ func (c *ClientWithResponses) GetTvSeasonWithResponse(ctx context.Context, serie
 		return nil, err
 	}
 	return ParseGetTvSeasonResponse(rsp)
+}
+
+// ParseCountriesResponse parses an HTTP response from a CountriesWithResponse call
+func ParseCountriesResponse(rsp *http.Response) (*CountriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CountriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Country
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDiscoverTvResponse parses an HTTP response from a DiscoverTvWithResponse call
+func ParseDiscoverTvResponse(rsp *http.Response) (*DiscoverTvResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DiscoverTvResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TvSearchPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTvGenresResponse parses an HTTP response from a TvGenresWithResponse call
+func ParseTvGenresResponse(rsp *http.Response) (*TvGenresResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TvGenresResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TvGenreList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseSearchTvResponse parses an HTTP response from a SearchTvWithResponse call

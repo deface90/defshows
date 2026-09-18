@@ -71,6 +71,16 @@ paths:
       parameters: [{ $ref: '#/components/parameters/ShowId' }]
       responses:
         '204': { description: No Content }
+  /me/shows/{showId}/watch:
+    post:
+      operationId: watchShow
+      summary: Mark all catalogued episodes watched and set tracking status to completed
+      description: Atomic and idempotent. Preserves existing episode ratings and watch dates. Episodes added to the catalog later are not automatically watched.
+      parameters: [{ $ref: '#/components/parameters/ShowId' }]
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /me/shows/{showId}/episodes/{episodeId}/watch:
     post:
       operationId: watchEpisode
@@ -119,6 +129,23 @@ paths:
               schema: { $ref: '#/components/schemas/Link' }
         '404': { $ref: '#/components/responses/Error' }
   /me/shows/{showId}/links/{linkId}:
+    patch:
+      operationId: updateLink
+      summary: Update a reference link value (URL or plain text)
+      parameters:
+        - { $ref: '#/components/parameters/ShowId' }
+        - name: linkId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateLinkRequest' }
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/Error' }
     delete:
       operationId: deleteLink
       summary: Delete a reference link
@@ -209,8 +236,11 @@ components:
         vote_count: { type: integer, format: int64 }
     Progress:
       type: object
-      required: [watched, total]
+      required: [watched, total, watched_episode_ids]
       properties:
+        watched_episode_ids:
+          type: array
+          items: { type: integer, format: int64 }
         watched: { type: integer }
         total: { type: integer }
         next_unwatched_episode_id: { type: integer, format: int64, nullable: true }
@@ -241,6 +271,11 @@ components:
         id: { type: integer, format: int64 }
         kind: { type: string, enum: [download, streaming, wiki, imdb, kinopoisk] }
         label: { type: string }
+        url: { type: string }
+    UpdateLinkRequest:
+      type: object
+      required: [url]
+      properties:
         url: { type: string }
     AddLinkRequest:
       type: object

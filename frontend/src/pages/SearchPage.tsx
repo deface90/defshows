@@ -1,3 +1,4 @@
+import { useListTracked } from '@/shared/api/tracking/endpoints'
 import { SimpleGrid, Stack, TextInput, Title } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 import { useState } from 'react'
@@ -11,6 +12,7 @@ export function SearchPage() {
   const [debounced] = useDebouncedValue(q, 400)
   const enabled = debounced.trim().length >= 3
 
+  const trackedQuery = useListTracked(undefined, { query: { enabled, retry: false } })
   const query = useSearchShows({ q: debounced }, { query: { enabled, retry: false } })
 
   return (
@@ -32,7 +34,18 @@ export function SearchPage() {
       {enabled && query.isSuccess && query.data.results.length > 0 && (
         <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }}>
           {query.data.results.map((show) => (
-            <ShowCard key={show.tmdb_id} show={show} action={<AddShowButton tmdbId={show.tmdb_id} />} />
+            <ShowCard
+              key={show.tmdb_id}
+              show={show}
+              to={`/catalog/${show.tmdb_id}`}
+              action={
+                <AddShowButton
+                  tmdbId={show.tmdb_id}
+                  disabled={!trackedQuery.isSuccess}
+                  addedShowId={trackedQuery.data?.tracked.find((item) => item.show.tmdb_id === show.tmdb_id)?.show.id}
+                />
+              }
+            />
           ))}
         </SimpleGrid>
       )}

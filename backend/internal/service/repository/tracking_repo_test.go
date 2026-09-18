@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/deface90/defshows/backend/internal/service/entity"
 	"github.com/deface90/defshows/backend/internal/service/repository"
@@ -94,6 +95,43 @@ func TestTrackingRepository(t *testing.T) {
 		t.Fatalf("want 0 watched after unmark, got %v", ids)
 	}
 
+	// Bulk mark preserves existing ratings and dates, and is scoped to the owner.
+	watchedAt := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	rating := 8
+	if err := repo.UpsertUserEpisode(ctx, &entity.UserEpisode{UserShowID: us.ID, EpisodeID: ep1.ID, Watched: true, WatchedAt: &watchedAt, Rating: &rating}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.WatchShow(ctx, user.ID+100000, show.ID); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("foreign user: %v", err)
+	}
+	if ids, _ := repo.WatchedEpisodeIDs(ctx, us.ID); len(ids) != 1 {
+		t.Fatal("foreign request changed marks")
+	}
+	for i := 0; i < 2; i++ {
+		if err := repo.WatchShow(ctx, user.ID, show.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if ids, _ := repo.WatchedEpisodeIDs(ctx, us.ID); len(ids) != 2 {
+		t.Fatalf("bulk watched IDs: %v", ids)
+	}
+	var saved entity.UserEpisode
+	if err := gdb.Where("user_show_id = ? AND episode_id = ?", us.ID, ep1.ID).First(&saved).Error; err != nil {
+		t.Fatal(err)
+	}
+	if saved.Rating == nil || *saved.Rating != rating || saved.WatchedAt == nil || !saved.WatchedAt.Equal(watchedAt) {
+		t.Fatalf("bulk mark overwrote history: %+v", saved)
+	}
+	if err := repo.UpsertUserEpisode(ctx, &entity.UserEpisode{UserShowID: us.ID, EpisodeID: ep2.ID, Watched: false}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.WatchShow(ctx, user.ID, show.ID); err != nil {
+		t.Fatal(err)
+	}
+	if ids, _ := repo.WatchedEpisodeIDs(ctx, us.ID); len(ids) != 2 {
+		t.Fatalf("bulk mark failed to restore unwatched episode: %v", ids)
+	}
+
 	// Links.
 	link := &entity.UserShowLink{UserShowID: us.ID, Kind: entity.LinkStreaming, Label: "LostFilm", URL: "https://x"}
 	if err := repo.AddLink(ctx, link); err != nil {
@@ -102,6 +140,16 @@ func TestTrackingRepository(t *testing.T) {
 	links, _ := repo.ListLinks(ctx, us.ID)
 	if len(links) != 1 {
 		t.Fatalf("want 1 link, got %d", len(links))
+	}
+	if err := repo.UpdateLink(ctx, us.ID+100000, link.ID, "foreign"); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("foreign link update: %v", err)
+	}
+	if err := repo.UpdateLink(ctx, us.ID, link.ID, "На диске"); err != nil {
+		t.Fatal(err)
+	}
+	links, err = repo.ListLinks(ctx, us.ID)
+	if err != nil || len(links) != 1 || links[0].ID != link.ID || links[0].URL != "На диске" || links[0].Label != "LostFilm" || links[0].Kind != entity.LinkStreaming {
+		t.Fatalf("updated links: %+v, %v", links, err)
 	}
 	if err := repo.DeleteLink(ctx, us.ID, link.ID); err != nil {
 		t.Fatalf("delete link: %v", err)

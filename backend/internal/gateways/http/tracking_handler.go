@@ -262,7 +262,7 @@ func toAPIShowRef(s *entity.Show) trackingapi.ShowRef {
 }
 
 func toAPIProgress(p usecase.Progress) trackingapi.Progress {
-	prog := trackingapi.Progress{Watched: p.Watched, Total: p.Total}
+	prog := trackingapi.Progress{Watched: p.Watched, Total: p.Total, WatchedEpisodeIds: append([]int64{}, p.WatchedEpisodeIDs...)}
 	if p.NextUnwatched != nil {
 		id := p.NextUnwatched.ID
 		prog.NextUnwatchedEpisodeId = &id
@@ -286,4 +286,32 @@ func toAPILink(l *entity.UserShowLink) trackingapi.Link {
 		Label: &label,
 		Url:   l.URL,
 	}
+}
+
+// WatchShow handles POST /me/shows/{showId}/watch.
+func (h *TrackingHandler) WatchShow(c echo.Context, showID trackingapi.ShowId) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	if err := h.uc.WatchShow(c.Request().Context(), uid, showID); err != nil {
+		return trackingErr(err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// UpdateLink handles PATCH /me/shows/{showId}/links/{linkId}.
+func (h *TrackingHandler) UpdateLink(c echo.Context, showID trackingapi.ShowId, linkID int64) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	var req trackingapi.UpdateLinkRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if err := h.uc.UpdateLink(c.Request().Context(), uid, showID, linkID, req.Url); err != nil {
+		return trackingErr(err)
+	}
+	return c.NoContent(http.StatusNoContent)
 }

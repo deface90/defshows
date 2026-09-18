@@ -188,9 +188,10 @@ type LinkList struct {
 
 // Progress defines model for Progress.
 type Progress struct {
-	NextUnwatchedEpisodeId *int64 `json:"next_unwatched_episode_id,omitempty"`
-	Total                  int    `json:"total"`
-	Watched                int    `json:"watched"`
+	NextUnwatchedEpisodeId *int64  `json:"next_unwatched_episode_id,omitempty"`
+	Total                  int     `json:"total"`
+	Watched                int     `json:"watched"`
+	WatchedEpisodeIds      []int64 `json:"watched_episode_ids"`
 }
 
 // Settings defines model for Settings.
@@ -225,6 +226,11 @@ type TrackedShow struct {
 // TrackedShowList defines model for TrackedShowList.
 type TrackedShowList struct {
 	Tracked []TrackedShow `json:"tracked"`
+}
+
+// UpdateLinkRequest defines model for UpdateLinkRequest.
+type UpdateLinkRequest struct {
+	Url string `json:"url"`
 }
 
 // UpdateSettingsRequest defines model for UpdateSettingsRequest.
@@ -278,6 +284,9 @@ type UpdateShowJSONRequestBody = UpdateShowRequest
 // AddLinkJSONRequestBody defines body for AddLink for application/json ContentType.
 type AddLinkJSONRequestBody = AddLinkRequest
 
+// UpdateLinkJSONRequestBody defines body for UpdateLink for application/json ContentType.
+type UpdateLinkJSONRequestBody = UpdateLinkRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetSettings Get user settings
@@ -316,6 +325,12 @@ type ServerInterface interface {
 	// DeleteLink Delete a reference link
 	// (DELETE /me/shows/{showId}/links/{linkId})
 	DeleteLink(ctx echo.Context, showId ShowId, linkId int64) error
+	// UpdateLink Update a reference link value (URL or plain text)
+	// (PATCH /me/shows/{showId}/links/{linkId})
+	UpdateLink(ctx echo.Context, showId ShowId, linkId int64) error
+	// WatchShow Mark all catalogued episodes watched and set tracking status to completed
+	// (POST /me/shows/{showId}/watch)
+	WatchShow(ctx echo.Context, showId ShowId) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -520,6 +535,46 @@ func (w *ServerInterfaceWrapper) DeleteLink(ctx echo.Context) error {
 	return err
 }
 
+// UpdateLink converts echo context to params.
+func (w *ServerInterfaceWrapper) UpdateLink(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "showId" -------------
+	var showId ShowId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "showId", ctx.Param("showId"), &showId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter showId: %s", err))
+	}
+
+	// ------------- Path parameter "linkId" -------------
+	var linkId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "linkId", ctx.Param("linkId"), &linkId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter linkId: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpdateLink(ctx, showId, linkId)
+	return err
+}
+
+// WatchShow converts echo context to params.
+func (w *ServerInterfaceWrapper) WatchShow(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "showId" -------------
+	var showId ShowId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "showId", ctx.Param("showId"), &showId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter showId: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.WatchShow(ctx, showId)
+	return err
+}
+
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -572,11 +627,13 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.DELETE(options.BaseURL+"/me/shows/:showId", wrapper.RemoveShow, options.OperationMiddlewares["removeShow"]...)
 	router.GET(options.BaseURL+"/me/shows/:showId", wrapper.GetTracked, options.OperationMiddlewares["getTracked"]...)
 	router.PATCH(options.BaseURL+"/me/shows/:showId", wrapper.UpdateShow, options.OperationMiddlewares["updateShow"]...)
+	router.POST(options.BaseURL+"/me/shows/:showId/watch", wrapper.WatchShow, options.OperationMiddlewares["watchShow"]...)
 	router.DELETE(options.BaseURL+"/me/shows/:showId/episodes/:episodeId/watch", wrapper.UnwatchEpisode, options.OperationMiddlewares["unwatchEpisode"]...)
 	router.POST(options.BaseURL+"/me/shows/:showId/episodes/:episodeId/watch", wrapper.WatchEpisode, options.OperationMiddlewares["watchEpisode"]...)
 	router.GET(options.BaseURL+"/me/shows/:showId/links", wrapper.ListLinks, options.OperationMiddlewares["listLinks"]...)
 	router.POST(options.BaseURL+"/me/shows/:showId/links", wrapper.AddLink, options.OperationMiddlewares["addLink"]...)
 	router.DELETE(options.BaseURL+"/me/shows/:showId/links/:linkId", wrapper.DeleteLink, options.OperationMiddlewares["deleteLink"]...)
+	router.PATCH(options.BaseURL+"/me/shows/:showId/links/:linkId", wrapper.UpdateLink, options.OperationMiddlewares["updateLink"]...)
 	router.GET(options.BaseURL+"/me/settings", wrapper.GetSettings, options.OperationMiddlewares["getSettings"]...)
 	router.PATCH(options.BaseURL+"/me/settings", wrapper.UpdateSettings, options.OperationMiddlewares["updateSettings"]...)
 
@@ -587,29 +644,32 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -5,6 +5,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './discoverShowsParams';
+export * from './discoverShowsSort';
+export * from './discoveryFilters';
+export * from './discoveryFiltersCountriesItem';
+export * from './discoveryFiltersGenresItem';
+export * from './discoveryResults';
 export * from './episode';
 export * from './error';
 export * from './errorResponse';

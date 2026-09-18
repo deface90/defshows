@@ -127,6 +127,60 @@ func TestWebSlice_EndToEnd(t *testing.T) {
 		t.Fatalf("unexpected progress: %+v", ts.Progress)
 	}
 
+	// Whole-show marking is idempotent and requires ownership/authentication.
+	watchPath := "/me/shows/" + strconv.FormatInt(showID, 10) + "/watch"
+	if rec := doJSON(t, e, http.MethodPost, watchPath, "", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated watch: %d", rec.Code)
+	}
+	if rec := doJSON(t, e, http.MethodPost, "/me/shows/999999/watch", token, nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("missing tracked show: %d", rec.Code)
+	}
+	for i := 0; i < 2; i++ {
+		if rec := doJSON(t, e, http.MethodPost, watchPath, token, nil); rec.Code != http.StatusNoContent {
+			t.Fatalf("watch show: %d (%s)", rec.Code, rec.Body.String())
+		}
+	}
+	rec = doJSON(t, e, http.MethodGet, "/me/shows/"+strconv.FormatInt(showID, 10), token, nil)
+	var completedShow trackingapi.TrackedShow
+	if err := json.Unmarshal(rec.Body.Bytes(), &completedShow); err != nil {
+		t.Fatal(err)
+	}
+	if completedShow.Progress.Watched != 2 || len(completedShow.Progress.WatchedEpisodeIds) != 2 || completedShow.Progress.NextUnwatchedEpisodeId != nil || completedShow.UserShow.Status != "completed" {
+		t.Fatalf("whole show progress: %+v", completedShow)
+	}
+
+	// A reference value can be edited without recreating the link.
+	linksPath := "/me/shows/" + strconv.FormatInt(showID, 10) + "/links"
+	rec = doJSON(t, e, http.MethodPost, linksPath, token, map[string]string{"kind": "wiki", "url": "https://example.com", "label": "Reference"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("add link: %d (%s)", rec.Code, rec.Body.String())
+	}
+	var link trackingapi.Link
+	if err := json.Unmarshal(rec.Body.Bytes(), &link); err != nil {
+		t.Fatal(err)
+	}
+	linkPath := linksPath + "/" + strconv.FormatInt(link.Id, 10)
+	rec = doJSON(t, e, http.MethodPatch, linkPath, "", map[string]string{"url": "text"})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated edit: %d", rec.Code)
+	}
+	rec = doJSON(t, e, http.MethodPatch, linkPath, token, map[string]string{"url": "На диске"})
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("edit link: %d (%s)", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, e, http.MethodGet, linksPath, token, nil)
+	var links trackingapi.LinkList
+	if err := json.Unmarshal(rec.Body.Bytes(), &links); err != nil {
+		t.Fatal(err)
+	}
+	if len(links.Links) != 1 || links.Links[0].Id != link.Id || links.Links[0].Url != "На диске" {
+		t.Fatalf("links after edit: %+v", links)
+	}
+	rec = doJSON(t, e, http.MethodPatch, linksPath+"/999999", token, map[string]string{"url": "text"})
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing link: %d", rec.Code)
+	}
+
 	// Update status → completed.
 	rec = doJSON(t, e, http.MethodPatch, "/me/shows/"+strconv.FormatInt(showID, 10), token,
 		map[string]string{"status": "completed"})

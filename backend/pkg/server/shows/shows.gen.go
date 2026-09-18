@@ -42,6 +42,47 @@ func (e ShowAiringStatus) Valid() bool {
 	}
 }
 
+// Defines values for DiscoverShowsParamsSort.
+const (
+	FirstAirDateDesc DiscoverShowsParamsSort = "first_air_date.desc"
+	PopularityDesc   DiscoverShowsParamsSort = "popularity.desc"
+	VoteAverageDesc  DiscoverShowsParamsSort = "vote_average.desc"
+)
+
+// Valid indicates whether the value is a known member of the DiscoverShowsParamsSort enum.
+func (e DiscoverShowsParamsSort) Valid() bool {
+	switch e {
+	case FirstAirDateDesc:
+		return true
+	case PopularityDesc:
+		return true
+	case VoteAverageDesc:
+		return true
+	default:
+		return false
+	}
+}
+
+// DiscoveryFilters defines model for DiscoveryFilters.
+type DiscoveryFilters struct {
+	Countries []struct {
+		Code string `json:"code"`
+		Name string `json:"name"`
+	} `json:"countries"`
+	Genres []struct {
+		Id   int64  `json:"id"`
+		Name string `json:"name"`
+	} `json:"genres"`
+}
+
+// DiscoveryResults defines model for DiscoveryResults.
+type DiscoveryResults struct {
+	Page         int           `json:"page"`
+	Results      []ShowSummary `json:"results"`
+	TotalPages   int           `json:"total_pages"`
+	TotalResults int           `json:"total_results"`
+}
+
 // Episode defines model for Episode.
 type Episode struct {
 	AirDate       *string `json:"air_date,omitempty"`
@@ -145,6 +186,22 @@ type ListShowsParams struct {
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 }
 
+// DiscoverShowsParams defines parameters for DiscoverShows.
+type DiscoverShowsParams struct {
+	Country   *string                  `form:"country,omitempty" json:"country,omitempty"`
+	Genres    *string                  `form:"genres,omitempty" json:"genres,omitempty"`
+	RatingMin *float64                 `form:"rating_min,omitempty" json:"rating_min,omitempty"`
+	RatingMax *float64                 `form:"rating_max,omitempty" json:"rating_max,omitempty"`
+	VotesMin  *int                     `form:"votes_min,omitempty" json:"votes_min,omitempty"`
+	DateFrom  *string                  `form:"date_from,omitempty" json:"date_from,omitempty"`
+	DateTo    *string                  `form:"date_to,omitempty" json:"date_to,omitempty"`
+	Page      *int                     `form:"page,omitempty" json:"page,omitempty"`
+	Sort      *DiscoverShowsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// DiscoverShowsParamsSort defines parameters for DiscoverShows.
+type DiscoverShowsParamsSort string
+
 // SearchShowsParams defines parameters for SearchShows.
 type SearchShowsParams struct {
 	Q string `form:"q" json:"q"`
@@ -158,12 +215,21 @@ type ServerInterface interface {
 	// ListShows List/search the local catalog
 	// (GET /shows)
 	ListShows(ctx echo.Context, params ListShowsParams) error
+	// DiscoverShows Discover TV shows by country, genres, TMDB rating and premiere dates
+	// (GET /shows/discover)
+	DiscoverShows(ctx echo.Context, params DiscoverShowsParams) error
+	// GetDiscoveryFilters TV genres and countries from TMDB
+	// (GET /shows/discover/filters)
+	GetDiscoveryFilters(ctx echo.Context) error
 	// ImportShow Import a show from TMDB into the local catalog
 	// (POST /shows/import)
 	ImportShow(ctx echo.Context) error
 	// SearchShows Search TMDB for shows to add
 	// (GET /shows/search)
 	SearchShows(ctx echo.Context, params SearchShowsParams) error
+	// GetShowByTMDB Show detail by TMDB ID, importing into the catalog on first view
+	// (GET /shows/tmdb/{tmdb_id})
+	GetShowByTMDB(ctx echo.Context, tmdbId int64) error
 	// GetShow Local show detail
 	// (GET /shows/{id})
 	GetShow(ctx echo.Context, id int64) error
@@ -192,6 +258,89 @@ func (w *ServerInterfaceWrapper) ListShows(ctx echo.Context) error {
 	return err
 }
 
+// DiscoverShows converts echo context to params.
+func (w *ServerInterfaceWrapper) DiscoverShows(ctx echo.Context) error {
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DiscoverShowsParams
+	// ------------- Optional query parameter "country" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "country", ctx.QueryParams(), &params.Country, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter country: %s", err))
+	}
+
+	// ------------- Optional query parameter "genres" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "genres", ctx.QueryParams(), &params.Genres, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter genres: %s", err))
+	}
+
+	// ------------- Optional query parameter "rating_min" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "rating_min", ctx.QueryParams(), &params.RatingMin, runtime.BindQueryParameterOptions{Type: "number", Format: "double"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter rating_min: %s", err))
+	}
+
+	// ------------- Optional query parameter "rating_max" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "rating_max", ctx.QueryParams(), &params.RatingMax, runtime.BindQueryParameterOptions{Type: "number", Format: "double"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter rating_max: %s", err))
+	}
+
+	// ------------- Optional query parameter "votes_min" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "votes_min", ctx.QueryParams(), &params.VotesMin, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter votes_min: %s", err))
+	}
+
+	// ------------- Optional query parameter "date_from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "date_from", ctx.QueryParams(), &params.DateFrom, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter date_from: %s", err))
+	}
+
+	// ------------- Optional query parameter "date_to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "date_to", ctx.QueryParams(), &params.DateTo, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter date_to: %s", err))
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", ctx.QueryParams(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page: %s", err))
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", ctx.QueryParams(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter sort: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.DiscoverShows(ctx, params)
+	return err
+}
+
+// GetDiscoveryFilters converts echo context to params.
+func (w *ServerInterfaceWrapper) GetDiscoveryFilters(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetDiscoveryFilters(ctx)
+	return err
+}
+
 // ImportShow converts echo context to params.
 func (w *ServerInterfaceWrapper) ImportShow(ctx echo.Context) error {
 	var err error
@@ -216,6 +365,22 @@ func (w *ServerInterfaceWrapper) SearchShows(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.SearchShows(ctx, params)
+	return err
+}
+
+// GetShowByTMDB converts echo context to params.
+func (w *ServerInterfaceWrapper) GetShowByTMDB(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "tmdb_id" -------------
+	var tmdbId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tmdb_id", ctx.Param("tmdb_id"), &tmdbId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter tmdb_id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetShowByTMDB(ctx, tmdbId)
 	return err
 }
 
@@ -282,7 +447,10 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 		Handler: si,
 	}
 
+	router.GET(options.BaseURL+"/shows/discover/filters", wrapper.GetDiscoveryFilters, options.OperationMiddlewares["getDiscoveryFilters"]...)
+	router.GET(options.BaseURL+"/shows/discover", wrapper.DiscoverShows, options.OperationMiddlewares["discoverShows"]...)
 	router.GET(options.BaseURL+"/shows/search", wrapper.SearchShows, options.OperationMiddlewares["searchShows"]...)
+	router.GET(options.BaseURL+"/shows/tmdb/:tmdb_id", wrapper.GetShowByTMDB, options.OperationMiddlewares["getShowByTMDB"]...)
 	router.POST(options.BaseURL+"/shows/import", wrapper.ImportShow, options.OperationMiddlewares["importShow"]...)
 	router.GET(options.BaseURL+"/shows", wrapper.ListShows, options.OperationMiddlewares["listShows"]...)
 	router.GET(options.BaseURL+"/shows/:id", wrapper.GetShow, options.OperationMiddlewares["getShow"]...)
@@ -294,23 +462,31 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

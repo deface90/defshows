@@ -132,3 +132,40 @@ func (r *TrackingRepository) DeleteLink(ctx context.Context, userShowID, linkID 
 		Where("id = ? AND user_show_id = ?", linkID, userShowID).
 		Delete(&entity.UserShowLink{}).Error
 }
+
+// WatchShow marks all currently catalogued episodes and completes the user's show
+// atomically. Existing watch dates and ratings are preserved on repeated calls.
+func (r *TrackingRepository) WatchShow(ctx context.Context, userID, showID int64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&entity.UserShow{}).Where("user_id = ? AND show_id = ?", userID, showID).
+			Updates(map[string]any{"status": entity.StatusCompleted, "updated_at": gorm.Expr("now()")})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrNotFound
+		}
+		return tx.Exec(`
+   INSERT INTO user_episodes (user_show_id, episode_id, watched, watched_at)
+   SELECT us.id, e.id, true, now()
+   FROM user_shows us JOIN episodes e ON e.show_id = us.show_id
+   WHERE us.user_id = ? AND us.show_id = ?
+   ON CONFLICT (user_show_id, episode_id) DO UPDATE
+   SET watched = true, watched_at = EXCLUDED.watched_at
+   WHERE user_episodes.watched = false
+  `, userID, showID).Error
+	})
+}
+
+// UpdateLink updates only the value of a link owned by the given user show.
+func (r *TrackingRepository) UpdateLink(ctx context.Context, userShowID, linkID int64, value string) error {
+	result := r.db.WithContext(ctx).Model(&entity.UserShowLink{}).
+		Where("id = ? AND user_show_id = ?", linkID, userShowID).Update("url", value)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

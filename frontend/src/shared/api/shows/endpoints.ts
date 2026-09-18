@@ -20,6 +20,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  DiscoverShowsParams,
+  DiscoveryFilters,
+  DiscoveryResults,
   ErrorResponse,
   ImportRequest,
   ListShowsParams,
@@ -48,6 +51,193 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+/**
+ * @summary TV genres and countries from TMDB
+ */
+export const getDiscoveryFilters = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<DiscoveryFilters>(
+      {url: `/shows/discover/filters`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetDiscoveryFiltersQueryKey = () => {
+    return [
+    `/shows/discover/filters`
+    ] as const;
+    }
+
+
+export const getGetDiscoveryFiltersQueryOptions = <TData = Awaited<ReturnType<typeof getDiscoveryFilters>>, TError = ErrorResponse>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryFilters>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDiscoveryFiltersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDiscoveryFilters>>> = ({ signal }) => getDiscoveryFilters(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryFilters>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDiscoveryFiltersQueryResult = NonNullable<Awaited<ReturnType<typeof getDiscoveryFilters>>>
+export type GetDiscoveryFiltersQueryError = ErrorResponse
+
+
+export function useGetDiscoveryFilters<TData = Awaited<ReturnType<typeof getDiscoveryFilters>>, TError = ErrorResponse>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryFilters>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDiscoveryFilters>>,
+          TError,
+          Awaited<ReturnType<typeof getDiscoveryFilters>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDiscoveryFilters<TData = Awaited<ReturnType<typeof getDiscoveryFilters>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryFilters>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDiscoveryFilters>>,
+          TError,
+          Awaited<ReturnType<typeof getDiscoveryFilters>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDiscoveryFilters<TData = Awaited<ReturnType<typeof getDiscoveryFilters>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryFilters>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary TV genres and countries from TMDB
+ */
+
+export function useGetDiscoveryFilters<TData = Awaited<ReturnType<typeof getDiscoveryFilters>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryFilters>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDiscoveryFiltersQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Discover TV shows by country, genres, TMDB rating and premiere dates
+ */
+export const discoverShows = (
+    params?: DiscoverShowsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<DiscoveryResults>(
+      {url: `/shows/discover`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getDiscoverShowsQueryKey = (params?: DiscoverShowsParams,) => {
+    return [
+    `/shows/discover`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getDiscoverShowsQueryOptions = <TData = Awaited<ReturnType<typeof discoverShows>>, TError = ErrorResponse>(params?: DiscoverShowsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof discoverShows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDiscoverShowsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof discoverShows>>> = ({ signal }) => discoverShows(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof discoverShows>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type DiscoverShowsQueryResult = NonNullable<Awaited<ReturnType<typeof discoverShows>>>
+export type DiscoverShowsQueryError = ErrorResponse
+
+
+export function useDiscoverShows<TData = Awaited<ReturnType<typeof discoverShows>>, TError = ErrorResponse>(
+ params: undefined |  DiscoverShowsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof discoverShows>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof discoverShows>>,
+          TError,
+          Awaited<ReturnType<typeof discoverShows>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDiscoverShows<TData = Awaited<ReturnType<typeof discoverShows>>, TError = ErrorResponse>(
+ params?: DiscoverShowsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof discoverShows>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof discoverShows>>,
+          TError,
+          Awaited<ReturnType<typeof discoverShows>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDiscoverShows<TData = Awaited<ReturnType<typeof discoverShows>>, TError = ErrorResponse>(
+ params?: DiscoverShowsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof discoverShows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Discover TV shows by country, genres, TMDB rating and premiere dates
+ */
+
+export function useDiscoverShows<TData = Awaited<ReturnType<typeof discoverShows>>, TError = ErrorResponse>(
+ params?: DiscoverShowsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof discoverShows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getDiscoverShowsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 /**
  * @summary Search TMDB for shows to add
@@ -131,6 +321,99 @@ export function useSearchShows<TData = Awaited<ReturnType<typeof searchShows>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getSearchShowsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Show detail by TMDB ID, importing into the catalog on first view
+ */
+export const getShowByTMDB = (
+    tmdbId: number,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<Show>(
+      {url: `/shows/tmdb/${tmdbId}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetShowByTMDBQueryKey = (tmdbId: number,) => {
+    return [
+    `/shows/tmdb/${tmdbId}`
+    ] as const;
+    }
+
+
+export const getGetShowByTMDBQueryOptions = <TData = Awaited<ReturnType<typeof getShowByTMDB>>, TError = ErrorResponse>(tmdbId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getShowByTMDB>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetShowByTMDBQueryKey(tmdbId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getShowByTMDB>>> = ({ signal }) => getShowByTMDB(tmdbId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: tmdbId !== null && tmdbId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getShowByTMDB>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetShowByTMDBQueryResult = NonNullable<Awaited<ReturnType<typeof getShowByTMDB>>>
+export type GetShowByTMDBQueryError = ErrorResponse
+
+
+export function useGetShowByTMDB<TData = Awaited<ReturnType<typeof getShowByTMDB>>, TError = ErrorResponse>(
+ tmdbId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getShowByTMDB>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getShowByTMDB>>,
+          TError,
+          Awaited<ReturnType<typeof getShowByTMDB>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetShowByTMDB<TData = Awaited<ReturnType<typeof getShowByTMDB>>, TError = ErrorResponse>(
+ tmdbId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getShowByTMDB>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getShowByTMDB>>,
+          TError,
+          Awaited<ReturnType<typeof getShowByTMDB>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetShowByTMDB<TData = Awaited<ReturnType<typeof getShowByTMDB>>, TError = ErrorResponse>(
+ tmdbId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getShowByTMDB>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Show detail by TMDB ID, importing into the catalog on first view
+ */
+
+export function useGetShowByTMDB<TData = Awaited<ReturnType<typeof getShowByTMDB>>, TError = ErrorResponse>(
+ tmdbId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getShowByTMDB>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetShowByTMDBQueryOptions(tmdbId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -1,9 +1,10 @@
+import { useEffect, useState } from 'react'
 import { Checkbox } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
 import {
   getGetTrackedQueryKey,
+  getListTrackedQueryKey,
   unwatchEpisode,
   watchEpisode,
 } from '@/shared/api/tracking/endpoints'
@@ -19,21 +20,25 @@ export function WatchToggle({
 }) {
   const queryClient = useQueryClient()
   const [checked, setChecked] = useState(watched)
+  useEffect(() => setChecked(watched), [watched])
 
   const mutation = useMutation({
     mutationFn: (next: boolean) =>
       next ? watchEpisode(showId, episodeId) : unwatchEpisode(showId, episodeId),
     onMutate: (next) => {
-      const prev = checked
-      setChecked(next) // optimistic
-      return { prev }
+      const previous = checked
+      setChecked(next)
+      return { previous }
     },
-    onError: (_e, _next, ctx) => {
-      if (ctx) setChecked(ctx.prev) // rollback
+    onError: (_error, _next, context) => {
+      if (context) setChecked(context.previous)
       notifications.show({ message: 'Не удалось обновить отметку', color: 'red' })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: getGetTrackedQueryKey(showId) })
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetTrackedQueryKey(showId) }),
+        queryClient.invalidateQueries({ queryKey: getListTrackedQueryKey() }),
+      ])
     },
   })
 

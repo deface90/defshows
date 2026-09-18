@@ -20,6 +20,7 @@ export * from './showRef';
 export * from './showRefAiringStatus';
 export * from './trackedShow';
 export * from './trackedShowList';
+export * from './updateLinkRequest';
 export * from './updateSettingsRequest';
 export * from './updateShowRequest';
 export * from './updateShowRequestStatus';

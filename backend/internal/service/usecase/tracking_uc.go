@@ -17,6 +17,8 @@ var (
 
 // TrackingRepo is the storage dependency of TrackingUsecase.
 type TrackingRepo interface {
+	UpdateLink(ctx context.Context, userShowID, linkID int64, value string) error
+	WatchShow(ctx context.Context, userID, showID int64) error
 	AddUserShow(ctx context.Context, us *entity.UserShow) error
 	GetUserShow(ctx context.Context, userID, showID int64) (*entity.UserShow, error)
 	ListUserShows(ctx context.Context, userID int64, status string) ([]entity.UserShow, error)
@@ -39,9 +41,10 @@ type Catalog interface {
 
 // Progress summarizes how far a user is through a show.
 type Progress struct {
-	Watched       int
-	Total         int
-	NextUnwatched *entity.Episode
+	WatchedEpisodeIDs []int64
+	Watched           int
+	Total             int
+	NextUnwatched     *entity.Episode
 }
 
 // TrackedShow bundles a user's tracking with the show and its progress.
@@ -221,7 +224,7 @@ func (uc *TrackingUsecase) progress(ctx context.Context, us *entity.UserShow) (P
 		watched[id] = true
 	}
 
-	prog := Progress{Total: len(episodes), Watched: len(watchedIDs)}
+	prog := Progress{Total: len(episodes), Watched: len(watchedIDs), WatchedEpisodeIDs: append([]int64{}, watchedIDs...)}
 	for i := range episodes {
 		if !watched[episodes[i].ID] {
 			prog.NextUnwatched = &episodes[i]
@@ -236,4 +239,18 @@ func notTracked(err error) error {
 		return ErrNotTracked
 	}
 	return err
+}
+
+// WatchShow marks all catalogued episodes watched and sets status to completed.
+func (uc *TrackingUsecase) WatchShow(ctx context.Context, userID, showID int64) error {
+	return notTracked(uc.repo.WatchShow(ctx, userID, showID))
+}
+
+// UpdateLink edits an existing link without changing its identity, label or kind.
+func (uc *TrackingUsecase) UpdateLink(ctx context.Context, userID, showID, linkID int64, value string) error {
+	us, err := uc.repo.GetUserShow(ctx, userID, showID)
+	if err != nil {
+		return notTracked(err)
+	}
+	return notTracked(uc.repo.UpdateLink(ctx, us.ID, linkID, value))
 }

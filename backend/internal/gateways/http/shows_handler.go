@@ -32,22 +32,7 @@ func (h *ShowsHandler) SearchShows(c echo.Context, params showsapi.SearchShowsPa
 		slog.ErrorContext(c.Request().Context(), "provider search failed", "provider", "tmdb", "error", err)
 		return echo.NewHTTPError(http.StatusBadGateway, "provider search failed")
 	}
-	out := make([]showsapi.ShowSummary, 0, len(res))
-	for _, s := range res {
-		s := s
-		out = append(out, showsapi.ShowSummary{
-			TmdbId:        s.TMDBID,
-			Title:         s.Title,
-			OriginalTitle: ptr(s.OriginalTitle),
-			Overview:      ptr(s.Overview),
-			PosterUrl:     ptr(s.PosterURL),
-			FirstAirDate:  dateStr(s.FirstAirDate),
-			Popularity:    f32(s.Popularity),
-			VoteAverage:   f32(s.VoteAverage),
-			VoteCount:     i64(s.VoteCount),
-		})
-	}
-	return c.JSON(http.StatusOK, showsapi.SearchResults{Results: out})
+	return c.JSON(http.StatusOK, showsapi.SearchResults{Results: toAPISummaries(res)})
 }
 
 // ImportShow handles POST /shows/import.
@@ -200,4 +185,17 @@ func dateStr(t *time.Time) *string {
 	}
 	s := t.Format("2006-01-02")
 	return &s
+}
+
+// GetShowByTMDB loads catalog details without adding the show to a user's list.
+func (h *ShowsHandler) GetShowByTMDB(c echo.Context, tmdbID int64) error {
+	if tmdbID <= 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid TMDB ID")
+	}
+	show, err := h.uc.EnsureShow(c.Request().Context(), tmdbID)
+	if err != nil {
+		slog.ErrorContext(c.Request().Context(), "provider show detail failed", "tmdb_id", tmdbID, "error", err)
+		return echo.NewHTTPError(http.StatusBadGateway, "provider show detail failed")
+	}
+	return h.GetShow(c, show.ID)
 }

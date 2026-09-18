@@ -8,6 +8,33 @@ info:
 servers:
   - url: https://api.themoviedb.org/3
 paths:
+  /discover/tv:
+    get:
+      operationId: discoverTv
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TvSearchPage' }
+  /genre/tv/list:
+    get:
+      operationId: tvGenres
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TvGenreList' }
+  /configuration/countries:
+    get:
+      operationId: countries
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Country' } }
   /search/tv:
     get:
       operationId: searchTv
@@ -60,6 +87,25 @@ paths:
               schema: { $ref: '#/components/schemas/TvSeasonDetail' }
 components:
   schemas:
+    Country:
+      type: object
+      required: [iso_3166_1, english_name]
+      properties:
+        iso_3166_1: { type: string }
+        english_name: { type: string }
+        native_name: { type: string }
+    TvGenreList:
+      type: object
+      required: [genres]
+      properties:
+        genres:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: integer, format: int64 }
+              name: { type: string }
     TvSearchPage:
       type: object
       properties:

@@ -3,6 +3,7 @@ import { notifications } from '@mantine/notifications'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getGetTrackedQueryKey,
+  getListTrackedQueryKey,
   unwatchEpisode,
   watchEpisode,
 } from '@/shared/api/tracking/endpoints'
@@ -30,17 +31,22 @@ export function SeasonWatchToggle({
   const mutation = useMutation({
     mutationFn: async (next: boolean) => {
       const targets = episodes.filter((ep) => watchedIds.has(ep.id) !== next)
-      await Promise.all(
+      const results = await Promise.allSettled(
         targets.map((ep) =>
           next ? watchEpisode(showId, ep.id) : unwatchEpisode(showId, ep.id),
         ),
       )
+      const failed = results.find((result) => result.status === 'rejected')
+      if (failed?.status === 'rejected') throw failed.reason
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: getGetTrackedQueryKey(showId) })
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetTrackedQueryKey(showId) }),
+        queryClient.invalidateQueries({ queryKey: getListTrackedQueryKey() }),
+      ])
     },
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: getGetTrackedQueryKey(showId) })
+      void queryClient.invalidateQueries({ queryKey: getGetTrackedQueryKey(showId) })
       notifications.show({ message: 'Не удалось обновить сезон', color: 'red' })
     },
   })

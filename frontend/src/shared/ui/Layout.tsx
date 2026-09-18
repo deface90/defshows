@@ -15,6 +15,7 @@ import { getRefreshToken, useAuthStore } from '@/shared/auth/authStore'
 const navItems = [
   { to: '/', label: 'Мои сериалы', end: true },
   { to: '/search', label: 'Поиск' },
+  { to: '/discover', label: 'Подбор' },
   { to: '/users', label: 'Пользователи' },
   { to: '/notifications', label: 'Уведомления' },
 ]
