@@ -11,7 +11,7 @@ export function SearchPage() {
   const [debounced] = useDebouncedValue(q, 400)
   const enabled = debounced.trim().length >= 3
 
-  const query = useSearchShows({ q: debounced }, { query: { enabled } })
+  const query = useSearchShows({ q: debounced }, { query: { enabled, retry: false } })
 
   return (
     <Stack>

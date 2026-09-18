@@ -23,4 +23,4 @@ npm-debug.log*
 /backend/deploy/data/
 docs
 /backend/deploy/docker-compose.prod.yml
-logo.png
+/logo.png

@@ -4,8 +4,10 @@ package tmdb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	tmdbclient "github.com/deface90/defshows/backend/pkg/clients/tmdb"
@@ -35,6 +37,9 @@ func New(baseURL, apiKey, language string, httpClient *http.Client) (*Provider, 
 	if language == "" {
 		language = "en-US"
 	}
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 15 * time.Second}
+	}
 	opts := []tmdbclient.ClientOption{}
 	if httpClient != nil {
 		opts = append(opts, tmdbclient.WithHTTPClient(httpClient))
@@ -59,7 +64,7 @@ func (p *Provider) editor(_ context.Context, req *http.Request) error {
 func (p *Provider) SearchShows(ctx context.Context, query string) ([]provider.ShowSummary, error) {
 	resp, err := p.client.SearchTvWithResponse(ctx, &tmdbclient.SearchTvParams{Query: query}, p.editor)
 	if err != nil {
-		return nil, fmt.Errorf("tmdb: search: %w", err)
+		return nil, fmt.Errorf("tmdb: search: %w", safeRequestError(err))
 	}
 	if resp.JSON200 == nil {
 		return nil, fmt.Errorf("tmdb: search: unexpected status %d", resp.StatusCode())
@@ -87,7 +92,7 @@ func (p *Provider) SearchShows(ctx context.Context, query string) ([]provider.Sh
 func (p *Provider) GetShow(ctx context.Context, tmdbID int64) (*provider.Show, error) {
 	resp, err := p.client.GetTvShowWithResponse(ctx, tmdbID, p.editor)
 	if err != nil {
-		return nil, fmt.Errorf("tmdb: get show: %w", err)
+		return nil, fmt.Errorf("tmdb: get show: %w", safeRequestError(err))
 	}
 	if resp.JSON200 == nil {
 		return nil, fmt.Errorf("tmdb: get show: unexpected status %d", resp.StatusCode())
@@ -136,7 +141,7 @@ func (p *Provider) GetShow(ctx context.Context, tmdbID int64) (*provider.Show, e
 func (p *Provider) GetSeason(ctx context.Context, tmdbID int64, seasonNumber int) (*provider.Season, error) {
 	resp, err := p.client.GetTvSeasonWithResponse(ctx, tmdbID, seasonNumber, p.editor)
 	if err != nil {
-		return nil, fmt.Errorf("tmdb: get season: %w", err)
+		return nil, fmt.Errorf("tmdb: get season: %w", safeRequestError(err))
 	}
 	if resp.JSON200 == nil {
 		return nil, fmt.Errorf("tmdb: get season: unexpected status %d", resp.StatusCode())
@@ -202,4 +207,13 @@ func val[T any](p *T) T {
 		return zero
 	}
 	return *p
+}
+
+// HTTP transport errors include the request URL, which contains the API key.
+func safeRequestError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return fmt.Errorf("%s: %w", urlErr.Op, urlErr.Err)
+	}
+	return err
 }

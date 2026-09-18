@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ var _ showsapi.ServerInterface = (*ShowsHandler)(nil)
 func (h *ShowsHandler) SearchShows(c echo.Context, params showsapi.SearchShowsParams) error {
 	res, err := h.uc.SearchExternal(c.Request().Context(), params.Q)
 	if err != nil {
+		slog.ErrorContext(c.Request().Context(), "provider search failed", "provider", "tmdb", "error", err)
 		return echo.NewHTTPError(http.StatusBadGateway, "provider search failed")
 	}
 	out := make([]showsapi.ShowSummary, 0, len(res))

@@ -1,6 +1,7 @@
 package tmdb_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -138,4 +139,26 @@ func TestProvider_GetSeason(t *testing.T) {
 	if e0.StillURL != "https://image.tmdb.org/t/p/w500/e1.jpg" {
 		t.Fatalf("still url: %q", e0.StillURL)
 	}
+}
+
+// A transport failure must remain diagnosable without logging the API key.
+func TestSearchTransportErrorOmitsCredentials(t *testing.T) {
+	client := &http.Client{Transport: failingTransport{}}
+	p, err := tmdb.New("https://example.invalid/3", "secret-api-key", "ru-RU", client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.SearchShows(t.Context(), "test")
+	if err == nil || !strings.Contains(err.Error(), "connection failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(err.Error(), "secret-api-key") || strings.Contains(err.Error(), "api_key") {
+		t.Fatalf("credentials in error: %v", err)
+	}
+}
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("connection failed")
 }

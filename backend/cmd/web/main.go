@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 
 	httpapi "github.com/deface90/defshows/backend/internal/gateways/http"
 	"github.com/deface90/defshows/backend/internal/gateways/providers/tmdb"
@@ -28,6 +29,7 @@ func main() {
 	}
 
 	logger := pkglog.New(cfg.Log)
+	slog.SetDefault(logger)
 
 	gdb, err := db.Connect(cfg.DB)
 	if err != nil {
