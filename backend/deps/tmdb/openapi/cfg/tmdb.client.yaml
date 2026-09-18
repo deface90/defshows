@@ -1,0 +1,6 @@
+package: tmdb
+# Output path is relative to api/openapi (where `go generate` runs).
+output: ../../pkg/clients/tmdb/tmdb.gen.go
+generate:
+  client: true
+  models: true

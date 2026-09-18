@@ -1,0 +1,8 @@
+package: showsapi
+output: ../../pkg/server/shows/shows.gen.go
+generate:
+  echo-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  skip-prune: true

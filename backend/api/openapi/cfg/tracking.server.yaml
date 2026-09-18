@@ -1,0 +1,8 @@
+package: trackingapi
+output: ../../pkg/server/tracking/tracking.gen.go
+generate:
+  echo-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  skip-prune: true

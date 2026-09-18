@@ -1,0 +1,8 @@
+package: notesapi
+output: ../../pkg/server/notes/notes.gen.go
+generate:
+  echo-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  skip-prune: true

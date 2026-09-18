@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: defShows Users API
+  version: 0.1.0
+security:
+  - bearerAuth: []
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      summary: List all users (public directory)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserList' }
+        '401': { $ref: '#/components/responses/Error' }
+  /users/{userId}:
+    get:
+      operationId: getUserProfile
+      summary: One user's public profile metadata
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserProfile' }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /users/{userId}/shows:
+    get:
+      operationId: listUserShows
+      summary: A user's tracked shows (only if the profile is public, or it's you/an admin)
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackedShowList' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    UserSummary:
+      type: object
+      required: [id, display_name, is_public, shows_count]
+      properties:
+        id: { type: integer, format: int64 }
+        display_name: { type: string }
+        email: { type: string }
+        is_public: { type: boolean }
+        shows_count: { type: integer }
+    UserList:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          items: { $ref: '#/components/schemas/UserSummary' }
+    UserProfile:
+      type: object
+      required: [id, display_name, is_public, shows_count]
+      properties:
+        id: { type: integer, format: int64 }
+        display_name: { type: string }
+        is_public: { type: boolean }
+        shows_count: { type: integer }
+    UserShow:
+      type: object
+      required: [id, show_id, status, favorite]
+      properties:
+        id: { type: integer, format: int64 }
+        show_id: { type: integer, format: int64 }
+        status: { type: string, enum: [watching, plan_to_watch, on_hold, completed, dropped] }
+        favorite: { type: boolean }
+        preferred_dubbing: { type: string }
+    ShowRef:
+      type: object
+      required: [id, tmdb_id, title, airing_status]
+      properties:
+        id: { type: integer, format: int64 }
+        tmdb_id: { type: integer, format: int64 }
+        title: { type: string }
+        original_title: { type: string }
+        poster_url: { type: string }
+        airing_status: { type: string, enum: [not_started, airing, between_seasons, ended] }
+        next_episode_air_date: { type: string, nullable: true }
+        vote_average: { type: number }
+        vote_count: { type: integer, format: int64 }
+    Progress:
+      type: object
+      required: [watched, total]
+      properties:
+        watched: { type: integer }
+        total: { type: integer }
+        next_unwatched_episode_id: { type: integer, format: int64, nullable: true }
+    TrackedShow:
+      type: object
+      required: [user_show, show, progress]
+      properties:
+        user_show: { $ref: '#/components/schemas/UserShow' }
+        show: { $ref: '#/components/schemas/ShowRef' }
+        progress: { $ref: '#/components/schemas/Progress' }
+    TrackedShowList:
+      type: object
+      required: [tracked]
+      properties:
+        tracked:
+          type: array
+          items: { $ref: '#/components/schemas/TrackedShow' }

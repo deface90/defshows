@@ -1,0 +1,192 @@
+openapi: 3.0.3
+info:
+  title: defShows Catalog API
+  version: 0.1.0
+paths:
+  /shows/search:
+    get:
+      operationId: searchShows
+      summary: Search TMDB for shows to add
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResults' }
+        '401': { $ref: '#/components/responses/Error' }
+  /shows/import:
+    post:
+      operationId: importShow
+      summary: Import a show from TMDB into the local catalog
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Show' }
+        '401': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+  /shows:
+    get:
+      operationId: listShows
+      summary: List/search the local catalog
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShowList' }
+        '401': { $ref: '#/components/responses/Error' }
+  /shows/{id}:
+    get:
+      operationId: getShow
+      summary: Local show detail
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Show' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    ImportRequest:
+      type: object
+      required: [tmdb_id]
+      properties:
+        tmdb_id: { type: integer, format: int64 }
+    ShowSummary:
+      type: object
+      required: [tmdb_id, title]
+      properties:
+        tmdb_id: { type: integer, format: int64 }
+        title: { type: string }
+        original_title: { type: string }
+        overview: { type: string }
+        poster_url: { type: string }
+        first_air_date: { type: string, nullable: true }
+        popularity: { type: number }
+        vote_average: { type: number }
+        vote_count: { type: integer, format: int64 }
+    SearchResults:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/ShowSummary' }
+    Rating:
+      type: object
+      required: [source, value]
+      properties:
+        source: { type: string }
+        value: { type: string }
+        votes: { type: integer, format: int64, nullable: true }
+    Genre:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        tmdb_id: { type: integer, format: int64 }
+        name: { type: string }
+    Episode:
+      type: object
+      required: [id, season_number, episode_number, name]
+      properties:
+        id: { type: integer, format: int64 }
+        season_number: { type: integer }
+        episode_number: { type: integer }
+        name: { type: string }
+        overview: { type: string }
+        air_date: { type: string, nullable: true }
+        runtime: { type: integer, nullable: true }
+        still_url: { type: string }
+    Season:
+      type: object
+      required: [id, season_number, name, episodes]
+      properties:
+        id: { type: integer, format: int64 }
+        season_number: { type: integer }
+        name: { type: string }
+        overview: { type: string }
+        air_date: { type: string, nullable: true }
+        episode_count: { type: integer }
+        poster_url: { type: string }
+        episodes:
+          type: array
+          items: { $ref: '#/components/schemas/Episode' }
+    Show:
+      type: object
+      required: [id, tmdb_id, title, airing_status]
+      properties:
+        id: { type: integer, format: int64 }
+        tmdb_id: { type: integer, format: int64 }
+        title: { type: string }
+        original_title: { type: string }
+        overview: { type: string }
+        poster_url: { type: string }
+        backdrop_url: { type: string }
+        status: { type: string }
+        in_production: { type: boolean }
+        first_air_date: { type: string, nullable: true }
+        last_air_date: { type: string, nullable: true }
+        next_episode_air_date: { type: string, nullable: true }
+        airing_status: { type: string, enum: [not_started, airing, between_seasons, ended] }
+        original_language: { type: string }
+        popularity: { type: number }
+        vote_average: { type: number }
+        vote_count: { type: integer, format: int64 }
+        genres:
+          type: array
+          items: { $ref: '#/components/schemas/Genre' }
+        ratings:
+          type: array
+          items: { $ref: '#/components/schemas/Rating' }
+        seasons:
+          type: array
+          items: { $ref: '#/components/schemas/Season' }
+    ShowList:
+      type: object
+      required: [shows]
+      properties:
+        shows:
+          type: array
+          items: { $ref: '#/components/schemas/Show' }

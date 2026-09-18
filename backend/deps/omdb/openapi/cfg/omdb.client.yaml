@@ -1,0 +1,6 @@
+package: omdb
+# Output path is relative to api/openapi (where `go generate` runs).
+output: ../../pkg/clients/omdb/omdb.gen.go
+generate:
+  client: true
+  models: true

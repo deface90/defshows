@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: OMDb (partial)
+  version: "1"
+  description: >
+    Hand-authored partial contract for OMDb — title lookup only. apikey is
+    injected per-request.
+servers:
+  - url: https://www.omdbapi.com
+paths:
+  /:
+    get:
+      operationId: getByTitle
+      parameters:
+        - name: t
+          in: query
+          required: true
+          schema: { type: string }
+        - name: y
+          in: query
+          required: false
+          schema: { type: string }
+        - name: type
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OmdbResponse' }
+components:
+  schemas:
+    OmdbResponse:
+      type: object
+      properties:
+        Title: { type: string }
+        Year: { type: string }
+        Response: { type: string }
+        Error: { type: string }
+        imdbRating: { type: string }
+        imdbVotes: { type: string }
+        Metascore: { type: string }
+        Ratings:
+          type: array
+          items: { $ref: '#/components/schemas/OmdbRating' }
+    OmdbRating:
+      type: object
+      properties:
+        Source: { type: string }
+        Value: { type: string }

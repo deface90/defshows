@@ -1,0 +1,132 @@
+/* Dark scheme (default). Mantine sets data-mantine-color-scheme on <html>, so
+   these custom vars + the body background switch together with the toggle. */
+:root,
+[data-mantine-color-scheme='dark'] {
+  --bg: #0b0f19;
+  --card: #0f172a;
+  --border: rgba(255,255,255,0.08);
+  --text: #e5e7eb;
+  --muted: rgba(229,231,235,0.65);
+  --accent: #fd7e14;
+}
+
+[data-mantine-color-scheme='light'] {
+  --bg: #f8f9fa;
+  --card: #ffffff;
+  --border: rgba(0,0,0,0.08);
+  --text: #1a1b1e;
+  --muted: rgba(26,27,30,0.6);
+  --accent: #fd7e14;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  height: 100%;
+  /* Solid base so the scroll/overscroll area is always a flat colour. */
+  background-color: var(--bg);
+}
+
+body {
+  /* Grow with content (not capped at the viewport) so the gradient paints once
+     at the top and the rest of a long page stays solid instead of repeating. */
+  min-height: 100%;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
+  background: radial-gradient(1200px 600px at 20% 0%, rgba(253,126,20,0.15), transparent 60%), var(--bg);
+  background-repeat: no-repeat;
+  color: var(--text);
+}
+
+a { color: inherit; text-decoration: none; }
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(10px);
+  background: rgba(11,15,25,0.7);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(124,58,237,0.18);
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(124,58,237,0.28);
+}
+
+.nav {
+  margin-left: 16px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nav a {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  color: var(--muted);
+}
+
+.nav a.active {
+  background: rgba(124,58,237,0.16);
+  border-color: rgba(124,58,237,0.28);
+  color: var(--text);
+}
+
+/* Top navigation links (Layout). Active section gets the brand accent + an
+   underline; the rest are muted and lift toward the accent on hover. */
+.app-navlink {
+  position: relative;
+  padding: 6px 4px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--mantine-color-dimmed);
+  border-bottom: 2px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.app-navlink:hover {
+  color: var(--mantine-color-brand-4);
+}
+
+.app-navlink.active {
+  color: var(--mantine-color-brand-6);
+  font-weight: 600;
+  border-bottom-color: var(--mantine-color-brand-6);
+}
+
+.card {
+  border: 1px solid var(--border);
+  background: rgba(15,23,42,0.72);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.muted { color: var(--muted); }
+
+.h1 { font-size: 20px; margin: 0; }

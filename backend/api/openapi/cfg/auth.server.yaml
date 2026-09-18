@@ -1,0 +1,8 @@
+package: authapi
+output: ../../pkg/server/auth/auth.gen.go
+generate:
+  echo-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  skip-prune: true

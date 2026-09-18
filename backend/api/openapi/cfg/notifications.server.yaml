@@ -1,0 +1,8 @@
+package: notificationsapi
+output: ../../pkg/server/notifications/notifications.gen.go
+generate:
+  echo-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  skip-prune: true
