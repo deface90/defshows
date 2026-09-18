@@ -33,10 +33,10 @@ describe('DiscoverPage', () => {
   it('submits multiple genres and filters only when requested', async () => {
     const user = userEvent.setup()
     renderWithProviders(<DiscoverPage />, { route: '/discover' })
-    await screen.findByText('Game of Thrones')
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Жанры' })).toBeEnabled())
-    expect(queries[0].get('votes_min')).toBe('100')
-    expect(await screen.findByRole('link', { name: 'В моих сериалах' })).toHaveAttribute('href', '/shows/10')
+    // No search runs until the user submits the form.
+    expect(queries).toHaveLength(0)
+    expect(screen.getByText('Задайте условия подбора')).toBeInTheDocument()
 
     await user.click(screen.getByRole('combobox', { name: 'Жанры' }))
     await user.click(await screen.findByRole('option', { name: /Драма/ }))
@@ -45,11 +45,14 @@ describe('DiscoverPage', () => {
     await user.keyboard('{Escape}')
     await user.clear(screen.getByLabelText('Рейтинг TMDB от'))
     await user.type(screen.getByLabelText('Рейтинг TMDB от'), '7.3')
-    expect(queries).toHaveLength(1)
+    expect(queries).toHaveLength(0)
     await user.click(screen.getByRole('button', { name: 'Подобрать' }))
     await waitFor(() => expect(queries.at(-1)?.get('genres')).toBe('18|35'))
     expect(queries.at(-1)?.get('rating_min')).toBe('7.3')
+    expect(queries.at(-1)?.get('votes_min')).toBe('100')
     expect(queries.at(-1)?.get('page')).toBe('1')
+    // The tracked show surfaces its "in my shows" link once results render.
+    expect(await screen.findByRole('link', { name: 'В моих сериалах' })).toHaveAttribute('href', '/shows/10')
     await user.click(screen.getByLabelText('Все выбранные'))
     await user.click(screen.getByRole('button', { name: 'Подобрать' }))
     await waitFor(() => expect(queries.at(-1)?.get('genres')).toBe('18,35'))
@@ -68,7 +71,8 @@ describe('DiscoverPage', () => {
     expect(queries[0].get('page')).toBe('2')
     expect(screen.getByLabelText('Премьера с')).toHaveValue('2000-01-01')
     await user.click(screen.getByRole('button', { name: 'Сбросить' }))
-    await waitFor(() => expect(queries.at(-1)?.get('page')).toBe('1'))
+    // Reset clears the URL → back to the "waiting for input" prompt, no new search.
+    await waitFor(() => expect(screen.getByText('Задайте условия подбора')).toBeInTheDocument())
     expect(screen.getByLabelText('Рейтинг TMDB от')).toHaveValue('0')
     await user.clear(screen.getByLabelText('Рейтинг TMDB от'))
     await user.type(screen.getByLabelText('Рейтинг TMDB от'), '9')
@@ -85,7 +89,9 @@ describe('DiscoverPage', () => {
 
   it('shows an empty result state', async () => {
     server.use(http.get(`${base}/shows/discover`, () => HttpResponse.json({ page: 1, total_pages: 0, total_results: 0, results: [] })))
+    const user = userEvent.setup()
     renderWithProviders(<DiscoverPage />, { route: '/discover' })
+    await user.click(await screen.findByRole('button', { name: 'Подобрать' }))
     expect(await screen.findByText('Сериалы не найдены')).toBeInTheDocument()
   })
 })

@@ -1,8 +1,10 @@
 import { Anchor, Card, Center, Stack, Text, Title } from '@mantine/core'
 import { Link } from 'react-router-dom'
 import { RegisterForm } from '@/features/auth/RegisterForm'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 export function RegisterPage() {
+  useDocumentTitle('Регистрация')
   return (
     <Center mih="100vh" p="md">
       <Card withBorder shadow="md" w={400} maw="100%" padding="xl">

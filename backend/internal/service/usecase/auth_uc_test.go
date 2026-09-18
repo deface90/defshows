@@ -158,6 +158,17 @@ func (f *fakeRepo) activeTokens() int {
 	return n
 }
 
+// backdateRevoked ages every revoked token so it falls outside the reuse grace
+// window (simulates a genuine, later replay rather than a concurrent race).
+func (f *fakeRepo) backdateRevoked(age time.Duration) {
+	for _, rt := range f.refresh {
+		if rt.RevokedAt != nil {
+			t := time.Now().Add(-age)
+			rt.RevokedAt = &t
+		}
+	}
+}
+
 func newUC(repo usecase.UserRepo) *usecase.AuthUsecase {
 	return usecase.NewAuthUsecase(repo, auth.NewJWTManager("test-secret", time.Hour), time.Hour)
 }
@@ -264,9 +275,25 @@ func TestAuth_Refresh_RotationAndReuse(t *testing.T) {
 		t.Fatalf("want 1 active token after rotation, got %d", repo.activeTokens())
 	}
 
-	// Reuse the old (now revoked) token → whole family revoked.
+	// Benign race: the just-revoked token replayed within the grace window is
+	// reissued in the same family (concurrent tabs / reload) instead of logging
+	// the user out.
+	racePair, err := uc.Refresh(ctx, pair.RefreshToken, "agent")
+	if err != nil {
+		t.Fatalf("want grace reissue on immediate reuse, got %v", err)
+	}
+	if racePair.RefreshToken == "" {
+		t.Fatal("expected a reissued refresh token within grace window")
+	}
+	if repo.activeTokens() != 2 {
+		t.Fatalf("want 2 active tokens after grace reissue, got %d", repo.activeTokens())
+	}
+
+	// Genuine reuse: the same revoked token replayed past the grace window kills
+	// the whole family.
+	repo.backdateRevoked(time.Hour)
 	if _, err := uc.Refresh(ctx, pair.RefreshToken, "agent"); !errors.Is(err, usecase.ErrInvalidRefresh) {
-		t.Fatalf("want ErrInvalidRefresh on reuse, got %v", err)
+		t.Fatalf("want ErrInvalidRefresh on reuse past grace, got %v", err)
 	}
 	if repo.activeTokens() != 0 {
 		t.Fatalf("want 0 active tokens after reuse detection, got %d", repo.activeTokens())

@@ -13,10 +13,12 @@ import {
 import type { DubbingStudio } from '@/shared/api/admin/model'
 import { DubbingForm } from '@/features/admin/DubbingForm'
 import type { DubbingStudioInput } from '@/features/admin/schemas'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 
 /** AdminDubbingPage manages the DubbingStudio reference table (admin only). */
 export function AdminDubbingPage() {
+  useDocumentTitle('Студии озвучки')
   const queryClient = useQueryClient()
   const query = useListDubbingStudios()
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListDubbingStudiosQueryKey() })
@@ -66,6 +68,7 @@ export function AdminDubbingPage() {
       ) : !query.data?.studios.length ? (
         <EmptyState title="Студий пока нет" />
       ) : (
+        <Table.ScrollContainer minWidth={520}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -112,6 +115,7 @@ export function AdminDubbingPage() {
             ))}
           </Table.Tbody>
         </Table>
+        </Table.ScrollContainer>
       )}
 
       <Modal opened={opened} onClose={close} title={editing ? 'Редактировать студию' : 'Новая студия'}>

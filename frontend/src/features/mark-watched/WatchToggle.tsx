@@ -13,10 +13,12 @@ export function WatchToggle({
   showId,
   episodeId,
   watched,
+  disabled = false,
 }: {
   showId: number
   episodeId: number
   watched: boolean
+  disabled?: boolean
 }) {
   const queryClient = useQueryClient()
   const [checked, setChecked] = useState(watched)
@@ -45,7 +47,7 @@ export function WatchToggle({
   return (
     <Checkbox
       checked={checked}
-      disabled={mutation.isPending}
+      disabled={disabled || mutation.isPending}
       onChange={(e) => mutation.mutate(e.currentTarget.checked)}
       aria-label="Просмотрено"
     />

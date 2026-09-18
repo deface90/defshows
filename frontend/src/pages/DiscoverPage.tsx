@@ -6,6 +6,7 @@ import { AddShowButton } from '@/features/add-show/AddShowButton'
 import { useDiscoverShows, useGetDiscoveryFilters } from '@/shared/api/shows/endpoints'
 import type { DiscoverShowsParams } from '@/shared/api/shows/model'
 import { useListTracked } from '@/shared/api/tracking/endpoints'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 
 const sortOptions = [
@@ -46,6 +47,7 @@ function serialize(params: DiscoverShowsParams): URLSearchParams {
 const regionNames = new Intl.DisplayNames(['ru'], { type: 'region' })
 
 export function DiscoverPage() {
+  useDocumentTitle('Подбор сериалов')
   const [searchParams, setSearchParams] = useSearchParams()
   const applied = readParams(searchParams)
   const [draft, setDraft] = useState(applied)
@@ -56,7 +58,10 @@ export function DiscoverPage() {
     setGenreMode(next.genres?.includes(',') ? 'all' : 'any')
   }, [searchParams])
   const references = useGetDiscoveryFilters({ query: { staleTime: 24 * 60 * 60 * 1000, retry: false } })
-  const results = useDiscoverShows(applied, { query: { enabled: !invalid(applied), retry: false } })
+  // Only run a search once the user has submitted the form (or opened a shared
+  // URL that already carries filters); an empty URL means "waiting for input".
+  const hasQuery = searchParams.toString().length > 0
+  const results = useDiscoverShows(applied, { query: { enabled: hasQuery && !invalid(applied), retry: false } })
   const tracked = useListTracked(undefined, { query: { retry: false } })
   const genres = draft.genres?.split(/[,|]/).filter(Boolean) ?? []
   const countries = (references.data?.countries ?? []).map((country) => ({
@@ -96,7 +101,8 @@ export function DiscoverPage() {
           </Group>
         </Stack>
       </Card>
-      {invalid(applied) && <ErrorState message="Некорректные параметры в ссылке. Измените фильтры или сбросьте их." />}
+      {!hasQuery && <EmptyState title="Задайте условия подбора" description="Выберите фильтры и нажмите «Подобрать»." />}
+      {hasQuery && invalid(applied) && <ErrorState message="Некорректные параметры в ссылке. Измените фильтры или сбросьте их." />}
       {results.isLoading && <LoadingState />}
       {results.isError && <Stack><ErrorState message="Не удалось подобрать сериалы" /><Button variant="subtle" onClick={() => results.refetch()}>Повторить подбор</Button></Stack>}
       {results.isSuccess && !invalid(applied) && <>

@@ -9,6 +9,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -39,9 +40,18 @@ func main() {
 		log.Fatalf("notifier: migrate: %v", err)
 	}
 
+	proxyTransport, err := telegramProxyTransport(cfg.Telegram.ProxyURL)
+	if err != nil {
+		log.Fatalf("notifier: telegram proxy: %v", err)
+	}
+	if cfg.Telegram.ProxyURL != "" {
+		logger.Info("telegram traffic routed through proxy")
+	}
+
 	notificationRepo := repository.NewNotificationRepository(gdb)
 	userRepo := repository.NewUserRepository(gdb)
-	channel := notify.NewTelegramChannel(cfg.Telegram.BaseURL, cfg.Telegram.Token, nil)
+	sendClient := &http.Client{Timeout: 10 * time.Second, Transport: proxyTransport}
+	channel := notify.NewTelegramChannel(cfg.Telegram.BaseURL, cfg.Telegram.Token, sendClient)
 
 	scanner := workers.NewNotifyScanner(notificationRepo, logger, cfg.Notifier.Lookback)
 	sender := workers.NewNotifySender(notificationRepo, channel, logger, 100)
@@ -56,7 +66,8 @@ func main() {
 		logger.Warn("TELEGRAM_BOT_TOKEN not set — sender and bot polling disabled")
 	} else {
 		go sender.Run(ctx, cfg.Notifier.SendInterval)
-		go pollTelegram(ctx, logger, cfg.Telegram, channel, linkUC)
+		pollClient := &http.Client{Timeout: 40 * time.Second, Transport: proxyTransport}
+		go pollTelegram(ctx, logger, cfg.Telegram, pollClient, channel, linkUC)
 	}
 
 	logger.Info("notifier started")
@@ -64,9 +75,21 @@ func main() {
 	logger.Info("notifier stopped")
 }
 
+// telegramProxyTransport returns an http RoundTripper routing through the given
+// proxy URL (socks5:// or http(s)://), or the default transport when unset.
+func telegramProxyTransport(proxyURL string) (http.RoundTripper, error) {
+	if proxyURL == "" {
+		return http.DefaultTransport, nil
+	}
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse TELEGRAM_PROXY_URL: %w", err)
+	}
+	return &http.Transport{Proxy: http.ProxyURL(u)}, nil
+}
+
 // pollTelegram long-polls getUpdates and links accounts on "/start <token>".
-func pollTelegram(ctx context.Context, logger *slog.Logger, tg config.Telegram, channel notify.Channel, linkUC *usecase.NotificationUsecase) {
-	client := &http.Client{Timeout: 40 * time.Second}
+func pollTelegram(ctx context.Context, logger *slog.Logger, tg config.Telegram, client *http.Client, channel notify.Channel, linkUC *usecase.NotificationUsecase) {
 	offset := 0
 	for {
 		if ctx.Err() != nil {

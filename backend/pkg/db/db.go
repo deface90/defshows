@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/deface90/defshows/backend/pkg/config"
 )
@@ -15,7 +16,11 @@ import (
 // Connect opens a gorm connection to Postgres, configures the pool, and verifies
 // connectivity with a ping so misconfiguration fails fast.
 func Connect(cfg config.DB) (*gorm.DB, error) {
-	gdb, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{TranslateError: true})
+	gdb, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{
+		TranslateError: true,
+		// Silence gorm's own SQL logging; services log through pkg/log (slog).
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("db: open: %w", err)
 	}

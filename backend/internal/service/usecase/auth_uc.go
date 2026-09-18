@@ -25,6 +25,15 @@ var (
 	ErrInvalidHandoff     = errors.New("usecase: invalid oauth handoff code")
 )
 
+// refreshReuseGrace tolerates benign refresh-token races: multiple tabs (or a
+// reload firing while a refresh is in flight) can each present the same stored
+// token near-simultaneously. Strict single-use rotation would treat the second
+// presentation as reuse and revoke the whole family, logging the user out
+// everywhere. Within this window after a token was rotated we instead issue a
+// fresh pair in the same family. A genuinely stolen token replayed later (past
+// the window) still trips reuse detection and kills the family.
+const refreshReuseGrace = 30 * time.Second
+
 // UserRepo is the storage dependency of AuthUsecase.
 type UserRepo interface {
 	CreateUser(ctx context.Context, u *entity.User) error
@@ -158,8 +167,18 @@ func (uc *AuthUsecase) Refresh(ctx context.Context, rawRefresh, userAgent string
 		return nil, err
 	}
 
-	// Reuse detection: a revoked token presented again → kill the family.
+	// Reuse detection: a revoked token presented again. If it was rotated only
+	// moments ago this is a benign race (concurrent tabs / reload), so reissue
+	// in the same family instead of revoking it. Presented later → genuine reuse,
+	// kill the family.
 	if rt.RevokedAt != nil {
+		if time.Since(*rt.RevokedAt) <= refreshReuseGrace {
+			u, err := uc.repo.FindUserByID(ctx, rt.UserID)
+			if err != nil {
+				return nil, err
+			}
+			return uc.issueTokens(ctx, u, userAgent, rt.FamilyID, &rt.ID)
+		}
 		_ = uc.repo.RevokeFamily(ctx, rt.FamilyID)
 		return nil, ErrInvalidRefresh
 	}

@@ -1,6 +1,7 @@
 import { Accordion, Center, Stack, Text } from '@mantine/core'
 import { SeasonWatchToggle } from '@/features/mark-watched/SeasonWatchToggle'
 import type { Season } from '@/shared/api/shows/model'
+import { isAired } from './airDate'
 import { EpisodeRow } from './EpisodeRow'
 
 export function SeasonAccordion({
@@ -24,7 +25,9 @@ export function SeasonAccordion({
           (n, ep) => (watchedIds.has(ep.id) ? n + 1 : n),
           0,
         )
-        const allWatched = season.episodes.length > 0 && watchedCount === season.episodes.length
+        // "Fully watched" ignores episodes that have not aired yet.
+        const airedCount = season.episodes.reduce((n, ep) => (isAired(ep.air_date) ? n + 1 : n), 0)
+        const allWatched = airedCount > 0 && watchedCount >= airedCount
         return (
         <Accordion.Item key={season.id} value={String(season.season_number)}>
           <Center pr="md">

@@ -145,7 +145,9 @@ func TestWebSlice_EndToEnd(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &completedShow); err != nil {
 		t.Fatal(err)
 	}
-	if completedShow.Progress.Watched != 2 || len(completedShow.Progress.WatchedEpisodeIds) != 2 || completedShow.Progress.NextUnwatchedEpisodeId != nil || completedShow.UserShow.Status != "completed" {
+	// WatchShow marks every aired episode but leaves the user's status alone
+	// (it stays "watching" from AddShow, not "completed").
+	if completedShow.Progress.Watched != 2 || len(completedShow.Progress.WatchedEpisodeIds) != 2 || completedShow.Progress.NextUnwatchedEpisodeId != nil || completedShow.UserShow.Status != "watching" {
 		t.Fatalf("whole show progress: %+v", completedShow)
 	}
 

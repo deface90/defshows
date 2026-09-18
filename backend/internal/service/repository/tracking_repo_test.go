@@ -29,13 +29,21 @@ func TestTrackingRepository(t *testing.T) {
 	if err := gdb.Create(season).Error; err != nil {
 		t.Fatalf("seed season: %v", err)
 	}
-	ep1 := &entity.Episode{SeasonID: season.ID, ShowID: show.ID, SeasonNumber: 1, EpisodeNumber: 1, Name: "E1"}
-	ep2 := &entity.Episode{SeasonID: season.ID, ShowID: show.ID, SeasonNumber: 1, EpisodeNumber: 2, Name: "E2"}
+	aired1 := time.Now().AddDate(0, 0, -30)
+	aired2 := time.Now().AddDate(0, 0, -23)
+	future := time.Now().AddDate(0, 0, 30)
+	ep1 := &entity.Episode{SeasonID: season.ID, ShowID: show.ID, SeasonNumber: 1, EpisodeNumber: 1, Name: "E1", AirDate: &aired1}
+	ep2 := &entity.Episode{SeasonID: season.ID, ShowID: show.ID, SeasonNumber: 1, EpisodeNumber: 2, Name: "E2", AirDate: &aired2}
+	// ep3 has not aired yet: WatchShow must skip it.
+	ep3 := &entity.Episode{SeasonID: season.ID, ShowID: show.ID, SeasonNumber: 1, EpisodeNumber: 3, Name: "E3", AirDate: &future}
 	if err := gdb.Create(ep1).Error; err != nil {
 		t.Fatalf("seed ep1: %v", err)
 	}
 	if err := gdb.Create(ep2).Error; err != nil {
 		t.Fatalf("seed ep2: %v", err)
+	}
+	if err := gdb.Create(ep3).Error; err != nil {
+		t.Fatalf("seed ep3: %v", err)
 	}
 
 	repo := repository.NewTrackingRepository(gdb)
@@ -112,8 +120,15 @@ func TestTrackingRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if ids, _ := repo.WatchedEpisodeIDs(ctx, us.ID); len(ids) != 2 {
-		t.Fatalf("bulk watched IDs: %v", ids)
+	bulkIDs, _ := repo.WatchedEpisodeIDs(ctx, us.ID)
+	if len(bulkIDs) != 2 {
+		t.Fatalf("bulk watched IDs: %v", bulkIDs)
+	}
+	// The unaired episode must not have been marked.
+	for _, id := range bulkIDs {
+		if id == ep3.ID {
+			t.Fatal("WatchShow marked an unaired episode")
+		}
 	}
 	var saved entity.UserEpisode
 	if err := gdb.Where("user_show_id = ? AND episode_id = ?", us.ID, ep1.ID).First(&saved).Error; err != nil {

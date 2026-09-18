@@ -2,6 +2,7 @@ import { Badge, Box, Group, Progress, Stack, Text } from '@mantine/core'
 import { Link } from 'react-router-dom'
 import { StatusSelect } from '@/features/show-status/StatusSelect'
 import type { UserShowStatus } from '@/shared/api/tracking/model'
+import { AiringStatusBadge } from './AiringStatusBadge'
 import { Poster } from './Poster'
 import { STATUS_LABELS } from './status'
 
@@ -16,6 +17,7 @@ export interface MyShowRowData {
     title: string
     original_title?: string
     poster_url?: string
+    airing_status?: string
     next_episode_air_date?: string | null
     vote_average?: number
     vote_count?: number
@@ -52,7 +54,7 @@ export function MyShowRow({
           />
           <Stack gap={6} style={{ minWidth: 0, flex: 1 }}>
             <Group gap={8} align="baseline" wrap="nowrap" style={{ minWidth: 0 }}>
-              <Text fw={600} lh={1.2} style={{ whiteSpace: 'nowrap' }}>
+              <Text fw={600} lh={1.2} truncate style={{ minWidth: 0 }}>
                 {show.title}
               </Text>
               {hasOriginal && (
@@ -62,10 +64,13 @@ export function MyShowRow({
               )}
             </Group>
 
-            <Text c="dimmed" size="sm">
-              {progress.watched} / {progress.total} эпизодов
-              {show.next_episode_air_date ? ` · следующий ${show.next_episode_air_date}` : ''}
-            </Text>
+            <Group gap="xs" wrap="nowrap" align="center" style={{ minWidth: 0 }}>
+              {show.airing_status && <AiringStatusBadge status={show.airing_status} />}
+              <Text c="dimmed" size="sm" truncate>
+                {progress.watched} / {progress.total} эпизодов
+                {show.next_episode_air_date ? ` · следующий ${show.next_episode_air_date}` : ''}
+              </Text>
+            </Group>
 
             <Group gap="sm" wrap="nowrap" align="center">
               <Progress value={pct} size="sm" radius="xl" w={280} maw="100%" style={{ flex: 1 }} />

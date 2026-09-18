@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { MyShowRow } from '@/entities/show/MyShowRow'
 import { useGetUserProfile, useListUserShows } from '@/shared/api/users/endpoints'
 import { useAuthStore } from '@/shared/auth/authStore'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 
 /**
@@ -17,6 +18,7 @@ export function UserProfilePage() {
 
   const profileQuery = useGetUserProfile(userId, { query: { enabled: Number.isFinite(userId) } })
   const profile = profileQuery.data
+  useDocumentTitle(profile ? `${profile.display_name} — профиль` : 'Профиль')
   const canView = !!profile && (profile.is_public || isSelf)
 
   const showsQuery = useListUserShows(userId, {

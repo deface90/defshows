@@ -241,7 +241,8 @@ func notTracked(err error) error {
 	return err
 }
 
-// WatchShow marks all catalogued episodes watched and sets status to completed.
+// WatchShow marks all currently-aired episodes watched, without changing the
+// show's status.
 func (uc *TrackingUsecase) WatchShow(ctx context.Context, userID, showID int64) error {
 	return notTracked(uc.repo.WatchShow(ctx, userID, showID))
 }

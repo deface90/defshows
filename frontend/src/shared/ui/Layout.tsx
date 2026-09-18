@@ -1,12 +1,16 @@
 import {
   ActionIcon,
   Box,
+  Burger,
   Container,
+  Drawer,
   Group,
   Menu,
+  Stack,
   useComputedColorScheme,
   useMantineColorScheme,
 } from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { QueryErrorBoundary } from '@/app/QueryErrorBoundary'
 import { logout } from '@/shared/api/auth/endpoints'
@@ -26,6 +30,7 @@ export function Layout() {
   const clear = useAuthStore((s) => s.clear)
   const { setColorScheme } = useMantineColorScheme()
   const computed = useComputedColorScheme('dark')
+  const [drawerOpen, drawer] = useDisclosure(false)
 
   const onLogout = async () => {
     const rt = getRefreshToken()
@@ -53,12 +58,13 @@ export function Layout() {
         }}
       >
         <Container size="lg">
-          <Group h={56} justify="space-between">
-            <Group gap="xl">
+          <Group h={56} justify="space-between" wrap="nowrap">
+            <Group gap="xl" wrap="nowrap">
               <NavLink to="/" style={{ display: 'flex', alignItems: 'center' }} aria-label="defShows">
                 <img src="/logo.png" alt="defShows" style={{ height: 32, display: 'block' }} />
               </NavLink>
-              <Group gap="xl">
+              {/* Full inline nav on wider screens; collapses into the burger below md. */}
+              <Group gap="lg" wrap="nowrap" visibleFrom="md">
                 {navItems.map((item) => (
                   <NavLink
                     key={item.to}
@@ -71,7 +77,7 @@ export function Layout() {
                 ))}
               </Group>
             </Group>
-            <Group>
+            <Group gap="sm" wrap="nowrap">
               <ActionIcon
                 variant="default"
                 aria-label="Переключить тему"
@@ -96,10 +102,41 @@ export function Layout() {
                   </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
+              <Burger
+                opened={drawerOpen}
+                onClick={drawer.toggle}
+                hiddenFrom="md"
+                size="sm"
+                aria-label="Навигация"
+              />
             </Group>
           </Group>
         </Container>
       </Box>
+
+      <Drawer
+        opened={drawerOpen}
+        onClose={drawer.close}
+        position="right"
+        size="70%"
+        title="Навигация"
+        hiddenFrom="md"
+      >
+        <Stack gap="xs">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              onClick={drawer.close}
+              className={({ isActive }) => `app-drawer-link${isActive ? ' active' : ''}`}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </Stack>
+      </Drawer>
+
       <Container size="lg" py="md">
         <QueryErrorBoundary>
           <Outlet />

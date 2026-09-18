@@ -97,6 +97,42 @@ func TestCatalogUsecase_ImportAndGet(t *testing.T) {
 	}
 }
 
+func TestCatalogUsecase_SkipsSpecials(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "shows", "genres")
+	repo := repository.NewCatalogRepository(gdb)
+	fp := sampleProvider()
+	// Prepend a TMDB "Specials" season (season 0); it must be ignored on import.
+	fp.show.Seasons = append([]provider.Season{{SeasonNumber: 0, Name: "Specials", EpisodeCount: 3}}, fp.show.Seasons...)
+	uc := usecase.NewCatalogUsecase(repo, fp)
+	ctx := context.Background()
+
+	show, err := uc.ImportShow(ctx, 1399)
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	detail, err := uc.GetShow(ctx, show.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if len(detail.Show.Seasons) != 1 {
+		t.Fatalf("want 1 season (specials skipped), got %d", len(detail.Show.Seasons))
+	}
+	for _, s := range detail.Show.Seasons {
+		if s.SeasonNumber == 0 {
+			t.Fatalf("specials season was imported: %+v", s)
+		}
+	}
+	for _, e := range detail.Episodes {
+		if e.SeasonNumber == 0 {
+			t.Fatalf("specials episode was imported: %+v", e)
+		}
+	}
+	if len(detail.Episodes) != 2 {
+		t.Fatalf("want 2 episodes, got %d", len(detail.Episodes))
+	}
+}
+
 func TestCatalogUsecase_EnsureShow(t *testing.T) {
 	gdb := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, gdb, "shows", "genres")

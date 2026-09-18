@@ -120,11 +120,14 @@ func TestAuthHandler_RefreshRotation(t *testing.T) {
 		t.Fatalf("refresh: want 200, got %d", rec.Code)
 	}
 
-	// Reuse old refresh → 401.
+	// Reusing the just-rotated token within the grace window is treated as a
+	// benign race (concurrent tabs / reload) and reissued rather than logging
+	// the user out. Genuine reuse past the grace window still revokes the family
+	// — covered by the usecase unit test TestAuth_Refresh_RotationAndReuse.
 	rec = doJSON(t, e, http.MethodPost, "/auth/refresh", "", map[string]string{
 		"refresh_token": reg.Tokens.RefreshToken,
 	})
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("reuse refresh: want 401, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("reuse within grace: want 200, got %d", rec.Code)
 	}
 }

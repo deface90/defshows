@@ -66,6 +66,36 @@ compose. Порты и теги образов переопределяются 
 - тег `vX.Y.Z` → `X.Y.Z`, `X.Y`, `latest`;
 - pull request → только сборка (без пуша), проверка Dockerfile'ов.
 
+## Бэкап БД
+
+`deploy/backup.sh` снимает дамп Postgres через `pg_dump` внутри сервиса
+`postgres` (клиент на хосте и открытый порт БД не нужны) и кладёт
+gzip-архив с таймстампом:
+
+```bash
+cd deploy
+./backup.sh                         # → ./backups/defshows-YYYYmmdd-HHMMSS.sql.gz
+BACKUP_DIR=/mnt/backups ./backup.sh # другой каталог
+RETENTION_DAYS=14 ./backup.sh       # хранить N дней (деф. 7; 0 — не чистить)
+```
+
+Восстановление:
+
+```bash
+gunzip -c backups/defshows-XXXX.sql.gz | \
+  docker compose -f docker-compose.prod.yml exec -T postgres \
+    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+```
+
+Ежедневно по cron (из каталога `deploy`):
+
+```cron
+30 3 * * * cd /opt/defshows/deploy && ./backup.sh >> backup.log 2>&1
+```
+
+Креды берутся из `.env` (`POSTGRES_USER`/`POSTGRES_DB`). Для dev-стенда
+переопредели `COMPOSE_FILE=docker-compose.yml`.
+
 ## Заметки
 
 - `minio-setup` — одноразовый контейнер: создаёт бакет `${MINIO_BUCKET}` и выходит.

@@ -1,5 +1,5 @@
 import { WatchShowButton } from '@/features/mark-watched/WatchShowButton'
-import { Anchor, Badge, Box, Card, Group, Progress, Stack, Tabs, Text, Title } from '@mantine/core'
+import { Anchor, Badge, Box, Card, Flex, Group, Progress, Stack, Tabs, Text, Title } from '@mantine/core'
 import { Link, useParams } from 'react-router-dom'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
 import { ContinueWatching } from '@/features/mark-watched/ContinueWatching'
@@ -16,6 +16,7 @@ import { useGetShow } from '@/shared/api/shows/endpoints'
 import type { Episode, Show } from '@/shared/api/shows/model'
 import { useGetTracked } from '@/shared/api/tracking/endpoints'
 import { isAxiosError } from 'axios'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 
 const eyebrow = { textTransform: 'uppercase', letterSpacing: '0.09em' } as const
@@ -30,8 +31,8 @@ export function ShowDetailPage() {
 }
 
 export function ShowDetailContent({ show, preview = false, backTo = '/search' }: { show: Show; preview?: boolean; backTo?: string }) {
+  useDocumentTitle(show.title)
   const trackedQuery = useGetTracked(show.id, { query: { retry: false } })
-  const showId = show.id
   const trackedShow = trackedQuery.isSuccess ? trackedQuery.data : undefined
   const tracked = !!trackedShow && !preview
   const progress = preview ? undefined : trackedShow?.progress
@@ -59,7 +60,12 @@ export function ShowDetailContent({ show, preview = false, backTo = '/search' }:
 
       {/* Hero */}
       <Card withBorder padding="lg">
-        <Group align="flex-start" wrap="nowrap" gap="xl">
+        <Flex
+          direction={{ base: 'column', xs: 'row' }}
+          align={{ base: 'center', xs: 'flex-start' }}
+          wrap="nowrap"
+          gap={{ base: 'md', xs: 'xl' }}
+        >
           <Poster
             src={show.poster_url || undefined}
             title={show.title}
@@ -67,7 +73,7 @@ export function ShowDetailContent({ show, preview = false, backTo = '/search' }:
             voteAverage={show.vote_average}
             voteCount={show.vote_count}
           />
-          <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
+          <Stack gap="sm" style={{ flex: 1, minWidth: 0, alignSelf: 'stretch' }}>
             <div>
               <Title order={2}>{show.title}</Title>
               {hasOriginal && (
@@ -105,7 +111,7 @@ export function ShowDetailContent({ show, preview = false, backTo = '/search' }:
                 <Box>
                   <WatchShowButton
                     showId={show.id}
-                    completed={trackedShow.user_show.status === 'completed' && !!progress && progress.watched === progress.total}
+                    completed={!!progress && progress.total > 0 && progress.watched === progress.total}
                   />
                 </Box>
                 {progress && (
@@ -134,7 +140,7 @@ export function ShowDetailContent({ show, preview = false, backTo = '/search' }:
               </Box>
             )}
           </Stack>
-        </Group>
+        </Flex>
       </Card>
 
       {tracked && <ContinueWatching showId={show.id} next={nextEp} />}

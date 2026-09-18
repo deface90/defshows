@@ -1,9 +1,11 @@
 import { Anchor, Card, Center, Divider, Stack, Text } from '@mantine/core'
 import { Link } from 'react-router-dom'
 import { LoginForm } from '@/features/auth/LoginForm'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 // import { OAuthButtons } from '@/features/auth/OAuthButtons'
 
 export function LoginPage() {
+  useDocumentTitle('Вход')
   return (
     <Center mih="100vh" p="md">
       <Card withBorder shadow="md" w={400} maw="100%" padding="xl">

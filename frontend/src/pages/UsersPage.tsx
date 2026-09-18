@@ -2,10 +2,12 @@ import { Badge, Box, Card, Group, Stack, Text, Title } from '@mantine/core'
 import { Link } from 'react-router-dom'
 import { useListUsers } from '@/shared/api/users/endpoints'
 import { useAuthStore } from '@/shared/auth/authStore'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 
 /** UsersPage lists all users with a link into each public/private profile. */
 export function UsersPage() {
+  useDocumentTitle('Пользователи')
   const query = useListUsers()
   const me = useAuthStore((s) => s.user)
   const users = query.data?.users ?? []

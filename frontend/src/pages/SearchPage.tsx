@@ -5,9 +5,11 @@ import { useState } from 'react'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
 import { ShowCard } from '@/entities/show/ShowCard'
 import { useSearchShows } from '@/shared/api/shows/endpoints'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 
 export function SearchPage() {
+  useDocumentTitle('Поиск сериалов')
   const [q, setQ] = useState('')
   const [debounced] = useDebouncedValue(q, 400)
   const enabled = debounced.trim().length >= 3

@@ -15,9 +15,9 @@ import (
 // Config is the aggregate configuration. Services embed/consume the sections
 // they need.
 type Config struct {
-	DB     DB
-	Log    Log
-	Server Server
+	DB       DB
+	Log      Log
+	Server   Server
 	JWT      JWT
 	TMDB     TMDB
 	OMDb     OMDb
@@ -57,6 +57,9 @@ type Telegram struct {
 	Token    string
 	Username string
 	BaseURL  string
+	// ProxyURL, when set, routes Telegram Bot API traffic (send + getUpdates)
+	// through a proxy — e.g. socks5://user:pass@host:1080 or http://host:3128.
+	ProxyURL string
 }
 
 // Notifier holds notification worker settings.
@@ -155,6 +158,7 @@ func Load() (Config, error) {
 			Token:    getEnv("TELEGRAM_BOT_TOKEN", ""),
 			Username: getEnv("TELEGRAM_BOT_USERNAME", ""),
 			BaseURL:  getEnv("TELEGRAM_API_BASE_URL", "https://api.telegram.org"),
+			ProxyURL: getEnv("TELEGRAM_PROXY_URL", ""),
 		},
 		Notifier: Notifier{
 			ScanInterval: getEnvDuration("NOTIFIER_SCAN_INTERVAL", 15*time.Minute),

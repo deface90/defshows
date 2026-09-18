@@ -36,11 +36,13 @@ func (fakeShowProvider) GetShow(context.Context, int64) (*provider.Show, error) 
 }
 
 func (fakeShowProvider) GetSeason(context.Context, int64, int) (*provider.Season, error) {
+	air1 := time.Date(2011, 4, 17, 0, 0, 0, 0, time.UTC)
+	air2 := time.Date(2011, 4, 24, 0, 0, 0, 0, time.UTC)
 	return &provider.Season{
 		SeasonNumber: 1,
 		Episodes: []provider.Episode{
-			{SeasonNumber: 1, EpisodeNumber: 1, Name: "Winter Is Coming"},
-			{SeasonNumber: 1, EpisodeNumber: 2, Name: "The Kingsroad"},
+			{SeasonNumber: 1, EpisodeNumber: 1, Name: "Winter Is Coming", AirDate: &air1},
+			{SeasonNumber: 1, EpisodeNumber: 2, Name: "The Kingsroad", AirDate: &air2},
 		},
 	}, nil
 }

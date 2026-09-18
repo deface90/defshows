@@ -7,10 +7,12 @@ import {
   markNotificationRead,
   useListNotifications,
 } from '@/shared/api/notifications/endpoints'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 
 /** NotificationsPage renders the in-app notification feed with read controls. */
 export function NotificationsPage() {
+  useDocumentTitle('Уведомления')
   const queryClient = useQueryClient()
   const query = useListNotifications()
   const invalidate = () =>

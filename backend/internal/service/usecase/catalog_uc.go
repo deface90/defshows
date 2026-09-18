@@ -174,6 +174,9 @@ func (uc *CatalogUsecase) importSeasonsAndEpisodes(ctx context.Context, show *en
 	}
 	seasons := make([]entity.Season, 0, len(ps.Seasons))
 	for _, s := range ps.Seasons {
+		if s.SeasonNumber == 0 {
+			continue // skip TMDB "Specials" (season 0)
+		}
 		seasons = append(seasons, entity.Season{
 			ShowID:       show.ID,
 			TMDBID:       s.TMDBID,
@@ -200,6 +203,9 @@ func (uc *CatalogUsecase) importSeasonsAndEpisodes(ctx context.Context, show *en
 
 	var episodes []entity.Episode
 	for _, s := range ps.Seasons {
+		if s.SeasonNumber == 0 {
+			continue // skip specials — no season row was created for them
+		}
 		sd, err := uc.provider.GetSeason(ctx, ps.TMDBID, s.SeasonNumber)
 		if err != nil {
 			return err

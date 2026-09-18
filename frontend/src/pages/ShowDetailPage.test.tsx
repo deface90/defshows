@@ -21,8 +21,8 @@ const show = {
       season_number: 1,
       name: 'Сезон 1',
       episodes: [
-        { id: 100, season_number: 1, episode_number: 1, name: 'Winter Is Coming' },
-        { id: 101, season_number: 1, episode_number: 2, name: 'The Kingsroad' },
+        { id: 100, season_number: 1, episode_number: 1, name: 'Winter Is Coming', air_date: '2011-04-17' },
+        { id: 101, season_number: 1, episode_number: 2, name: 'The Kingsroad', air_date: '2011-04-24' },
       ],
     },
   ],
@@ -83,7 +83,7 @@ it('keeps a later season checked independently of the first and updates episode 
   const watched = new Set<number>()
   const detailed = { ...show, seasons: [show.seasons[0], {
     id: 2, season_number: 2, name: 'Сезон 2',
-    episodes: [{ id: 200, season_number: 2, episode_number: 1, name: 'Later episode' }],
+    episodes: [{ id: 200, season_number: 2, episode_number: 1, name: 'Later episode', air_date: '2012-04-01' }],
   }] }
   server.use(
     http.get(`${base}/shows/10`, () => HttpResponse.json(detailed)),
