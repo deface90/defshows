@@ -9,7 +9,6 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -21,6 +20,7 @@ import (
 	"github.com/deface90/defshows/backend/migrations"
 	"github.com/deface90/defshows/backend/pkg/config"
 	"github.com/deface90/defshows/backend/pkg/db"
+	"github.com/deface90/defshows/backend/pkg/httpx"
 	pkglog "github.com/deface90/defshows/backend/pkg/log"
 	"github.com/deface90/defshows/backend/pkg/notify"
 )
@@ -40,11 +40,11 @@ func main() {
 		log.Fatalf("notifier: migrate: %v", err)
 	}
 
-	proxyTransport, err := telegramProxyTransport(cfg.Telegram.ProxyURL)
+	proxyTransport, err := httpx.Transport(cfg.Proxy)
 	if err != nil {
-		log.Fatalf("notifier: telegram proxy: %v", err)
+		log.Fatalf("notifier: proxy: %v", err)
 	}
-	if cfg.Telegram.ProxyURL != "" {
+	if cfg.Proxy != "" {
 		logger.Info("telegram traffic routed through proxy")
 	}
 
@@ -75,19 +75,6 @@ func main() {
 	logger.Info("notifier stopped")
 }
 
-// telegramProxyTransport returns an http RoundTripper routing through the given
-// proxy URL (socks5:// or http(s)://), or the default transport when unset.
-func telegramProxyTransport(proxyURL string) (http.RoundTripper, error) {
-	if proxyURL == "" {
-		return http.DefaultTransport, nil
-	}
-	u, err := url.Parse(proxyURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse TELEGRAM_PROXY_URL: %w", err)
-	}
-	return &http.Transport{Proxy: http.ProxyURL(u)}, nil
-}
-
 // pollTelegram long-polls getUpdates and links accounts on "/start <token>".
 func pollTelegram(ctx context.Context, logger *slog.Logger, tg config.Telegram, client *http.Client, channel notify.Channel, linkUC *usecase.NotificationUsecase) {
 	offset := 0
@@ -112,7 +99,7 @@ func pollTelegram(ctx context.Context, logger *slog.Logger, tg config.Telegram, 
 			}
 			token := strings.TrimSpace(strings.TrimPrefix(text, "/start "))
 			chatID := u.Message.Chat.ID
-			reply := "Аккаунт привязан! Будут приходить уведомления о новых сериях."
+			reply := "Аккаунт успешно привязан! Сюда будут приходить уведомления о новых сезонах и эпизодах!"
 			if err := linkUC.LinkTelegram(ctx, token, chatID); err != nil {
 				logger.Warn("telegram link failed", "err", err)
 				reply = "Ссылка недействительна или истекла. Запросите новую в defShows."

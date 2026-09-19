@@ -236,13 +236,14 @@ components:
         vote_count: { type: integer, format: int64 }
     Progress:
       type: object
-      required: [watched, total, watched_episode_ids]
+      required: [watched, total, unwatched, watched_episode_ids]
       properties:
         watched_episode_ids:
           type: array
           items: { type: integer, format: int64 }
         watched: { type: integer }
         total: { type: integer }
+        unwatched: { type: integer, description: Aired but not-yet-watched episodes }
         next_unwatched_episode_id: { type: integer, format: int64, nullable: true }
     TrackedShow:
       type: object

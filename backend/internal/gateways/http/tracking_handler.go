@@ -262,7 +262,7 @@ func toAPIShowRef(s *entity.Show) trackingapi.ShowRef {
 }
 
 func toAPIProgress(p usecase.Progress) trackingapi.Progress {
-	prog := trackingapi.Progress{Watched: p.Watched, Total: p.Total, WatchedEpisodeIds: append([]int64{}, p.WatchedEpisodeIDs...)}
+	prog := trackingapi.Progress{Watched: p.Watched, Total: p.Total, Unwatched: p.Unwatched, WatchedEpisodeIds: append([]int64{}, p.WatchedEpisodeIDs...)}
 	if p.NextUnwatched != nil {
 		id := p.NextUnwatched.ID
 		prog.NextUnwatchedEpisodeId = &id

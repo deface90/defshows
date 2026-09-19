@@ -14,6 +14,8 @@ const (
 
 // Show is a catalog entry mirrored from TMDB.
 type Show struct {
+	IMDbURL            *string `gorm:"column:imdb_url"`
+	WikipediaURL       *string
 	ID                 int64 `gorm:"primaryKey"`
 	TMDBID             int64 `gorm:"column:tmdb_id"`
 	Title              string

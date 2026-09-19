@@ -5,6 +5,7 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"time"
 
 	httpapi "github.com/deface90/defshows/backend/internal/gateways/http"
 	"github.com/deface90/defshows/backend/internal/gateways/providers/tmdb"
@@ -16,7 +17,9 @@ import (
 	"github.com/deface90/defshows/backend/pkg/config"
 	"github.com/deface90/defshows/backend/pkg/crud"
 	"github.com/deface90/defshows/backend/pkg/db"
+	"github.com/deface90/defshows/backend/pkg/httpx"
 	pkglog "github.com/deface90/defshows/backend/pkg/log"
+	"github.com/deface90/defshows/backend/pkg/storage"
 )
 
 func main() {
@@ -39,9 +42,24 @@ func main() {
 		log.Fatalf("web: migrate: %v", err)
 	}
 
-	tmdbProvider, err := tmdb.New("", cfg.TMDB.APIKey, cfg.TMDB.Language, nil)
+	proxyClient, err := httpx.Client(cfg.Proxy, 15*time.Second)
+	if err != nil {
+		log.Fatalf("web: proxy: %v", err)
+	}
+	tmdbProvider, err := tmdb.New("", cfg.TMDB.APIKey, cfg.TMDB.Language, proxyClient)
 	if err != nil {
 		log.Fatalf("web: tmdb: %v", err)
+	}
+
+	// Optional image mirror: copies posters/backdrops into object storage and
+	// serves them from /images, so the browser never hits the TMDB image host.
+	var imageStore *storage.S3
+	if cfg.S3.Enabled() {
+		imageStore, err = storage.New(cfg.S3, proxyClient)
+		if err != nil {
+			log.Fatalf("web: storage: %v", err)
+		}
+		logger.Info("image mirror enabled", "bucket", cfg.S3.Bucket)
 	}
 
 	userRepo := repository.NewUserRepository(gdb)
@@ -61,6 +79,9 @@ func main() {
 		logger.Info("seeded default admin", "email", cfg.Seed.AdminEmail)
 	}
 	catalogUC := usecase.NewCatalogUsecase(catalogRepo, tmdbProvider)
+	if imageStore != nil {
+		catalogUC.WithImageMirror(imageStore)
+	}
 	trackingUC := usecase.NewTrackingUsecase(trackingRepo, catalogUC)
 	notificationUC := usecase.NewNotificationUsecase(notificationRepo, userRepo, cfg.Telegram.Username, cfg.Notifier.LinkTTL)
 	notesUC := usecase.NewNotesUsecase(notesRepo)
@@ -74,7 +95,7 @@ func main() {
 	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb))
 	usersH := httpapi.NewUsersHandler(authUC, trackingUC)
 
-	e := httpapi.NewWebRouter(authH, showsH, trackingH, notificationsH, notesH, adminH, usersH, jwtMgr, cfg.Server.CORSAllowedOrigins...)
+	e := httpapi.NewWebRouter(authH, showsH, trackingH, notificationsH, notesH, adminH, usersH, jwtMgr, imageStore, proxyClient, cfg.Server.CORSAllowedOrigins...)
 	logger.Info("web service starting", "addr", cfg.Server.Addr)
 	if err := e.Start(cfg.Server.Addr); err != nil {
 		log.Fatalf("web: server: %v", err)

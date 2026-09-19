@@ -4,7 +4,6 @@ import { Link, useParams } from 'react-router-dom'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
 import { ContinueWatching } from '@/features/mark-watched/ContinueWatching'
 import { NotesList } from '@/features/notes/NotesList'
-import { LinksEditor } from '@/features/show-links/LinksEditor'
 import { StatusSelect } from '@/features/show-status/StatusSelect'
 import { RecapView } from '@/entities/recap/RecapView'
 import { SeasonAccordion } from '@/entities/episode/SeasonAccordion'
@@ -163,18 +162,18 @@ export function ShowDetailContent({ show, preview = false, backTo = '/search' }:
             )}
           </div>
 
-          {!preview && <Tabs key={tracked ? 'tracked' : 'guest'} defaultValue={tracked ? 'links' : 'recap'}>
+          {(show.imdb_url || show.wikipedia_url) && (
+            <Group gap="md">
+              {show.imdb_url && <Anchor href={show.imdb_url} target="_blank" rel="noopener noreferrer" size="sm">IMDb ↗</Anchor>}
+              {show.wikipedia_url && <Anchor href={show.wikipedia_url} target="_blank" rel="noopener noreferrer" size="sm">Wikipedia ↗</Anchor>}
+            </Group>
+          )}
+
+          {!preview && <Tabs key={tracked ? 'tracked' : 'guest'} defaultValue="recap">
             <Tabs.List>
-              {tracked && <Tabs.Tab value="links">Ссылки</Tabs.Tab>}
               <Tabs.Tab value="recap">Рекап</Tabs.Tab>
               {tracked && <Tabs.Tab value="notes">Заметки</Tabs.Tab>}
             </Tabs.List>
-
-            {tracked && (
-              <Tabs.Panel value="links" pt="md">
-                <LinksEditor showId={show.id} dubbing={trackedShow?.user_show.preferred_dubbing} />
-              </Tabs.Panel>
-            )}
 
             <Tabs.Panel value="recap" pt="md">
               <RecapView showId={show.id} />

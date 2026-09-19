@@ -61,6 +61,9 @@ paths:
           in: path
           required: true
           schema: { type: integer, format: int64 }
+        - name: append_to_response
+          in: query
+          schema: { type: string }
       responses:
         '200':
           description: OK
@@ -144,6 +147,11 @@ components:
         popularity: { type: number }
         vote_average: { type: number }
         vote_count: { type: integer, format: int64 }
+        external_ids:
+          type: object
+          properties:
+            imdb_id: { type: string, nullable: true }
+            wikidata_id: { type: string, nullable: true }
         genres:
           type: array
           items: { $ref: '#/components/schemas/Genre' }

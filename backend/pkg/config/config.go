@@ -26,6 +26,28 @@ type Config struct {
 	Notifier Notifier
 	OAuth    OAuth
 	Seed     Seed
+	S3       S3
+	// Proxy, when set, routes ALL outbound service traffic that can be blocked
+	// from the host (Telegram Bot API, TMDB API, image downloads) through a
+	// proxy — e.g. socks5://user:pass@host:1080 or http://host:3128.
+	Proxy string
+}
+
+// S3 holds object-storage (MinIO/S3) settings for mirroring catalog images.
+type S3 struct {
+	Endpoint  string
+	Bucket    string
+	AccessKey string
+	SecretKey string
+	// ImagePublicBaseURL is the browser-reachable base URL of the web API that
+	// serves mirrored images (e.g. http://localhost:8080); mirrored poster URLs
+	// are built as <base>/images/<key>.
+	ImagePublicBaseURL string
+}
+
+// Enabled reports whether object storage is fully configured.
+func (s S3) Enabled() bool {
+	return s.Endpoint != "" && s.Bucket != "" && s.AccessKey != "" && s.SecretKey != ""
 }
 
 // Seed holds optional bootstrap data applied on startup after migrations.
@@ -57,9 +79,6 @@ type Telegram struct {
 	Token    string
 	Username string
 	BaseURL  string
-	// ProxyURL, when set, routes Telegram Bot API traffic (send + getUpdates)
-	// through a proxy — e.g. socks5://user:pass@host:1080 or http://host:3128.
-	ProxyURL string
 }
 
 // Notifier holds notification worker settings.
@@ -158,7 +177,14 @@ func Load() (Config, error) {
 			Token:    getEnv("TELEGRAM_BOT_TOKEN", ""),
 			Username: getEnv("TELEGRAM_BOT_USERNAME", ""),
 			BaseURL:  getEnv("TELEGRAM_API_BASE_URL", "https://api.telegram.org"),
-			ProxyURL: getEnv("TELEGRAM_PROXY_URL", ""),
+		},
+		Proxy: getEnv("PROXY_URL", ""),
+		S3: S3{
+			Endpoint:           getEnv("S3_ENDPOINT", ""),
+			Bucket:             getEnv("S3_BUCKET", ""),
+			AccessKey:          getEnv("S3_ACCESS_KEY", ""),
+			SecretKey:          getEnv("S3_SECRET_KEY", ""),
+			ImagePublicBaseURL: getEnv("IMAGE_PUBLIC_BASE_URL", "http://localhost:8080"),
 		},
 		Notifier: Notifier{
 			ScanInterval: getEnvDuration("NOTIFIER_SCAN_INTERVAL", 15*time.Minute),

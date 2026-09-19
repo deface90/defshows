@@ -12,9 +12,9 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 const tabs = [{ value: 'all', label: 'Все' }, ...STATUS_OPTIONS]
 
 const sortOptions = [
-  { value: 'default', label: 'По умолчанию' },
-  { value: 'title', label: 'По названию' },
   { value: 'progress', label: 'По прогрессу' },
+  { value: 'title', label: 'По названию' },
+  { value: 'default', label: 'По дате добавления' },
 ]
 
 // Filter by the show's broadcast (airing) status — distinct from the user's own
@@ -38,7 +38,7 @@ export function MyShowsPage() {
   const [status, setStatus] = useState('')
   const [airing, setAiring] = useState('')
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState('default')
+  const [sort, setSort] = useState('progress')
   const [reversed, setReversed] = useState(false)
   useDocumentTitle('Мои сериалы')
   const query = useListTracked()
@@ -53,6 +53,9 @@ export function MyShowsPage() {
     return map
   }, [all])
 
+  // Shows with aired-but-unwatched episodes — surfaced as a shortcut to /unwatched.
+  const unwatchedCount = useMemo(() => all.filter((t) => t.progress.unwatched > 0).length, [all])
+
   const visible = useMemo(() => {
     let list = status ? all.filter((t) => t.user_show.status === status) : all
     if (airing) list = list.filter((t) => t.show.airing_status === airing)
@@ -62,12 +65,12 @@ export function MyShowsPage() {
         `${t.show.title} ${t.show.original_title ?? ''}`.toLocaleLowerCase('ru').includes(needle),
       )
     }
-    // Natural order per key; `reversed` flips it. Default keeps the server order
-    // (recently added first).
+    // Natural order per key; `reversed` flips it. 'default' keeps the server
+    // order (recently added first); 'progress' shows least-watched first.
     if (sort === 'title') {
       list = [...list].sort((a, b) => a.show.title.localeCompare(b.show.title, 'ru'))
     } else if (sort === 'progress') {
-      list = [...list].sort((a, b) => pct(b) - pct(a))
+      list = [...list].sort((a, b) => pct(a) - pct(b))
     } else {
       list = [...list]
     }
@@ -115,6 +118,17 @@ export function MyShowsPage() {
                 </Text>
               </Tabs.Tab>
             ))}
+            <Button
+              component={Link}
+              to="/unwatched"
+              variant="subtle"
+              color="brand"
+              size="compact-sm"
+              ml="auto"
+              my="auto"
+            >
+              🔴 Непросмотренные{unwatchedCount > 0 ? ` ${unwatchedCount}` : ''}
+            </Button>
           </Tabs.List>
         </Tabs>
 

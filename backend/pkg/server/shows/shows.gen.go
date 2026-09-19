@@ -138,26 +138,32 @@ type Season struct {
 
 // Show defines model for Show.
 type Show struct {
-	AiringStatus       ShowAiringStatus `json:"airing_status"`
-	BackdropUrl        *string          `json:"backdrop_url,omitempty"`
-	FirstAirDate       *string          `json:"first_air_date,omitempty"`
-	Genres             *[]Genre         `json:"genres,omitempty"`
-	Id                 int64            `json:"id"`
-	InProduction       *bool            `json:"in_production,omitempty"`
-	LastAirDate        *string          `json:"last_air_date,omitempty"`
-	NextEpisodeAirDate *string          `json:"next_episode_air_date,omitempty"`
-	OriginalLanguage   *string          `json:"original_language,omitempty"`
-	OriginalTitle      *string          `json:"original_title,omitempty"`
-	Overview           *string          `json:"overview,omitempty"`
-	Popularity         *float32         `json:"popularity,omitempty"`
-	PosterUrl          *string          `json:"poster_url,omitempty"`
-	Ratings            *[]Rating        `json:"ratings,omitempty"`
-	Seasons            *[]Season        `json:"seasons,omitempty"`
-	Status             *string          `json:"status,omitempty"`
-	Title              string           `json:"title"`
-	TmdbId             int64            `json:"tmdb_id"`
-	VoteAverage        *float32         `json:"vote_average,omitempty"`
-	VoteCount          *int64           `json:"vote_count,omitempty"`
+	AiringStatus ShowAiringStatus `json:"airing_status"`
+	BackdropUrl  *string          `json:"backdrop_url,omitempty"`
+	FirstAirDate *string          `json:"first_air_date,omitempty"`
+	Genres       *[]Genre         `json:"genres,omitempty"`
+	Id           int64            `json:"id"`
+
+	// ImdbUrl Automatically resolved IMDb title URL
+	ImdbUrl            *string   `json:"imdb_url,omitempty"`
+	InProduction       *bool     `json:"in_production,omitempty"`
+	LastAirDate        *string   `json:"last_air_date,omitempty"`
+	NextEpisodeAirDate *string   `json:"next_episode_air_date,omitempty"`
+	OriginalLanguage   *string   `json:"original_language,omitempty"`
+	OriginalTitle      *string   `json:"original_title,omitempty"`
+	Overview           *string   `json:"overview,omitempty"`
+	Popularity         *float32  `json:"popularity,omitempty"`
+	PosterUrl          *string   `json:"poster_url,omitempty"`
+	Ratings            *[]Rating `json:"ratings,omitempty"`
+	Seasons            *[]Season `json:"seasons,omitempty"`
+	Status             *string   `json:"status,omitempty"`
+	Title              string    `json:"title"`
+	TmdbId             int64     `json:"tmdb_id"`
+	VoteAverage        *float32  `json:"vote_average,omitempty"`
+	VoteCount          *int64    `json:"vote_count,omitempty"`
+
+	// WikipediaUrl Wikipedia article, Russian preferred with English fallback
+	WikipediaUrl *string `json:"wikipedia_url,omitempty"`
 }
 
 // ShowAiringStatus defines model for Show.AiringStatus.
@@ -462,31 +468,32 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

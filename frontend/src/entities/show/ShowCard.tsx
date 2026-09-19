@@ -1,3 +1,4 @@
+import { imageUrl } from '@/shared/lib/imageUrl'
 import { Link } from 'react-router-dom'
 import { Anchor, Box, Card, Group, Image, Stack, Text } from '@mantine/core'
 import type { ReactNode } from 'react'
@@ -15,7 +16,7 @@ export function ShowCard({ show, action, to }: { show: ShowSummary; action?: Rea
         <Box style={{ position: 'relative' }}>
           <Box component={Link} to={to ?? "#"} tabIndex={to ? 0 : -1} style={{ pointerEvents: to ? undefined : "none" }} aria-label={show.title}>
           <Image
-            src={show.poster_url || undefined}
+            src={imageUrl(show.poster_url)}
             h={220}
             radius="sm"
             fallbackSrc="https://placehold.co/300x450?text=No+Poster"

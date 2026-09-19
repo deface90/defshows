@@ -22,6 +22,8 @@ type ShowSummary struct {
 
 // Show is full catalog detail for a series.
 type Show struct {
+	IMDbURL          *string
+	WikipediaURL     *string
 	TMDBID           int64
 	Title            string
 	OriginalTitle    string

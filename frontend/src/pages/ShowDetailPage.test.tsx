@@ -153,3 +153,39 @@ it('keeps watch state unchanged when bulk marking fails', async () => {
   for (const box of screen.getAllByRole('checkbox')) expect(box).not.toBeChecked()
   expect(screen.getByRole('button', { name: 'Отметить весь сериал просмотренным' })).toBeEnabled()
 })
+
+
+it('shows automatic references and removes personal links and dubbing controls', async () => {
+  const imdb = 'https://www.imdb.com/title/tt0944947/'
+  const wiki = 'https://ru.wikipedia.org/wiki/Game_of_Thrones'
+  let personalLinkRequests = 0
+  server.use(
+    http.get(`${base}/shows/10`, () => HttpResponse.json({ ...show, imdb_url: imdb, wikipedia_url: wiki })),
+    http.get(`${base}/me/shows/10`, () => HttpResponse.json({
+      user_show: { id: 5, show_id: 10, status: 'watching', favorite: false, preferred_dubbing: 'LostFilm' },
+      show, progress: { watched: 0, total: 2, watched_episode_ids: [] },
+    })),
+    http.get(`${base}/me/shows/10/links`, () => {
+      personalLinkRequests++
+      return HttpResponse.json({ links: [] })
+    }),
+  )
+  renderDetail()
+  expect(await screen.findByRole('link', { name: 'IMDb ↗' })).toHaveAttribute('href', imdb)
+  expect(screen.getByRole('link', { name: 'Wikipedia ↗' })).toHaveAttribute('href', wiki)
+  expect(await screen.findByRole('tab', { name: 'Заметки' })).toBeInTheDocument()
+  expect(screen.queryByRole('tab', { name: 'Ссылки' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Озвучка')).not.toBeInTheDocument()
+  expect(personalLinkRequests).toBe(0)
+})
+
+it('omits reference links when the provider has none', async () => {
+  server.use(
+    http.get(`${base}/shows/10`, () => HttpResponse.json(show)),
+    http.get(`${base}/me/shows/10`, () => new HttpResponse(null, { status: 404 })),
+  )
+  renderDetail()
+  await screen.findByText('Game of Thrones')
+  expect(screen.queryByRole('link', { name: 'IMDb ↗' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'Wikipedia ↗' })).not.toBeInTheDocument()
+})

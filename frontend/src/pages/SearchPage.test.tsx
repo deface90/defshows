@@ -14,7 +14,7 @@ describe('SearchPage', () => {
       http.get(`${base}/me/shows`, () => HttpResponse.json({ tracked: [] })),
       http.get(`${base}/shows/search`, () =>
         HttpResponse.json({
-          results: [{ tmdb_id: 1399, title: 'Game of Thrones', first_air_date: '2011-04-17' }],
+          results: [{ tmdb_id: 1399, title: 'Game of Thrones', poster_url: 'https://image.tmdb.org/t/p/w500/poster.jpg', first_air_date: '2011-04-17' }],
         }),
       ),
     )
@@ -24,6 +24,7 @@ describe('SearchPage', () => {
 
     expect(await screen.findByText('Game of Thrones', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Добавить' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Game of Thrones' })).toHaveAttribute('src', `${base}/images/tmdb/w500/poster.jpg`)
     expect(screen.getAllByRole('link', { name: 'Game of Thrones' })[0]).toHaveAttribute('href', '/catalog/1399')
   })
 })

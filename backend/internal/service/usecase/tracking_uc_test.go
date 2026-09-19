@@ -47,13 +47,25 @@ func TestTrackingUsecase_Flow(t *testing.T) {
 		t.Fatalf("episodes: %v (n=%d)", err, len(episodes))
 	}
 
-	// Initial progress: 0/2, next = episode 1.
+	// Initial progress: 0/2, next = episode 1. Only episode 1 has aired (episode 2
+	// has no air date), so exactly one aired-unwatched episode.
 	prog, err := uc.GetProgress(ctx, user.ID, us.ShowID)
 	if err != nil {
 		t.Fatalf("progress: %v", err)
 	}
-	if prog.Watched != 0 || prog.Total != 2 || prog.NextUnwatched == nil || prog.NextUnwatched.ID != episodes[0].ID {
+	if prog.Watched != 0 || prog.Total != 2 || prog.Unwatched != 1 || prog.NextUnwatched == nil || prog.NextUnwatched.ID != episodes[0].ID {
 		t.Fatalf("unexpected initial progress: %+v", prog)
+	}
+
+	// After watching the only aired episode (episode 1), no aired-unwatched left.
+	if err := uc.SetEpisodeWatched(ctx, user.ID, us.ShowID, episodes[0].ID, true); err != nil {
+		t.Fatalf("mark ep1: %v", err)
+	}
+	if prog, _ = uc.GetProgress(ctx, user.ID, us.ShowID); prog.Unwatched != 0 {
+		t.Fatalf("expected 0 aired-unwatched after watching aired episode, got %+v", prog)
+	}
+	if err := uc.SetEpisodeWatched(ctx, user.ID, us.ShowID, episodes[0].ID, false); err != nil {
+		t.Fatalf("unmark ep1: %v", err)
 	}
 
 	// Episodes can be watched out of order; progress must retain the exact IDs.

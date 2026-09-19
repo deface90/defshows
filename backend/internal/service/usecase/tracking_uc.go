@@ -44,7 +44,10 @@ type Progress struct {
 	WatchedEpisodeIDs []int64
 	Watched           int
 	Total             int
-	NextUnwatched     *entity.Episode
+	// Unwatched counts episodes that have already aired but are not marked
+	// watched — i.e. what the user can actually watch right now.
+	Unwatched     int
+	NextUnwatched *entity.Episode
 }
 
 // TrackedShow bundles a user's tracking with the show and its progress.
@@ -225,13 +228,25 @@ func (uc *TrackingUsecase) progress(ctx context.Context, us *entity.UserShow) (P
 	}
 
 	prog := Progress{Total: len(episodes), Watched: len(watchedIDs), WatchedEpisodeIDs: append([]int64{}, watchedIDs...)}
+	now := time.Now()
 	for i := range episodes {
-		if !watched[episodes[i].ID] {
+		if watched[episodes[i].ID] {
+			continue
+		}
+		if prog.NextUnwatched == nil {
 			prog.NextUnwatched = &episodes[i]
-			break
+		}
+		if aired(episodes[i].AirDate, now) {
+			prog.Unwatched++
 		}
 	}
 	return prog, nil
+}
+
+// aired reports whether an episode with the given air date has already been
+// released (nil air date = unknown, treated as not yet aired).
+func aired(airDate *time.Time, now time.Time) bool {
+	return airDate != nil && !airDate.After(now)
 }
 
 func notTracked(err error) error {

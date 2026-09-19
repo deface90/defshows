@@ -265,6 +265,8 @@ components:
         original_title: { type: string }
         overview: { type: string }
         poster_url: { type: string }
+        imdb_url: { type: string, description: "Automatically resolved IMDb title URL" }
+        wikipedia_url: { type: string, description: "Wikipedia article, Russian preferred with English fallback" }
         backdrop_url: { type: string }
         status: { type: string }
         in_production: { type: boolean }

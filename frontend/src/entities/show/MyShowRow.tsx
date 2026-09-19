@@ -23,22 +23,25 @@ export interface MyShowRowData {
     vote_count?: number
   }
   user_show: { status: string }
-  progress: { watched: number; total: number }
+  progress: { watched: number; total: number; unwatched?: number }
 }
 
 export function MyShowRow({
   tracked,
   readOnly = false,
+  showUnwatched = false,
 }: {
   tracked: MyShowRowData
   readOnly?: boolean
+  showUnwatched?: boolean
 }) {
   const { show, user_show, progress } = tracked
   const pct = progress.total > 0 ? Math.round((progress.watched / progress.total) * 100) : 0
   const hasOriginal = show.original_title && show.original_title !== show.title
+  const unwatched = progress.unwatched ?? 0
 
   return (
-    <Group wrap="nowrap" align="center" gap="xl" p="md">
+    <div className="my-show-row">
       <Box
         component={Link}
         to={`/shows/${show.id}`}
@@ -66,6 +69,11 @@ export function MyShowRow({
 
             <Group gap="xs" wrap="nowrap" align="center" style={{ minWidth: 0 }}>
               {show.airing_status && <AiringStatusBadge status={show.airing_status} />}
+              {showUnwatched && unwatched > 0 && (
+                <Badge variant="filled" color="brand" style={{ flexShrink: 0 }}>
+                  🔴 {unwatched} к просмотру
+                </Badge>
+              )}
               <Text c="dimmed" size="sm" truncate>
                 {progress.watched} / {progress.total} эпизодов
                 {show.next_episode_air_date ? ` · следующий ${show.next_episode_air_date}` : ''}
@@ -82,13 +90,15 @@ export function MyShowRow({
         </Group>
       </Box>
 
-      {readOnly ? (
-        <Badge variant="light" color="brand" w={150} style={{ flexShrink: 0 }}>
-          {STATUS_LABELS[user_show.status] ?? user_show.status}
-        </Badge>
-      ) : (
-        <StatusSelect showId={show.id} status={user_show.status as UserShowStatus} />
-      )}
-    </Group>
+      <div className="my-show-row__status">
+        {readOnly ? (
+          <Badge variant="light" color="brand" w={150} maw="100%" style={{ flexShrink: 0 }}>
+            {STATUS_LABELS[user_show.status] ?? user_show.status}
+          </Badge>
+        ) : (
+          <StatusSelect showId={show.id} status={user_show.status as UserShowStatus} fullWidth />
+        )}
+      </div>
+    </div>
   )
 }

@@ -51,6 +51,8 @@ func newWebServer(t *testing.T) *echo.Echo {
 		adminH,
 		usersH,
 		jwtMgr,
+		nil,
+		nil,
 	)
 }
 

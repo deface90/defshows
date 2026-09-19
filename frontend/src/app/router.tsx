@@ -11,6 +11,7 @@ import { RegisterPage } from '@/pages/RegisterPage'
 import { SearchPage } from '@/pages/SearchPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { ShowDetailPage } from '@/pages/ShowDetailPage'
+import { UnwatchedPage } from '@/pages/UnwatchedPage'
 import { UserProfilePage } from '@/pages/UserProfilePage'
 import { UsersPage } from '@/pages/UsersPage'
 import { Layout } from '@/shared/ui/Layout'
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { index: true, element: <MyShowsPage /> },
+          { path: 'unwatched', element: <UnwatchedPage /> },
           { path: 'search', element: <SearchPage /> },
           { path: 'discover', element: <DiscoverPage /> },
           { path: 'catalog/:tmdbId', element: <CatalogShowPage /> },

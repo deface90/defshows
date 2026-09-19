@@ -164,3 +164,38 @@ func TestCatalogRepository_Ratings(t *testing.T) {
 		}
 	}
 }
+
+func TestCatalogRepository_ReferenceLinksRefresh(t *testing.T) {
+	db := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, db, "shows", "genres")
+	repo := repository.NewCatalogRepository(db)
+	imdb, wiki := "https://www.imdb.com/title/tt0944947/", "https://en.wikipedia.org/wiki/Game_of_Thrones"
+	ctx := t.Context()
+	show := &entity.Show{TMDBID: 1399, Title: "Game of Thrones", IMDbURL: &imdb, WikipediaURL: &wiki}
+	if err := repo.UpsertShow(ctx, show); err != nil {
+		t.Fatal(err)
+	}
+	// Failed enrichment must not erase known links.
+	if err := repo.UpsertShow(ctx, &entity.Show{TMDBID: 1399, Title: "Updated"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.GetShowByID(ctx, show.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.IMDbURL == nil || *got.IMDbURL != imdb || got.WikipediaURL == nil || *got.WikipediaURL != wiki {
+		t.Fatalf("lost links: %+v", got)
+	}
+	// A successful lookup can replace a URL or explicitly remove a stale link.
+	updated, empty := "https://ru.wikipedia.org/wiki/Game_of_Thrones", ""
+	if err := repo.UpsertShow(ctx, &entity.Show{TMDBID: 1399, Title: "Updated", IMDbURL: &empty, WikipediaURL: &updated}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = repo.GetShowByID(ctx, show.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.IMDbURL == nil || *got.IMDbURL != "" || got.WikipediaURL == nil || *got.WikipediaURL != updated {
+		t.Fatalf("links not refreshed: %+v", got)
+	}
+}

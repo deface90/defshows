@@ -27,15 +27,23 @@ func (r *CatalogRepository) UpsertShow(ctx context.Context, s *entity.Show) erro
 	if s.AiringStatus == "" {
 		s.AiringStatus = entity.AiringNotStarted
 	}
+	columns := []string{
+		"title", "original_title", "overview", "poster_key", "backdrop_key",
+		"status", "in_production", "first_air_date", "last_air_date",
+		"next_episode_air_date", "last_episode_air_date", "airing_status",
+		"original_language", "popularity", "vote_average", "vote_count",
+		"last_synced_at", "updated_at",
+	}
+	// nil means enrichment failed or was unavailable; retain previously known links.
+	if s.IMDbURL != nil {
+		columns = append(columns, "imdb_url")
+	}
+	if s.WikipediaURL != nil {
+		columns = append(columns, "wikipedia_url")
+	}
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "tmdb_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"title", "original_title", "overview", "poster_key", "backdrop_key",
-			"status", "in_production", "first_air_date", "last_air_date",
-			"next_episode_air_date", "last_episode_air_date", "airing_status",
-			"original_language", "popularity", "vote_average", "vote_count",
-			"last_synced_at", "updated_at",
-		}),
+		Columns:   []clause.Column{{Name: "tmdb_id"}},
+		DoUpdates: clause.AssignmentColumns(columns),
 	}).Create(s).Error
 }
 

@@ -9,6 +9,8 @@ export interface Progress {
   watched_episode_ids: number[];
   watched: number;
   total: number;
+  /** Aired but not-yet-watched episodes */
+  unwatched: number;
   /** @nullable */
   next_unwatched_episode_id?: number | null;
 }

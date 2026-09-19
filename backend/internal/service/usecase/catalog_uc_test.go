@@ -59,6 +59,8 @@ func TestCatalogUsecase_ImportAndGet(t *testing.T) {
 	testutil.Truncate(t, gdb, "shows", "genres")
 	repo := repository.NewCatalogRepository(gdb)
 	fp := sampleProvider()
+	imdb, wiki := "https://www.imdb.com/title/tt0944947/", "https://ru.wikipedia.org/wiki/Game_of_Thrones"
+	fp.show.IMDbURL, fp.show.WikipediaURL = &imdb, &wiki
 	uc := usecase.NewCatalogUsecase(repo, fp)
 	ctx := context.Background()
 
@@ -73,6 +75,9 @@ func TestCatalogUsecase_ImportAndGet(t *testing.T) {
 	detail, err := uc.GetShow(ctx, show.ID)
 	if err != nil {
 		t.Fatalf("get: %v", err)
+	}
+	if detail.Show.IMDbURL == nil || *detail.Show.IMDbURL != imdb || detail.Show.WikipediaURL == nil || *detail.Show.WikipediaURL != wiki {
+		t.Fatalf("reference links not persisted: %+v", detail.Show)
 	}
 	if len(detail.Show.Genres) != 1 {
 		t.Fatalf("want 1 genre, got %d", len(detail.Show.Genres))
@@ -130,6 +135,60 @@ func TestCatalogUsecase_SkipsSpecials(t *testing.T) {
 	}
 	if len(detail.Episodes) != 2 {
 		t.Fatalf("want 2 episodes, got %d", len(detail.Episodes))
+	}
+}
+
+// fakeMirror records mirror calls and returns a deterministic public URL.
+type fakeMirror struct {
+	keys []string
+	fail bool
+}
+
+func (m *fakeMirror) Mirror(_ context.Context, _, key string) (string, error) {
+	m.keys = append(m.keys, key)
+	if m.fail {
+		return "", context.DeadlineExceeded
+	}
+	return "https://cdn.example/" + key, nil
+}
+
+func TestCatalogUsecase_ImportMirrorsImages(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "shows", "genres")
+	repo := repository.NewCatalogRepository(gdb)
+	fp := sampleProvider()
+	fp.show.PosterURL = "https://image.tmdb.org/p/poster.jpg"
+	fp.show.BackdropURL = "https://image.tmdb.org/p/backdrop.jpg"
+	mirror := &fakeMirror{}
+	uc := usecase.NewCatalogUsecase(repo, fp).WithImageMirror(mirror)
+	ctx := context.Background()
+
+	show, err := uc.ImportShow(ctx, 1399)
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	// Deterministic keys, mirrored public URLs stored on the show.
+	if want := []string{"shows/1399/poster.jpg", "shows/1399/backdrop.jpg"}; len(mirror.keys) != 2 || mirror.keys[0] != want[0] || mirror.keys[1] != want[1] {
+		t.Fatalf("unexpected mirror keys: %v", mirror.keys)
+	}
+	if show.PosterKey == nil || *show.PosterKey != "https://cdn.example/shows/1399/poster.jpg" {
+		t.Fatalf("poster not mirrored: %v", show.PosterKey)
+	}
+	if show.BackdropKey == nil || *show.BackdropKey != "https://cdn.example/shows/1399/backdrop.jpg" {
+		t.Fatalf("backdrop not mirrored: %v", show.BackdropKey)
+	}
+
+	// On mirror failure, fall back to the original source URL.
+	testutil.Truncate(t, gdb, "shows", "genres")
+	fp2 := sampleProvider()
+	fp2.show.PosterURL = "https://image.tmdb.org/p/poster.jpg"
+	uc2 := usecase.NewCatalogUsecase(repo, fp2).WithImageMirror(&fakeMirror{fail: true})
+	show2, err := uc2.ImportShow(ctx, 1399)
+	if err != nil {
+		t.Fatalf("import (mirror fail): %v", err)
+	}
+	if show2.PosterKey == nil || *show2.PosterKey != "https://image.tmdb.org/p/poster.jpg" {
+		t.Fatalf("expected fallback to source URL, got %v", show2.PosterKey)
 	}
 }
 

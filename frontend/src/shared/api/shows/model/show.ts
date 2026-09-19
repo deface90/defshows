@@ -16,6 +16,10 @@ export interface Show {
   original_title?: string;
   overview?: string;
   poster_url?: string;
+  /** Automatically resolved IMDb title URL */
+  imdb_url?: string;
+  /** Wikipedia article, Russian preferred with English fallback */
+  wikipedia_url?: string;
   backdrop_url?: string;
   status?: string;
   in_production?: boolean;

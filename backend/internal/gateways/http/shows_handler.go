@@ -85,6 +85,8 @@ func toAPIShowBasic(s *entity.Show) showsapi.Show {
 	return showsapi.Show{
 		Id:                 s.ID,
 		TmdbId:             s.TMDBID,
+		ImdbUrl:            s.IMDbURL,
+		WikipediaUrl:       s.WikipediaURL,
 		Title:              s.Title,
 		OriginalTitle:      ptr(s.OriginalTitle),
 		Overview:           ptr(s.Overview),

@@ -15,6 +15,7 @@ import (
 	showsapi "github.com/deface90/defshows/backend/pkg/server/shows"
 	trackingapi "github.com/deface90/defshows/backend/pkg/server/tracking"
 	usersapi "github.com/deface90/defshows/backend/pkg/server/users"
+	"github.com/deface90/defshows/backend/pkg/storage"
 )
 
 // authPublicPaths are the auth routes reachable without a valid access token.
@@ -26,6 +27,9 @@ var authPublicPaths = map[string]bool{
 	"/auth/oauth/:provider":          true,
 	"/auth/oauth/:provider/callback": true,
 	"/auth/oauth/exchange":           true,
+	// Catalog images are public (referenced directly by <img> tags).
+	"/images/*":                    true,
+	"/images/tmdb/:size/:filename": true,
 }
 
 // NewAuthRouter builds the echo router for the auth service. Every route except
@@ -39,9 +43,9 @@ func NewAuthRouter(h *AuthHandler, jwt *auth.JWTManager) *echo.Echo {
 }
 
 // NewWebRouter builds the echo router for the web service: auth, catalog, and
-// tracking on one echo. Every route except the public auth endpoints requires a
-// valid Bearer access token.
-func NewWebRouter(authH *AuthHandler, showsH *ShowsHandler, trackingH *TrackingHandler, notificationsH *NotificationsHandler, notesH *NotesHandler, adminH *AdminHandler, usersH *UsersHandler, jwt *auth.JWTManager, corsOrigins ...string) *echo.Echo {
+// tracking on one echo. Public auth endpoints and catalog images do not require
+// a Bearer access token.
+func NewWebRouter(authH *AuthHandler, showsH *ShowsHandler, trackingH *TrackingHandler, notificationsH *NotificationsHandler, notesH *NotesHandler, adminH *AdminHandler, usersH *UsersHandler, jwt *auth.JWTManager, imageStore *storage.S3, imageClient *http.Client, corsOrigins ...string) *echo.Echo {
 	e := echo.New()
 	e.Use(middleware.Recover())
 	// CORS runs before the auth guard so browser preflight (OPTIONS) is answered
@@ -51,6 +55,10 @@ func NewWebRouter(authH *AuthHandler, showsH *ShowsHandler, trackingH *TrackingH
 	}
 	e.Use(requireAuthExcept(jwt, authPublicPaths))
 	e.Use(requireAdminForAdminPaths())
+	e.GET("/images/tmdb/:size/:filename", serveTMDBImage(imageClient))
+	if imageStore != nil {
+		e.GET("/images/*", serveImage(imageStore))
+	}
 	authapi.RegisterHandlers(e, authH)
 	showsapi.RegisterHandlers(e, showsH)
 	trackingapi.RegisterHandlers(e, trackingH)
@@ -59,6 +67,24 @@ func NewWebRouter(authH *AuthHandler, showsH *ShowsHandler, trackingH *TrackingH
 	adminapi.RegisterHandlers(e, adminH)
 	usersapi.RegisterHandlers(e, usersH)
 	return e
+}
+
+// serveImage streams a mirrored object from storage. The key is the path after
+// "/images/" (e.g. shows/42/poster.jpg).
+func serveImage(store *storage.S3) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		key := c.Param("*")
+		if key == "" {
+			return echo.NewHTTPError(http.StatusNotFound, "not found")
+		}
+		body, contentType, err := store.Get(c.Request().Context(), key)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusNotFound, "not found")
+		}
+		defer body.Close()
+		c.Response().Header().Set("Cache-Control", "public, max-age=86400")
+		return c.Stream(http.StatusOK, contentType, body)
+	}
 }
 
 // requireAdminForAdminPaths enforces the admin role on /admin/* routes (runs

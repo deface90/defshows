@@ -28,6 +28,7 @@ type Provider struct {
 	client        *tmdbclient.ClientWithResponses
 	apiKey        string
 	language      string
+	httpClient    *http.Client
 }
 
 var _ provider.ShowProvider = (*Provider)(nil)
@@ -52,7 +53,7 @@ func New(baseURL, apiKey, language string, httpClient *http.Client) (*Provider, 
 	if err != nil {
 		return nil, fmt.Errorf("tmdb: new client: %w", err)
 	}
-	return &Provider{client: c, apiKey: apiKey, language: language}, nil
+	return &Provider{client: c, apiKey: apiKey, language: language, httpClient: httpClient}, nil
 }
 
 // editor injects api_key and language on every request.
@@ -78,7 +79,8 @@ func (p *Provider) SearchShows(ctx context.Context, query string) ([]provider.Sh
 
 // GetShow fetches full series detail.
 func (p *Provider) GetShow(ctx context.Context, tmdbID int64) (*provider.Show, error) {
-	resp, err := p.client.GetTvShowWithResponse(ctx, tmdbID, p.editor)
+	appendResponse := "external_ids"
+	resp, err := p.client.GetTvShowWithResponse(ctx, tmdbID, &tmdbclient.GetTvShowParams{AppendToResponse: &appendResponse}, p.editor)
 	if err != nil {
 		return nil, fmt.Errorf("tmdb: get show: %w", safeRequestError(err))
 	}
@@ -121,6 +123,14 @@ func (p *Provider) GetShow(ctx context.Context, tmdbID int64) (*provider.Show, e
 				PosterURL:    imageURL(sn.PosterPath),
 			})
 		}
+	}
+	if s.ExternalIds != nil {
+		imdbURL := ""
+		if id := val(s.ExternalIds.ImdbId); imdbIDPattern.MatchString(id) {
+			imdbURL = "https://www.imdb.com/title/" + id + "/"
+		}
+		show.IMDbURL = &imdbURL
+		show.WikipediaURL = p.wikipediaURL(ctx, val(s.ExternalIds.WikidataId))
 	}
 	return show, nil
 }

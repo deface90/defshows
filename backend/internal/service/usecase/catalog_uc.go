@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/deface90/defshows/backend/internal/service/entity"
@@ -12,6 +14,13 @@ import (
 
 // ErrShowNotFound is returned when a show is not in the local catalog.
 var ErrShowNotFound = errors.New("usecase: show not found")
+
+// ImageMirror stores an external image under a deterministic key and returns
+// the public URL to serve it from. Used to mirror TMDB posters/backdrops so
+// browsers never hit the (blockable) TMDB image host.
+type ImageMirror interface {
+	Mirror(ctx context.Context, srcURL, key string) (string, error)
+}
 
 // CatalogRepo is the storage dependency of CatalogUsecase.
 type CatalogRepo interface {
@@ -42,11 +51,20 @@ type ShowDetail struct {
 type CatalogUsecase struct {
 	repo     CatalogRepo
 	provider provider.ShowProvider
+	mirror   ImageMirror
+	logger   *slog.Logger
 }
 
 // NewCatalogUsecase creates a CatalogUsecase.
 func NewCatalogUsecase(repo CatalogRepo, p provider.ShowProvider) *CatalogUsecase {
-	return &CatalogUsecase{repo: repo, provider: p}
+	return &CatalogUsecase{repo: repo, provider: p, logger: slog.Default()}
+}
+
+// WithImageMirror attaches an image mirror used to copy posters/backdrops into
+// object storage on import. Returns the usecase for chaining.
+func (uc *CatalogUsecase) WithImageMirror(m ImageMirror) *CatalogUsecase {
+	uc.mirror = m
+	return uc
 }
 
 // SearchExternal searches the external provider (TMDB).
@@ -114,13 +132,17 @@ func (uc *CatalogUsecase) ImportShow(ctx context.Context, tmdbID int64) (*entity
 
 	now := time.Now()
 	status := deriveAiringStatus(ps)
+	posterURL := uc.mirrorImage(ctx, ps.PosterURL, fmt.Sprintf("shows/%d/poster.jpg", ps.TMDBID))
+	backdropURL := uc.mirrorImage(ctx, ps.BackdropURL, fmt.Sprintf("shows/%d/backdrop.jpg", ps.TMDBID))
 	show := &entity.Show{
+		IMDbURL:            ps.IMDbURL,
+		WikipediaURL:       ps.WikipediaURL,
 		TMDBID:             ps.TMDBID,
 		Title:              ps.Title,
 		OriginalTitle:      ps.OriginalTitle,
 		Overview:           ps.Overview,
-		PosterKey:          strOrNil(ps.PosterURL),
-		BackdropKey:        strOrNil(ps.BackdropURL),
+		PosterKey:          strOrNil(posterURL),
+		BackdropKey:        strOrNil(backdropURL),
 		Status:             ps.Status,
 		InProduction:       ps.InProduction,
 		FirstAirDate:       ps.FirstAirDate,
@@ -276,4 +298,20 @@ func strOrNil(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// mirrorImage copies srcURL into object storage under key and returns the public
+// URL. With no mirror configured, or on any error, it falls back to srcURL so
+// the catalog still records the (original) image reference. Deterministic keys
+// mean re-imports overwrite in place — images don't accumulate.
+func (uc *CatalogUsecase) mirrorImage(ctx context.Context, srcURL, key string) string {
+	if uc.mirror == nil || srcURL == "" {
+		return srcURL
+	}
+	publicURL, err := uc.mirror.Mirror(ctx, srcURL, key)
+	if err != nil {
+		uc.logger.Warn("image mirror failed", "key", key, "err", err)
+		return srcURL
+	}
+	return publicURL
 }

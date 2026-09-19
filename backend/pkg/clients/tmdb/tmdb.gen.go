@@ -93,7 +93,11 @@ type TvSeasonDetail struct {
 
 // TvShow defines model for TvShow.
 type TvShow struct {
-	BackdropPath     *string     `json:"backdrop_path,omitempty"`
+	BackdropPath *string `json:"backdrop_path,omitempty"`
+	ExternalIds  *struct {
+		ImdbId     *string `json:"imdb_id,omitempty"`
+		WikidataId *string `json:"wikidata_id,omitempty"`
+	} `json:"external_ids,omitempty"`
 	FirstAirDate     *string     `json:"first_air_date,omitempty"`
 	Genres           *[]Genre    `json:"genres,omitempty"`
 	Id               *int64      `json:"id,omitempty"`
@@ -117,6 +121,11 @@ type TvShow struct {
 type SearchTvParams struct {
 	Query string `form:"query" json:"query"`
 	Page  *int   `form:"page,omitempty" json:"page,omitempty"`
+}
+
+// GetTvShowParams defines parameters for GetTvShow.
+type GetTvShowParams struct {
+	AppendToResponse *string `form:"append_to_response,omitempty" json:"append_to_response,omitempty"`
 }
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
@@ -206,7 +215,7 @@ type ClientInterface interface {
 	SearchTv(ctx context.Context, params *SearchTvParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetTvShow performs a GET /tv/{series_id} (the `GetTvShow` operationId) request.
-	GetTvShow(ctx context.Context, seriesId int64, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetTvShow(ctx context.Context, seriesId int64, params *GetTvShowParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetTvSeason performs a GET /tv/{series_id}/season/{season_number} (the `GetTvSeason` operationId) request.
 	GetTvSeason(ctx context.Context, seriesId int64, seasonNumber int, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -265,8 +274,8 @@ func (c *Client) SearchTv(ctx context.Context, params *SearchTvParams, reqEditor
 }
 
 // GetTvShow performs a GET /tv/{series_id} (the `GetTvShow` operationId) request.
-func (c *Client) GetTvShow(ctx context.Context, seriesId int64, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetTvShowRequest(c.Server, seriesId)
+func (c *Client) GetTvShow(ctx context.Context, seriesId int64, params *GetTvShowParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTvShowRequest(c.Server, seriesId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +443,7 @@ func NewSearchTvRequest(server string, params *SearchTvParams) (*http.Request, e
 }
 
 // NewGetTvShowRequest constructs an http.Request for the GetTvShow method
-func NewGetTvShowRequest(server string, seriesId int64) (*http.Request, error) {
+func NewGetTvShowRequest(server string, seriesId int64, params *GetTvShowParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -457,6 +466,33 @@ func NewGetTvShowRequest(server string, seriesId int64) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.AppendToResponse != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "append_to_response", *params.AppendToResponse, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -575,7 +611,7 @@ type ClientWithResponsesInterface interface {
 	// GetTvShowWithResponse performs a GET /tv/{series_id} (the `GetTvShow` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	GetTvShowWithResponse(ctx context.Context, seriesId int64, reqEditors ...RequestEditorFn) (*GetTvShowResponse, error)
+	GetTvShowWithResponse(ctx context.Context, seriesId int64, params *GetTvShowParams, reqEditors ...RequestEditorFn) (*GetTvShowResponse, error)
 
 	// GetTvSeasonWithResponse performs a GET /tv/{series_id}/season/{season_number} (the `GetTvSeason` operationId) request.
 	//
@@ -876,8 +912,8 @@ func (c *ClientWithResponses) SearchTvWithResponse(ctx context.Context, params *
 // GetTvShowWithResponse performs a GET /tv/{series_id} (the `GetTvShow` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) GetTvShowWithResponse(ctx context.Context, seriesId int64, reqEditors ...RequestEditorFn) (*GetTvShowResponse, error) {
-	rsp, err := c.GetTvShow(ctx, seriesId, reqEditors...)
+func (c *ClientWithResponses) GetTvShowWithResponse(ctx context.Context, seriesId int64, params *GetTvShowParams, reqEditors ...RequestEditorFn) (*GetTvShowResponse, error) {
+	rsp, err := c.GetTvShow(ctx, seriesId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

@@ -1,3 +1,4 @@
+import { imageUrl } from '@/shared/lib/imageUrl'
 import { Box, Image } from '@mantine/core'
 import { RatingBadge } from './RatingBadge'
 
@@ -30,7 +31,7 @@ export function Poster({
 }) {
   const cover = src ? (
     <Image
-      src={src}
+      src={imageUrl(src)}
       w={w}
       radius="md"
       fit="cover"

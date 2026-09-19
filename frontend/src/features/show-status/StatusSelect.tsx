@@ -5,7 +5,15 @@ import { getGetTrackedQueryKey, getListTrackedQueryKey, updateShow } from '@/sha
 import type { UserShowStatus } from '@/shared/api/tracking/model'
 import { STATUS_OPTIONS } from '@/entities/show/status'
 
-export function StatusSelect({ showId, status }: { showId: number; status: UserShowStatus }) {
+export function StatusSelect({
+  showId,
+  status,
+  fullWidth = false,
+}: {
+  showId: number
+  status: UserShowStatus
+  fullWidth?: boolean
+}) {
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: (next: string) => updateShow(showId, { status: next as UserShowStatus }),
@@ -22,7 +30,7 @@ export function StatusSelect({ showId, status }: { showId: number; status: UserS
   return (
     <Select
       size="xs"
-      w={150}
+      w={fullWidth ? '100%' : 150}
       data={STATUS_OPTIONS}
       value={status}
       allowDeselect={false}

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/deface90/defshows/backend/internal/gateways/providers/omdb"
 	"github.com/deface90/defshows/backend/internal/gateways/providers/tmdb"
@@ -15,7 +16,9 @@ import (
 	"github.com/deface90/defshows/backend/migrations"
 	"github.com/deface90/defshows/backend/pkg/config"
 	"github.com/deface90/defshows/backend/pkg/db"
+	"github.com/deface90/defshows/backend/pkg/httpx"
 	pkglog "github.com/deface90/defshows/backend/pkg/log"
+	"github.com/deface90/defshows/backend/pkg/storage"
 )
 
 func main() {
@@ -33,12 +36,24 @@ func main() {
 		log.Fatalf("worker: migrate: %v", err)
 	}
 
-	tmdbProvider, err := tmdb.New("", cfg.TMDB.APIKey, cfg.TMDB.Language, nil)
+	proxyClient, err := httpx.Client(cfg.Proxy, 15*time.Second)
+	if err != nil {
+		log.Fatalf("worker: proxy: %v", err)
+	}
+	tmdbProvider, err := tmdb.New("", cfg.TMDB.APIKey, cfg.TMDB.Language, proxyClient)
 	if err != nil {
 		log.Fatalf("worker: tmdb: %v", err)
 	}
 	catalogRepo := repository.NewCatalogRepository(gdb)
 	catalogUC := usecase.NewCatalogUsecase(catalogRepo, tmdbProvider)
+	if cfg.S3.Enabled() {
+		imageStore, err := storage.New(cfg.S3, proxyClient)
+		if err != nil {
+			log.Fatalf("worker: storage: %v", err)
+		}
+		catalogUC.WithImageMirror(imageStore)
+		logger.Info("image mirror enabled", "bucket", cfg.S3.Bucket)
+	}
 	syncer := workers.NewCatalogSyncer(catalogUC, logger, cfg.Worker.StaleAge, cfg.Worker.Throttle, cfg.Worker.Batch)
 
 	if cfg.OMDb.APIKey != "" {
