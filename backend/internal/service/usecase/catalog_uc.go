@@ -131,7 +131,7 @@ func (uc *CatalogUsecase) ImportShow(ctx context.Context, tmdbID int64) (*entity
 	}
 
 	now := time.Now()
-	status := deriveAiringStatus(ps)
+	status := deriveAiringStatus(ps, now)
 	posterURL := uc.mirrorImage(ctx, ps.PosterURL, fmt.Sprintf("shows/%d/poster.jpg", ps.TMDBID))
 	backdropURL := uc.mirrorImage(ctx, ps.BackdropURL, fmt.Sprintf("shows/%d/backdrop.jpg", ps.TMDBID))
 	show := &entity.Show{
@@ -271,10 +271,13 @@ func (uc *CatalogUsecase) linkNextEpisode(ctx context.Context, showID int64, ps 
 	return uc.repo.SetNextEpisode(ctx, showID, nil, ps.NextEpisode.AirDate, status)
 }
 
-func deriveAiringStatus(ps *provider.Show) entity.AiringStatus {
+func deriveAiringStatus(ps *provider.Show, now time.Time) entity.AiringStatus {
 	switch {
 	case ps.NextEpisode != nil:
-		return entity.AiringNow
+		if nextSeasonStarted(ps, now) {
+			return entity.AiringNow
+		}
+		return entity.AiringBetweenSeasons
 	case ps.InProduction:
 		return entity.AiringBetweenSeasons
 	case ps.Status == "Ended" || ps.Status == "Canceled":
@@ -284,6 +287,28 @@ func deriveAiringStatus(ps *provider.Show) entity.AiringStatus {
 	default:
 		return entity.AiringNotStarted
 	}
+}
+
+// A scheduled episode does not mean its season has premiered. TMDB's season
+// air date is the premiere date; never use the previous season's last episode
+// as evidence that the upcoming season is already airing.
+func nextSeasonStarted(ps *provider.Show, now time.Time) bool {
+	next := ps.NextEpisode
+	if next.SeasonNumber <= 0 {
+		return false
+	}
+	for _, season := range ps.Seasons {
+		if season.SeasonNumber == next.SeasonNumber && season.AirDate != nil {
+			return aired(season.AirDate, now)
+		}
+	}
+	// Fallback for incomplete season metadata, including premiere day before
+	// TMDB moves the first episode from next_episode_to_air to last_episode_to_air.
+	if next.EpisodeNumber == 1 && aired(next.AirDate, now) {
+		return true
+	}
+	last := ps.LastEpisode
+	return last != nil && last.SeasonNumber == next.SeasonNumber && last.EpisodeNumber > 0 && aired(last.AirDate, now)
 }
 
 func episodeAirDate(e *provider.Episode) *time.Time {

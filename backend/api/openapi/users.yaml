@@ -114,8 +114,8 @@ components:
       type: object
       required: [watched, total]
       properties:
-        watched: { type: integer }
-        total: { type: integer }
+        watched: { type: integer, description: Watched episodes that have already aired }
+        total: { type: integer, description: Episodes with a known air date of today or earlier }
         next_unwatched_episode_id: { type: integer, format: int64, nullable: true }
     TrackedShow:
       type: object

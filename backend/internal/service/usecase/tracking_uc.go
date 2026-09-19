@@ -39,7 +39,8 @@ type Catalog interface {
 	Episodes(ctx context.Context, showID int64) ([]entity.Episode, error)
 }
 
-// Progress summarizes how far a user is through a show.
+// Progress summarizes viewing of aired episodes only.
+// WatchedEpisodeIDs preserves all saved marks, including dates later changed by the provider.
 type Progress struct {
 	WatchedEpisodeIDs []int64
 	Watched           int
@@ -227,17 +228,20 @@ func (uc *TrackingUsecase) progress(ctx context.Context, us *entity.UserShow) (P
 		watched[id] = true
 	}
 
-	prog := Progress{Total: len(episodes), Watched: len(watchedIDs), WatchedEpisodeIDs: append([]int64{}, watchedIDs...)}
+	prog := Progress{WatchedEpisodeIDs: append([]int64{}, watchedIDs...)}
 	now := time.Now()
 	for i := range episodes {
-		if watched[episodes[i].ID] {
+		if !aired(episodes[i].AirDate, now) {
 			continue
 		}
+		prog.Total++
+		if watched[episodes[i].ID] {
+			prog.Watched++
+			continue
+		}
+		prog.Unwatched++
 		if prog.NextUnwatched == nil {
 			prog.NextUnwatched = &episodes[i]
-		}
-		if aired(episodes[i].AirDate, now) {
-			prog.Unwatched++
 		}
 	}
 	return prog, nil

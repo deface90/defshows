@@ -7,7 +7,9 @@
 
 export interface Progress {
   watched_episode_ids: number[];
+  /** Watched episodes that have already aired */
   watched: number;
+  /** Episodes with a known air date of today or earlier */
   total: number;
   /** Aired but not-yet-watched episodes */
   unwatched: number;

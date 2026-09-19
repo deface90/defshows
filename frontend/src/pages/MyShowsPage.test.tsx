@@ -26,6 +26,7 @@ describe('MyShowsPage', () => {
 
     expect(await screen.findByText('Game of Thrones')).toBeInTheDocument()
     expect(screen.getByText('1 / 10 эпизодов')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Смотрю/ })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('shows an empty state when nothing is tracked', async () => {

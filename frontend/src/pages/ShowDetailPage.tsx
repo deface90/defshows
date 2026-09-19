@@ -5,7 +5,7 @@ import { AddShowButton } from '@/features/add-show/AddShowButton'
 import { ContinueWatching } from '@/features/mark-watched/ContinueWatching'
 import { NotesList } from '@/features/notes/NotesList'
 import { StatusSelect } from '@/features/show-status/StatusSelect'
-import { RecapView } from '@/entities/recap/RecapView'
+// import { RecapView } from '@/entities/recap/RecapView'
 import { SeasonAccordion } from '@/entities/episode/SeasonAccordion'
 import { AiringStatusBadge } from '@/entities/show/AiringStatusBadge'
 import { NextEpisodeInfo } from '@/entities/show/NextEpisodeInfo'
@@ -169,15 +169,17 @@ export function ShowDetailContent({ show, preview = false, backTo = '/search' }:
             </Group>
           )}
 
-          {!preview && <Tabs key={tracked ? 'tracked' : 'guest'} defaultValue="recap">
+          {!preview && tracked && <Tabs defaultValue="notes">
             <Tabs.List>
-              <Tabs.Tab value="recap">Рекап</Tabs.Tab>
+              {/* <Tabs.Tab value="recap">Рекап</Tabs.Tab> */}
               {tracked && <Tabs.Tab value="notes">Заметки</Tabs.Tab>}
             </Tabs.List>
 
+            {/* Recap is temporarily hidden until generation is available.
             <Tabs.Panel value="recap" pt="md">
               <RecapView showId={show.id} />
             </Tabs.Panel>
+            */}
 
             {tracked && (
               <Tabs.Panel value="notes" pt="md">

@@ -6,7 +6,9 @@
  */
 
 export interface Progress {
+  /** Watched episodes that have already aired */
   watched: number;
+  /** Episodes with a known air date of today or earlier */
   total: number;
   /** @nullable */
   next_unwatched_episode_id?: number | null;

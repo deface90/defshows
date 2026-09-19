@@ -28,7 +28,7 @@ export function ContinueWatching({ showId, next }: { showId: number; next: Episo
           </Text>
           <Text fw={700} fz="lg">
             {done
-              ? 'Все эпизоды просмотрены'
+              ? 'Все вышедшие эпизоды просмотрены'
               : `${episodeCode(next.season_number, next.episode_number)} · ${next.name}`}
           </Text>
           {!done && next.runtime ? (

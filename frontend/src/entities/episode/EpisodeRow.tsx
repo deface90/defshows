@@ -51,11 +51,6 @@ export function EpisodeRow({
           {aired ? airLabel : `📅 ${airLabel}`}
         </Text>
       ) : null}
-      {episode.runtime ? (
-        <Text size="xs" c="dimmed" w={54} ta="right" style={{ flex: 'none' }}>
-          {episode.runtime} мин
-        </Text>
-      ) : null}
     </Group>
   )
 }

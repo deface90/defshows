@@ -55,10 +55,10 @@ describe('ShowDetailPage', () => {
     expect(screen.getByText('IMDb: 9.2/10')).toBeInTheDocument()
     expect(await screen.findByText('Winter Is Coming')).toBeInTheDocument()
 
-    // Episode 100 (before next unwatched 101) is checked; 101 is not.
+    // Newest first: episode 101 is unchecked, episode 100 is checked.
     const boxes = await screen.findAllByRole('checkbox', { name: 'Просмотрено' })
-    expect(boxes[0]).toBeChecked()
-    expect(boxes[1]).not.toBeChecked()
+    expect(boxes[0]).not.toBeChecked()
+    expect(boxes[1]).toBeChecked()
 
     // Season toggle is indeterminate: 1 of 2 episodes watched.
     const seasonBox = screen.getByRole('checkbox', { name: 'Отметить сезон просмотренным' })
@@ -103,16 +103,16 @@ it('keeps a later season checked independently of the first and updates episode 
   )
   renderDetail()
   const seasons = await screen.findAllByRole('checkbox', { name: 'Отметить сезон просмотренным' })
-  await user.click(screen.getByRole('button', { name: /Сезон 2/ }))
-  await user.click(seasons[1])
-  await waitFor(() => expect(seasons[1]).toBeChecked())
-  expect(seasons[0]).not.toBeChecked()
-  const episodes = screen.getAllByRole('checkbox', { name: 'Просмотрено' })
-  expect(episodes[0]).not.toBeChecked()
-  expect(episodes[2]).toBeChecked()
-  await user.click(seasons[1])
-  await waitFor(() => expect(episodes[2]).not.toBeChecked())
+  await user.click(screen.getByRole('button', { name: /Сезон 1/ }))
+  await user.click(seasons[0])
+  await waitFor(() => expect(seasons[0]).toBeChecked())
   expect(seasons[1]).not.toBeChecked()
+  const episodes = screen.getAllByRole('checkbox', { name: 'Просмотрено' })
+  expect(episodes[2]).not.toBeChecked()
+  expect(episodes[0]).toBeChecked()
+  await user.click(seasons[0])
+  await waitFor(() => expect(episodes[0]).not.toBeChecked())
+  expect(seasons[0]).not.toBeChecked()
 })
 
 it('marks the entire show with one write request and refreshes all checkboxes', async () => {
@@ -188,4 +188,25 @@ it('omits reference links when the provider has none', async () => {
   await screen.findByText('Game of Thrones')
   expect(screen.queryByRole('link', { name: 'IMDb ↗' })).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: 'Wikipedia ↗' })).not.toBeInTheDocument()
+})
+
+it('shows completed aired progress even with upcoming and undated episodes in the season', async () => {
+  const upcoming = { id: 102, season_number: 1, episode_number: 3, name: 'Upcoming episode', air_date: '2999-01-01' }
+  const undated = { id: 103, season_number: 1, episode_number: 4, name: 'Undated episode', air_date: null }
+  const detailed = { ...show, seasons: [{ ...show.seasons[0], episodes: [...show.seasons[0].episodes, upcoming, undated] }] }
+  server.use(
+    http.get(`${base}/shows/10`, () => HttpResponse.json(detailed)),
+    http.get(`${base}/me/shows/10`, () => HttpResponse.json({
+      user_show: { id: 5, show_id: 10, status: 'watching', favorite: false },
+      show: detailed,
+      progress: { watched: 2, total: 2, unwatched: 0, watched_episode_ids: [100, 101, 102], next_unwatched_episode_id: null },
+    })),
+  )
+  renderDetail()
+  expect(await screen.findByText('Все вышедшие эпизоды просмотрены')).toBeInTheDocument()
+  expect(screen.getByText('2 / 2 ✓')).toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: 'Отметить сезон просмотренным' })).toBeChecked()
+  expect(screen.getByText('Upcoming episode')).toBeInTheDocument()
+  expect(screen.getByText('Undated episode')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Весь сериал просмотрен ✓' })).toBeDisabled()
 })

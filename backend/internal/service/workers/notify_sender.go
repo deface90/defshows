@@ -65,10 +65,8 @@ func (s *NotifySender) Run(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		if sent, failed, err := s.RunOnce(ctx); err != nil && ctx.Err() == nil {
+		if _, _, err := s.RunOnce(ctx); err != nil && ctx.Err() == nil {
 			s.logger.Error("notify send failed", "err", err)
-		} else {
-			s.logger.Info("notify send complete", "sent", sent, "failed", failed)
 		}
 		select {
 		case <-ctx.Done():

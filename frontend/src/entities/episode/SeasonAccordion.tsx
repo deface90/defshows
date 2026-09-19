@@ -18,15 +18,17 @@ export function SeasonAccordion({
   if (seasons.length === 0) {
     return <Text c="dimmed">Нет информации о сезонах</Text>
   }
+  const sortedSeasons = [...seasons].sort((a, b) => b.season_number - a.season_number)
   return (
-    <Accordion multiple defaultValue={[String(seasons[0].season_number)]}>
-      {seasons.map((season) => {
-        const watchedCount = season.episodes.reduce(
+    <Accordion multiple defaultValue={[String(sortedSeasons[0].season_number)]}>
+      {sortedSeasons.map((season) => {
+        const airedEpisodes = season.episodes.filter((ep) => isAired(ep.air_date))
+        const watchedCount = airedEpisodes.reduce(
           (n, ep) => (watchedIds.has(ep.id) ? n + 1 : n),
           0,
         )
         // "Fully watched" ignores episodes that have not aired yet.
-        const airedCount = season.episodes.reduce((n, ep) => (isAired(ep.air_date) ? n + 1 : n), 0)
+        const airedCount = airedEpisodes.length
         const allWatched = airedCount > 0 && watchedCount >= airedCount
         return (
         <Accordion.Item key={season.id} value={String(season.season_number)}>
@@ -34,7 +36,7 @@ export function SeasonAccordion({
             <Accordion.Control>
               {season.name || `Сезон ${season.season_number}`}{' '}
               <Text span c="dimmed" size="sm">
-                {tracked ? `${watchedCount} / ${season.episodes.length}${allWatched ? ' ✓' : ''}` : `${season.episodes.length} эпизодов`}
+                {tracked ? `${watchedCount} / ${airedCount}${allWatched ? ' ✓' : ''}` : `${season.episodes.length} эпизодов`}
               </Text>
             </Accordion.Control>
             {tracked && (
@@ -47,7 +49,7 @@ export function SeasonAccordion({
           </Center>
           <Accordion.Panel>
             <Stack gap={2}>
-              {season.episodes.map((ep) => (
+              {[...season.episodes].sort((a, b) => b.episode_number - a.episode_number).map((ep) => (
                 <EpisodeRow
                   key={ep.id}
                   episode={ep}

@@ -21,10 +21,10 @@ const sortOptions = [
 // watch status in the tabs above.
 const airingOptions = [
   { value: '', label: 'Любой статус выхода' },
-  { value: 'airing', label: '🔴 Идёт' },
-  { value: 'between_seasons', label: '⏸ Между сезонами' },
-  { value: 'not_started', label: 'Не начат' },
-  { value: 'ended', label: '✅ Завершён' },
+  { value: 'airing', label: '▶ Идёт' },
+  { value: 'between_seasons', label: 'Ⅱ Между сезонами' },
+  { value: 'not_started', label: '◷ Не начат' },
+  { value: 'ended', label: '■ Завершён' },
 ]
 
 function pct(t: TrackedShow): number {
@@ -35,7 +35,7 @@ function pct(t: TrackedShow): number {
 const PAGE = 20
 
 export function MyShowsPage() {
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState('watching')
   const [airing, setAiring] = useState('')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('progress')
@@ -196,7 +196,7 @@ export function MyShowsPage() {
         {shown.map((t, i) => (
           <div key={t.user_show.id}>
             {i > 0 && <Divider />}
-            <MyShowRow tracked={t} />
+            <MyShowRow tracked={t} showUnwatched />
           </div>
         ))}
         {hasMore && (

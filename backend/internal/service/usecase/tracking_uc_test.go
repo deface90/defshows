@@ -47,13 +47,13 @@ func TestTrackingUsecase_Flow(t *testing.T) {
 		t.Fatalf("episodes: %v (n=%d)", err, len(episodes))
 	}
 
-	// Initial progress: 0/2, next = episode 1. Only episode 1 has aired (episode 2
+	// Initial progress: 0/1, next = episode 1. Only episode 1 has aired (episode 2
 	// has no air date), so exactly one aired-unwatched episode.
 	prog, err := uc.GetProgress(ctx, user.ID, us.ShowID)
 	if err != nil {
 		t.Fatalf("progress: %v", err)
 	}
-	if prog.Watched != 0 || prog.Total != 2 || prog.Unwatched != 1 || prog.NextUnwatched == nil || prog.NextUnwatched.ID != episodes[0].ID {
+	if prog.Watched != 0 || prog.Total != 1 || prog.Unwatched != 1 || prog.NextUnwatched == nil || prog.NextUnwatched.ID != episodes[0].ID {
 		t.Fatalf("unexpected initial progress: %+v", prog)
 	}
 
@@ -73,28 +73,28 @@ func TestTrackingUsecase_Flow(t *testing.T) {
 		t.Fatal(err)
 	}
 	prog, err = uc.GetProgress(ctx, user.ID, us.ShowID)
-	if err != nil || prog.Watched != 1 || len(prog.WatchedEpisodeIDs) != 1 || prog.WatchedEpisodeIDs[0] != episodes[1].ID || prog.NextUnwatched == nil || prog.NextUnwatched.ID != episodes[0].ID {
+	if err != nil || prog.Watched != 0 || len(prog.WatchedEpisodeIDs) != 1 || prog.WatchedEpisodeIDs[0] != episodes[1].ID || prog.NextUnwatched == nil || prog.NextUnwatched.ID != episodes[0].ID {
 		t.Fatalf("out-of-order progress: %+v, %v", prog, err)
 	}
 	if err := uc.SetEpisodeWatched(ctx, user.ID, us.ShowID, episodes[1].ID, false); err != nil {
 		t.Fatal(err)
 	}
 
-	// Mark episode 1 watched → 1/2, next = episode 2.
+	// Mark episode 1 watched → 1/1, no released episode left.
 	if err := uc.SetEpisodeWatched(ctx, user.ID, us.ShowID, episodes[0].ID, true); err != nil {
 		t.Fatalf("mark watched: %v", err)
 	}
 	prog, _ = uc.GetProgress(ctx, user.ID, us.ShowID)
-	if prog.Watched != 1 || prog.NextUnwatched == nil || prog.NextUnwatched.ID != episodes[1].ID {
+	if prog.Watched != 1 || prog.Total != 1 || prog.NextUnwatched != nil {
 		t.Fatalf("progress after mark: %+v", prog)
 	}
 
-	// Mark episode 2 → 2/2, no next.
+	// A legacy mark on an undated episode must not inflate progress.
 	if err := uc.SetEpisodeWatched(ctx, user.ID, us.ShowID, episodes[1].ID, true); err != nil {
 		t.Fatalf("mark ep2: %v", err)
 	}
 	prog, _ = uc.GetProgress(ctx, user.ID, us.ShowID)
-	if prog.Watched != 2 || prog.NextUnwatched != nil {
+	if prog.Watched != 1 || prog.Total != 1 || prog.NextUnwatched != nil {
 		t.Fatalf("progress complete: %+v", prog)
 	}
 
@@ -103,7 +103,7 @@ func TestTrackingUsecase_Flow(t *testing.T) {
 	if err != nil || len(list) != 1 {
 		t.Fatalf("list: %v (n=%d)", err, len(list))
 	}
-	if list[0].Progress.Watched != 2 {
+	if list[0].Progress.Watched != 1 {
 		t.Fatalf("list progress: %+v", list[0].Progress)
 	}
 
