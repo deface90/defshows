@@ -7,7 +7,7 @@ import { isAxiosError } from 'axios'
 import { addShow } from '@/shared/api/tracking/endpoints'
 import { getGetTrackedQueryKey, getListTrackedQueryKey } from '@/shared/api/tracking/endpoints'
 
-export function AddShowButton({ tmdbId, addedShowId, disabled = false }: { tmdbId: number; addedShowId?: number; disabled?: boolean }) {
+export function AddShowButton({ tmdbId, addedShowId, disabled = false, label = 'Добавить' }: { tmdbId: number; addedShowId?: number; disabled?: boolean; label?: string }) {
   const [added, setAdded] = useState<number>()
   const [alreadyAdded, setAlreadyAdded] = useState(false)
   const queryClient = useQueryClient()
@@ -37,7 +37,7 @@ export function AddShowButton({ tmdbId, addedShowId, disabled = false }: { tmdbI
 
   return (
     <Button disabled={disabled} size="xs" loading={mutation.isPending} onClick={() => mutation.mutate()}>
-      Добавить
+      {label}
     </Button>
   )
 }

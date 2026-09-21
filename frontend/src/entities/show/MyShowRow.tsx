@@ -1,5 +1,6 @@
 import { Badge, Box, Group, Progress, Stack, Text } from '@mantine/core'
 import { Link } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { StatusSelect } from '@/features/show-status/StatusSelect'
 import type { UserShowStatus } from '@/shared/api/tracking/model'
 import { AiringStatusBadge } from './AiringStatusBadge'
@@ -30,10 +31,12 @@ export function MyShowRow({
   tracked,
   readOnly = false,
   showUnwatched = false,
+  action,
 }: {
   tracked: MyShowRowData
   readOnly?: boolean
   showUnwatched?: boolean
+  action?: ReactNode
 }) {
   const { show, user_show, progress } = tracked
   const pct = progress.total > 0 ? Math.round((progress.watched / progress.total) * 100) : 0
@@ -91,13 +94,16 @@ export function MyShowRow({
       </Box>
 
       <div className="my-show-row__status">
-        {readOnly ? (
-          <Badge variant="light" color="brand" w={150} maw="100%" style={{ flexShrink: 0 }}>
-            {STATUS_LABELS[user_show.status] ?? user_show.status}
-          </Badge>
-        ) : (
-          <StatusSelect showId={show.id} status={user_show.status as UserShowStatus} fullWidth />
-        )}
+        <Stack gap="xs">
+          {readOnly ? (
+            <Badge variant="light" color="brand" w={150} maw="100%" style={{ flexShrink: 0 }}>
+              {STATUS_LABELS[user_show.status] ?? user_show.status}
+            </Badge>
+          ) : (
+            <StatusSelect showId={show.id} status={user_show.status as UserShowStatus} fullWidth />
+          )}
+          {action}
+        </Stack>
       </div>
     </div>
   )

@@ -1,6 +1,8 @@
-import { Anchor, Card, Divider, Group, Stack, Text, Title } from '@mantine/core'
+import { Anchor, Card, Divider, Stack, Text, Title } from '@mantine/core'
 import { Link, useParams } from 'react-router-dom'
 import { MyShowRow } from '@/entities/show/MyShowRow'
+import { AddShowButton } from '@/features/add-show/AddShowButton'
+import { useListTracked } from '@/shared/api/tracking/endpoints'
 import { useGetUserProfile, useListUserShows } from '@/shared/api/users/endpoints'
 import { useAuthStore } from '@/shared/auth/authStore'
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
@@ -25,6 +27,8 @@ export function UserProfilePage() {
     query: { enabled: canView, retry: false },
   })
   const shows = showsQuery.data?.tracked ?? []
+  const canAdd = !!me && !isSelf && canView
+  const trackedQuery = useListTracked(undefined, { query: { enabled: canAdd, retry: false } })
 
   return (
     <Stack gap="lg">
@@ -61,7 +65,18 @@ export function UserProfilePage() {
               {shows.map((t, i) => (
                 <div key={t.user_show.id}>
                   {i > 0 && <Divider />}
-                  <MyShowRow tracked={t} readOnly />
+                  <MyShowRow
+                    tracked={t}
+                    readOnly
+                    action={canAdd ? (
+                      <AddShowButton
+                        tmdbId={t.show.tmdb_id}
+                        label="Добавить к себе"
+                        disabled={!trackedQuery.isSuccess}
+                        addedShowId={trackedQuery.data?.tracked.find((item) => item.show.tmdb_id === t.show.tmdb_id)?.show.id}
+                      />
+                    ) : undefined}
+                  />
                 </div>
               ))}
             </Card>
