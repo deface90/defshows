@@ -5,6 +5,8 @@ import { AdminDubbingPage } from '@/pages/admin/AdminDubbingPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { OAuthCallbackPage } from '@/pages/OAuthCallbackPage'
 import { HomePage } from '@/pages/HomePage'
+import { LegalPage } from '@/pages/LegalPage'
+import { PrivacyPage } from '@/pages/PrivacyPage'
 import { MyShowsPage } from '@/pages/MyShowsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
@@ -36,6 +38,9 @@ export const router = createBrowserRouter([
           { path: 'search', element: <SearchPage /> },
           { path: 'discover', element: <DiscoverPage /> },
           { path: 'catalog/:tmdbId', element: <CatalogShowPage /> },
+          // Legal pages must be publicly reachable (required for vc.ru etc.).
+          { path: 'legal', element: <LegalPage /> },
+          { path: 'privacy', element: <PrivacyPage /> },
           // Private routes: everything bound to a user's account.
           {
             element: <RequireAuth />,

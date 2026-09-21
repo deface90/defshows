@@ -16,6 +16,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { QueryErrorBoundary } from '@/app/QueryErrorBoundary'
 import { logout } from '@/shared/api/auth/endpoints'
 import { getRefreshToken, useAuthStore } from '@/shared/auth/authStore'
+import { LegalFooter } from './LegalFooter'
 
 // Public nav is shown to everyone; the catalog is browsable without an account.
 const publicNavItems = [
@@ -56,7 +57,7 @@ export function Layout() {
   }
 
   return (
-    <Box>
+    <Box style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
       <Box
         component="header"
         style={{
@@ -166,11 +167,13 @@ export function Layout() {
         </Stack>
       </Drawer>
 
-      <Container size="lg" py="md">
+      <Container size="lg" py="md" w="100%">
         <QueryErrorBoundary>
           <Outlet />
         </QueryErrorBoundary>
       </Container>
+
+      <LegalFooter />
     </Box>
   )
 }
