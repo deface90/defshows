@@ -1,3 +1,4 @@
+import { RatingBadge } from '@/entities/show/RatingBadge'
 import { Box, Group, Text, Tooltip } from '@mantine/core'
 import { WatchToggle } from '@/features/mark-watched/WatchToggle'
 import type { Episode } from '@/shared/api/shows/model'
@@ -46,6 +47,9 @@ export function EpisodeRow({
       <Text size="sm" truncate style={{ flex: 1, minWidth: 0 }} c={watched ? 'dimmed' : undefined}>
         {episode.name}
       </Text>
+      {(episode.vote_count ?? 0) > 0 && (
+        <RatingBadge average={episode.vote_average} votes={episode.vote_count} size="sm" onPoster={false} />
+      )}
       {airLabel ? (
         <Text size="xs" c={aired ? 'dimmed' : 'brand'} style={{ flex: 'none' }}>
           {aired ? airLabel : `📅 ${airLabel}`}

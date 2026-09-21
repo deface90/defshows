@@ -249,6 +249,7 @@ func toAPIUserShow(us *entity.UserShow) trackingapi.UserShow {
 
 func toAPIShowRef(s *entity.Show) trackingapi.ShowRef {
 	return trackingapi.ShowRef{
+		SeasonCount:        &s.SeasonCount,
 		Id:                 s.ID,
 		TmdbId:             s.TMDBID,
 		Title:              s.Title,

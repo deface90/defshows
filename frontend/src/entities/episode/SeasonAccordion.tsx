@@ -1,4 +1,5 @@
-import { Accordion, Center, Stack, Text } from '@mantine/core'
+import { RatingBadge } from '@/entities/show/RatingBadge'
+import { Accordion, Center, Group, Stack, Text } from '@mantine/core'
 import { SeasonWatchToggle } from '@/features/mark-watched/SeasonWatchToggle'
 import type { Season } from '@/shared/api/shows/model'
 import { isAired } from './airDate'
@@ -34,10 +35,13 @@ export function SeasonAccordion({
         <Accordion.Item key={season.id} value={String(season.season_number)}>
           <Center pr="md">
             <Accordion.Control>
-              {season.name || `Сезон ${season.season_number}`}{' '}
-              <Text span c="dimmed" size="sm">
-                {tracked ? `${watchedCount} / ${airedCount}${allWatched ? ' ✓' : ''}` : `${season.episodes.length} эпизодов`}
-              </Text>
+              <Group gap="xs" component="span">
+                <Text span>{season.name || `Сезон ${season.season_number}`}</Text>
+                <Text span c="dimmed" size="sm">
+                  {tracked ? `${watchedCount} / ${airedCount}${allWatched ? ' ✓' : ''}` : `${season.episodes.length} эпизодов`}
+                </Text>
+                <RatingBadge average={season.vote_average} size="sm" onPoster={false} />
+              </Group>
             </Accordion.Control>
             {tracked && (
               <SeasonWatchToggle

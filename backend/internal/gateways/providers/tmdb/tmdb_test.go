@@ -35,9 +35,9 @@ const tvShowJSON = `{
 }`
 
 const seasonJSON = `{
-  "id": 3624, "season_number": 1, "name": "Season 1", "air_date": "2011-04-17", "poster_path": "/s1.jpg",
+  "id": 3624, "season_number": 1, "name": "Season 1", "air_date": "2011-04-17", "poster_path": "/s1.jpg", "vote_average": 9,
   "episodes": [
-    {"id": 63056, "season_number": 1, "episode_number": 1, "name": "Winter Is Coming", "air_date": "2011-04-17", "runtime": 62, "still_path": "/e1.jpg"},
+    {"id": 63056, "season_number": 1, "episode_number": 1, "name": "Winter Is Coming", "air_date": "2011-04-17", "runtime": 62, "still_path": "/e1.jpg", "vote_average": 8.5, "vote_count": 123},
     {"id": 63057, "season_number": 1, "episode_number": 2, "name": "The Kingsroad", "air_date": "2011-04-24", "runtime": 56}
   ]
 }`
@@ -131,6 +131,15 @@ func TestProvider_GetSeason(t *testing.T) {
 	}
 	if season.EpisodeCount != 2 {
 		t.Fatalf("episode count: %d", season.EpisodeCount)
+	}
+	if season.VoteAverage != 9 {
+		t.Fatalf("season rating: %v", season.VoteAverage)
+	}
+	if season.Episodes[0].VoteAverage != 8.5 || season.Episodes[0].VoteCount != 123 {
+		t.Fatalf("episode rating: %+v", season.Episodes[0])
+	}
+	if season.Episodes[1].VoteAverage != 0 || season.Episodes[1].VoteCount != 0 {
+		t.Fatal("missing rating should remain zero")
 	}
 	e0 := season.Episodes[0]
 	if e0.Name != "Winter Is Coming" || e0.Runtime == nil || *e0.Runtime != 62 {

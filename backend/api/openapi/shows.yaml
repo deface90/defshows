@@ -233,6 +233,8 @@ components:
       type: object
       required: [id, season_number, episode_number, name]
       properties:
+        vote_average: { type: number }
+        vote_count: { type: integer, format: int64 }
         id: { type: integer, format: int64 }
         season_number: { type: integer }
         episode_number: { type: integer }
@@ -245,6 +247,7 @@ components:
       type: object
       required: [id, season_number, name, episodes]
       properties:
+        vote_average: { type: number }
         id: { type: integer, format: int64 }
         season_number: { type: integer }
         name: { type: string }

@@ -7,6 +7,11 @@
 import type { ShowRefAiringStatus } from './showRefAiringStatus';
 
 export interface ShowRef {
+  /**
+     * Catalog seasons excluding specials
+     * @minimum 0
+     */
+  season_count?: number;
   id: number;
   tmdb_id: number;
   title: string;

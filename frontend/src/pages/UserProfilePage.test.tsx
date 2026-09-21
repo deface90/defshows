@@ -46,7 +46,7 @@ describe('UserProfilePage', () => {
           tracked: [
             {
               user_show: { id: 7, show_id: 10, status: 'watching', favorite: false },
-              show: { id: 10, tmdb_id: 1399, title: 'Game of Thrones', airing_status: 'ended' },
+              show: { id: 10, tmdb_id: 1399, title: 'Game of Thrones', airing_status: 'ended', season_count: 3 },
               progress: { watched: 2, total: 10 },
             },
           ],
@@ -56,11 +56,12 @@ describe('UserProfilePage', () => {
     renderAt(1)
     expect(await screen.findByText('Game of Thrones')).toBeInTheDocument()
     expect(screen.getByText('2 / 10 эпизодов')).toBeInTheDocument()
+    expect(screen.getByText('3 сезона')).toBeInTheDocument()
   })
 
   const tracked = {
     user_show: { id: 7, show_id: 10, status: 'watching', favorite: false },
-    show: { id: 10, tmdb_id: 1399, title: 'Game of Thrones', airing_status: 'ended' },
+    show: { id: 10, tmdb_id: 1399, title: 'Game of Thrones', airing_status: 'ended', season_count: 3 },
     progress: { watched: 2, total: 10 },
   }
 
@@ -85,6 +86,7 @@ describe('UserProfilePage', () => {
     expect(await screen.findByRole('link', { name: 'В моих сериалах' })).toHaveAttribute('href', '/shows/10')
     expect(body).toEqual({ tmdb_id: 1399 })
     expect(screen.getByText('2 / 10 эпизодов')).toBeInTheDocument()
+    expect(screen.getByText('3 сезона')).toBeInTheDocument()
   })
 
   it('links to a show that is already in my collection', async () => {
@@ -102,4 +104,29 @@ describe('UserProfilePage', () => {
     expect(await screen.findByText('Game of Thrones')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Добавить к себе' })).not.toBeInTheDocument()
   })
+  it('offers a retry when checking my collection fails, then allows adding', async () => {
+    mockProfile()
+    let failed = true
+    server.use(http.get(`${base}/me/shows`, () => failed
+      ? new HttpResponse(null, { status: 500 })
+      : HttpResponse.json({ tracked: [] })))
+    renderAt(1)
+    expect(await screen.findByText('Не удалось проверить твою коллекцию')).toBeInTheDocument()
+    expect(screen.getByText('В этом профиле: Смотрю')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Статус' })).not.toBeInTheDocument()
+    failed = false
+    await userEvent.click(screen.getByRole('button', { name: 'Повторить проверку' }))
+    expect(await screen.findByRole('button', { name: 'Добавить к себе' })).toBeEnabled()
+  })
+
+  it('keeps the add action available when adding fails', async () => {
+    mockProfile()
+    server.use(http.post(`${base}/me/shows`, () => new HttpResponse(null, { status: 500 })))
+    renderAt(1)
+    await userEvent.click(await screen.findByRole('button', { name: 'Добавить к себе' }))
+    expect(await screen.findByText('Не удалось добавить сериал')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'В моих сериалах' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Добавить к себе' })).toBeEnabled()
+  })
+
 })

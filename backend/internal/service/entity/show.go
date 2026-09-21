@@ -14,6 +14,7 @@ const (
 
 // Show is a catalog entry mirrored from TMDB.
 type Show struct {
+	SeasonCount        int     `gorm:"column:season_count;->;-:migration"`
 	IMDbURL            *string `gorm:"column:imdb_url"`
 	WikipediaURL       *string
 	ID                 int64 `gorm:"primaryKey"`
@@ -48,6 +49,7 @@ func (Show) TableName() string { return "shows" }
 
 // Season is a show season.
 type Season struct {
+	VoteAverage  float64
 	ID           int64 `gorm:"primaryKey"`
 	ShowID       int64
 	TMDBID       *int64 `gorm:"column:tmdb_id"`
@@ -64,6 +66,8 @@ func (Season) TableName() string { return "seasons" }
 
 // Episode is a single episode.
 type Episode struct {
+	VoteAverage   float64
+	VoteCount     int64
 	ID            int64 `gorm:"primaryKey"`
 	SeasonID      int64
 	ShowID        int64

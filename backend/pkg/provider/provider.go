@@ -52,6 +52,7 @@ type Genre struct {
 
 // Season is a season with optional episodes (populated by GetSeason).
 type Season struct {
+	VoteAverage  float64
 	TMDBID       *int64
 	SeasonNumber int
 	Name         string
@@ -64,6 +65,8 @@ type Season struct {
 
 // Episode is a single episode.
 type Episode struct {
+	VoteAverage   float64
+	VoteCount     int64
 	TMDBID        *int64
 	SeasonNumber  int
 	EpisodeNumber int

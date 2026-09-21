@@ -101,6 +101,7 @@ components:
       type: object
       required: [id, tmdb_id, title, airing_status]
       properties:
+        season_count: { type: integer, minimum: 0, description: Catalog seasons excluding specials }
         id: { type: integer, format: int64 }
         tmdb_id: { type: integer, format: int64 }
         title: { type: string }

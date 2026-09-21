@@ -199,3 +199,35 @@ func TestCatalogRepository_ReferenceLinksRefresh(t *testing.T) {
 		t.Fatalf("links not refreshed: %+v", got)
 	}
 }
+
+func TestCatalogRepository_SeasonCount(t *testing.T) {
+	db := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, db, "shows", "genres")
+	repo := repository.NewCatalogRepository(db)
+	ctx := t.Context()
+	show := &entity.Show{TMDBID: 777, Title: "Season count"}
+	if err := repo.UpsertShow(ctx, show); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.GetShowByID(ctx, show.ID)
+	if err != nil || got.SeasonCount != 0 {
+		t.Fatalf("empty catalog: %+v, %v", got, err)
+	}
+	// Count actual season rows even when episodes have not been announced yet.
+	seasons := []entity.Season{
+		{ShowID: show.ID, SeasonNumber: 0, Name: "Specials"},
+		{ShowID: show.ID, SeasonNumber: 1, Name: "First"},
+		{ShowID: show.ID, SeasonNumber: 2, Name: "Upcoming"},
+	}
+	if err := repo.UpsertSeasons(ctx, seasons); err != nil {
+		t.Fatal(err)
+	}
+	got, err = repo.GetShowByID(ctx, show.ID)
+	if err != nil || got.SeasonCount != 2 {
+		t.Fatalf("season count: %+v, %v", got, err)
+	}
+	// A computed count must not become an INSERT column during subsequent imports.
+	if err := repo.UpsertShow(ctx, got); err != nil {
+		t.Fatal(err)
+	}
+}

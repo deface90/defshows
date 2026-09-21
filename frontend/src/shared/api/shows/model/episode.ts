@@ -6,6 +6,8 @@
  */
 
 export interface Episode {
+  vote_average?: number;
+  vote_count?: number;
   id: number;
   season_number: number;
   episode_number: number;

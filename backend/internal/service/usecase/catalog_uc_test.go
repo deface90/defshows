@@ -45,9 +45,10 @@ func sampleProvider() *fakeProvider {
 			LastEpisode:  &provider.Episode{SeasonNumber: 8, EpisodeNumber: 6, Name: "The Iron Throne"},
 		},
 		season: &provider.Season{
+			VoteAverage:  9,
 			SeasonNumber: 1,
 			Episodes: []provider.Episode{
-				{SeasonNumber: 1, EpisodeNumber: 1, Name: "Winter Is Coming", AirDate: &air},
+				{SeasonNumber: 1, EpisodeNumber: 1, Name: "Winter Is Coming", AirDate: &air, VoteAverage: 8.5, VoteCount: 123},
 				{SeasonNumber: 1, EpisodeNumber: 2, Name: "The Kingsroad"},
 			},
 		},
@@ -92,6 +93,13 @@ func TestCatalogUsecase_ImportAndGet(t *testing.T) {
 		t.Fatalf("expected nil next episode for ended show")
 	}
 
+	if detail.Show.Seasons[0].VoteAverage != 9 || detail.Episodes[0].VoteAverage != 8.5 || detail.Episodes[0].VoteCount != 123 {
+		t.Fatalf("ratings not persisted: seasons=%+v episodes=%+v", detail.Show.Seasons, detail.Episodes)
+	}
+	// A refresh replaces ratings, including a rating cleared by the provider.
+	fp.season.VoteAverage = 8
+	fp.season.Episodes[0].VoteAverage = 0
+	fp.season.Episodes[0].VoteCount = 0
 	// Idempotent re-import: still one show, two episodes.
 	if _, err := uc.ImportShow(ctx, 1399); err != nil {
 		t.Fatalf("re-import: %v", err)
@@ -99,6 +107,13 @@ func TestCatalogUsecase_ImportAndGet(t *testing.T) {
 	eps, _ := repo.GetEpisodesByShow(ctx, show.ID)
 	if len(eps) != 2 {
 		t.Fatalf("want 2 episodes after re-import, got %d", len(eps))
+	}
+	refreshed, err := uc.GetShow(ctx, show.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.Show.Seasons[0].VoteAverage != 8 || refreshed.Episodes[0].VoteAverage != 0 || refreshed.Episodes[0].VoteCount != 0 {
+		t.Fatalf("ratings not refreshed: %+v, %+v", refreshed.Show.Seasons, refreshed.Episodes)
 	}
 }
 

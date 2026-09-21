@@ -15,21 +15,25 @@ export function RatingBadge({
   average,
   votes,
   size = 'sm',
+  onPoster = true,
 }: {
   average?: number | null
   votes?: number | null
   size?: MantineSize
+  onPoster?: boolean
 }) {
-  if (average == null || average <= 0) return null
+  if (average == null || !Number.isFinite(average) || average <= 0) return null
   return (
-    <Tooltip label={`${formatVotes(votes ?? 0)} голосов на TMDB`} withArrow disabled={!votes}>
+    <Tooltip label={votes ? `${formatVotes(votes)} голосов на TMDB` : 'Рейтинг TMDB'} withArrow>
       <Badge
         size={size}
+        variant="light"
+        color="yellow"
         radius="sm"
         leftSection="★"
         aria-label={`Рейтинг TMDB ${average.toFixed(1)}`}
         styles={{
-          root: { backgroundColor: 'rgba(0, 0, 0, 0.72)', color: '#ffd43b' },
+          root: { flexShrink: 0, ...(onPoster ? { backgroundColor: 'rgba(0, 0, 0, 0.72)', color: '#ffd43b' } : {}) },
           label: { fontWeight: 700 },
         }}
       >

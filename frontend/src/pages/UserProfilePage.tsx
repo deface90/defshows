@@ -1,4 +1,4 @@
-import { Anchor, Card, Divider, Stack, Text, Title } from '@mantine/core'
+import { Anchor, Button, Card, Divider, Stack, Text, Title } from '@mantine/core'
 import { Link, useParams } from 'react-router-dom'
 import { MyShowRow } from '@/entities/show/MyShowRow'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
@@ -68,14 +68,19 @@ export function UserProfilePage() {
                   <MyShowRow
                     tracked={t}
                     readOnly
-                    action={canAdd ? (
+                    action={canAdd ? (trackedQuery.isError ? (
+                      <Stack gap={4}>
+                        <Text size="xs" c="red">Не удалось проверить твою коллекцию</Text>
+                        <Button size="xs" variant="light" onClick={() => trackedQuery.refetch()}>Повторить проверку</Button>
+                      </Stack>
+                    ) : (
                       <AddShowButton
                         tmdbId={t.show.tmdb_id}
-                        label="Добавить к себе"
+                        label={trackedQuery.isSuccess ? 'Добавить к себе' : 'Проверяем коллекцию…'}
                         disabled={!trackedQuery.isSuccess}
                         addedShowId={trackedQuery.data?.tracked.find((item) => item.show.tmdb_id === t.show.tmdb_id)?.show.id}
                       />
-                    ) : undefined}
+                    )) : undefined}
                   />
                 </div>
               ))}

@@ -15,7 +15,7 @@ describe('MyShowsPage', () => {
           tracked: [
             {
               user_show: { id: 1, show_id: 10, status: 'watching', favorite: false },
-              show: { id: 10, tmdb_id: 1399, title: 'Game of Thrones', airing_status: 'ended' },
+              show: { id: 10, tmdb_id: 1399, title: 'Game of Thrones', airing_status: 'ended', season_count: 3 },
               progress: { watched: 1, total: 10 },
             },
           ],
@@ -26,6 +26,7 @@ describe('MyShowsPage', () => {
 
     expect(await screen.findByText('Game of Thrones')).toBeInTheDocument()
     expect(screen.getByText('1 / 10 эпизодов')).toBeInTheDocument()
+    expect(screen.getByText('3 сезона')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /Смотрю/ })).toHaveAttribute('aria-selected', 'true')
   })
 

@@ -139,6 +139,7 @@ func toUsersUserShow(us *entity.UserShow) usersapi.UserShow {
 
 func toUsersShowRef(s *entity.Show) usersapi.ShowRef {
 	return usersapi.ShowRef{
+		SeasonCount:        &s.SeasonCount,
 		Id:                 s.ID,
 		TmdbId:             s.TMDBID,
 		Title:              s.Title,

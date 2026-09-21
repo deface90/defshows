@@ -7,6 +7,7 @@
 import type { Episode } from './episode';
 
 export interface Season {
+  vote_average?: number;
   id: number;
   season_number: number;
   name: string;

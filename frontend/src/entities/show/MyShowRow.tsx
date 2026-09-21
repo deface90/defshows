@@ -22,9 +22,19 @@ export interface MyShowRowData {
     next_episode_air_date?: string | null
     vote_average?: number
     vote_count?: number
+    season_count?: number
   }
   user_show: { status: string }
   progress: { watched: number; total: number; unwatched?: number }
+}
+
+function seasonLabel(count: number): string {
+  const mod100 = count % 100
+  const mod10 = count % 10
+  if (mod100 >= 11 && mod100 <= 14) return `${count} сезонов`
+  if (mod10 === 1) return `${count} сезон`
+  if (mod10 >= 2 && mod10 <= 4) return `${count} сезона`
+  return `${count} сезонов`
 }
 
 export function MyShowRow({
@@ -82,6 +92,10 @@ export function MyShowRow({
                 {show.next_episode_air_date ? ` · следующий ${show.next_episode_air_date}` : ''}
               </Text>
             </Group>
+            {show.season_count != null && <Text c="dimmed" size="sm">{seasonLabel(show.season_count)}</Text>}
+            {readOnly && action && (
+              <Text c="dimmed" size="xs">В этом профиле: {STATUS_LABELS[user_show.status] ?? user_show.status}</Text>
+            )}
 
             <Group gap="sm" wrap="nowrap" align="center">
               <Progress value={pct} size="sm" radius="xl" w={280} maw="100%" style={{ flex: 1 }} />
@@ -95,14 +109,14 @@ export function MyShowRow({
 
       <div className="my-show-row__status">
         <Stack gap="xs">
-          {readOnly ? (
+          {readOnly ? (action ?? (
             <Badge variant="light" color="brand" w={150} maw="100%" style={{ flexShrink: 0 }}>
               {STATUS_LABELS[user_show.status] ?? user_show.status}
             </Badge>
-          ) : (
+          )) : (
             <StatusSelect showId={show.id} status={user_show.status as UserShowStatus} fullWidth />
           )}
-          {action}
+          {!readOnly && action}
         </Stack>
       </div>
     </div>

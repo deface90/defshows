@@ -210,3 +210,23 @@ it('shows completed aired progress even with upcoming and undated episodes in th
   expect(screen.getByText('Undated episode')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Весь сериал просмотрен ✓' })).toBeDisabled()
 })
+
+it('shows TMDB season and episode ratings, omitting unrated episodes', async () => {
+  const detailed = { ...show, seasons: [{
+    ...show.seasons[0], vote_average: 9,
+    episodes: [
+      { ...show.seasons[0].episodes[0], vote_average: 8.5, vote_count: 123 },
+      { ...show.seasons[0].episodes[1], vote_average: 0, vote_count: 0 },
+    ],
+  }] }
+  server.use(
+    http.get(`${base}/shows/10`, () => HttpResponse.json(detailed)),
+    http.get(`${base}/me/shows/10`, () => new HttpResponse(null, { status: 404 })),
+  )
+  renderDetail()
+  expect(await screen.findByLabelText('Рейтинг TMDB 9.0')).toBeInTheDocument()
+  const episodeRating = screen.getByLabelText('Рейтинг TMDB 8.5')
+  expect(screen.queryByLabelText('Рейтинг TMDB 0.0')).not.toBeInTheDocument()
+  await userEvent.hover(episodeRating)
+  expect(await screen.findByText('123 голосов на TMDB')).toBeInTheDocument()
+})

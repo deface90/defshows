@@ -77,6 +77,10 @@ func TestUsers_DirectoryAndVisibility(t *testing.T) {
 		t.Fatalf("want 1 tracked show, got %d", len(tracked.Tracked))
 	}
 
+	if tracked.Tracked[0].Show.SeasonCount == nil || *tracked.Tracked[0].Show.SeasonCount != 1 {
+		t.Fatalf("season count missing from public profile: %+v", tracked.Tracked[0].Show)
+	}
+
 	// Profile metadata reflects the public flag and shows count.
 	rec = doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(bob.User.Id, 10), alice.Tokens.AccessToken, nil)
 	if rec.Code != http.StatusOK {

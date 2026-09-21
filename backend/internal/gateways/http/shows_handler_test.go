@@ -39,9 +39,10 @@ func (fakeShowProvider) GetSeason(context.Context, int64, int) (*provider.Season
 	air1 := time.Date(2011, 4, 17, 0, 0, 0, 0, time.UTC)
 	air2 := time.Date(2011, 4, 24, 0, 0, 0, 0, time.UTC)
 	return &provider.Season{
+		VoteAverage:  9,
 		SeasonNumber: 1,
 		Episodes: []provider.Episode{
-			{SeasonNumber: 1, EpisodeNumber: 1, Name: "Winter Is Coming", AirDate: &air1},
+			{SeasonNumber: 1, EpisodeNumber: 1, Name: "Winter Is Coming", AirDate: &air1, VoteAverage: 8.5, VoteCount: 123},
 			{SeasonNumber: 1, EpisodeNumber: 2, Name: "The Kingsroad", AirDate: &air2},
 		},
 	}, nil
@@ -86,6 +87,12 @@ func TestShowsHandler_ImportGetListSearch(t *testing.T) {
 	}
 	if len((*show.Seasons)[0].Episodes) != 2 {
 		t.Fatalf("want 2 nested episodes, got %d", len((*show.Seasons)[0].Episodes))
+	}
+
+	season := (*show.Seasons)[0]
+	episode := season.Episodes[0]
+	if season.VoteAverage == nil || *season.VoteAverage != 9 || episode.VoteAverage == nil || *episode.VoteAverage != 8.5 || episode.VoteCount == nil || *episode.VoteCount != 123 {
+		t.Fatalf("missing API ratings: season=%+v episode=%+v", season, episode)
 	}
 
 	// Get by id.

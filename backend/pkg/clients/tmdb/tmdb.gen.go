@@ -30,14 +30,16 @@ type Genre struct {
 
 // TvEpisode defines model for TvEpisode.
 type TvEpisode struct {
-	AirDate       *string `json:"air_date,omitempty"`
-	EpisodeNumber *int    `json:"episode_number,omitempty"`
-	Id            *int64  `json:"id,omitempty"`
-	Name          *string `json:"name,omitempty"`
-	Overview      *string `json:"overview,omitempty"`
-	Runtime       *int    `json:"runtime,omitempty"`
-	SeasonNumber  *int    `json:"season_number,omitempty"`
-	StillPath     *string `json:"still_path,omitempty"`
+	AirDate       *string  `json:"air_date,omitempty"`
+	EpisodeNumber *int     `json:"episode_number,omitempty"`
+	Id            *int64   `json:"id,omitempty"`
+	Name          *string  `json:"name,omitempty"`
+	Overview      *string  `json:"overview,omitempty"`
+	Runtime       *int     `json:"runtime,omitempty"`
+	SeasonNumber  *int     `json:"season_number,omitempty"`
+	StillPath     *string  `json:"still_path,omitempty"`
+	VoteAverage   *float32 `json:"vote_average,omitempty"`
+	VoteCount     *int64   `json:"vote_count,omitempty"`
 }
 
 // TvGenreList defines model for TvGenreList.
@@ -71,13 +73,14 @@ type TvSearchResult struct {
 
 // TvSeason defines model for TvSeason.
 type TvSeason struct {
-	AirDate      *string `json:"air_date,omitempty"`
-	EpisodeCount *int    `json:"episode_count,omitempty"`
-	Id           *int64  `json:"id,omitempty"`
-	Name         *string `json:"name,omitempty"`
-	Overview     *string `json:"overview,omitempty"`
-	PosterPath   *string `json:"poster_path,omitempty"`
-	SeasonNumber *int    `json:"season_number,omitempty"`
+	AirDate      *string  `json:"air_date,omitempty"`
+	EpisodeCount *int     `json:"episode_count,omitempty"`
+	Id           *int64   `json:"id,omitempty"`
+	Name         *string  `json:"name,omitempty"`
+	Overview     *string  `json:"overview,omitempty"`
+	PosterPath   *string  `json:"poster_path,omitempty"`
+	SeasonNumber *int     `json:"season_number,omitempty"`
+	VoteAverage  *float32 `json:"vote_average,omitempty"`
 }
 
 // TvSeasonDetail defines model for TvSeasonDetail.
@@ -89,6 +92,7 @@ type TvSeasonDetail struct {
 	Overview     *string      `json:"overview,omitempty"`
 	PosterPath   *string      `json:"poster_path,omitempty"`
 	SeasonNumber *int         `json:"season_number,omitempty"`
+	VoteAverage  *float32     `json:"vote_average,omitempty"`
 }
 
 // TvShow defines model for TvShow.

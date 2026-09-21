@@ -195,11 +195,18 @@ func (uc *CatalogUsecase) importSeasonsAndEpisodes(ctx context.Context, show *en
 		return nil
 	}
 	seasons := make([]entity.Season, 0, len(ps.Seasons))
+	seasonDetails := make(map[int]*provider.Season, len(ps.Seasons))
 	for _, s := range ps.Seasons {
 		if s.SeasonNumber == 0 {
 			continue // skip TMDB "Specials" (season 0)
 		}
+		sd, err := uc.provider.GetSeason(ctx, ps.TMDBID, s.SeasonNumber)
+		if err != nil {
+			return err
+		}
+		seasonDetails[s.SeasonNumber] = sd
 		seasons = append(seasons, entity.Season{
+			VoteAverage:  sd.VoteAverage,
 			ShowID:       show.ID,
 			TMDBID:       s.TMDBID,
 			SeasonNumber: s.SeasonNumber,
@@ -228,16 +235,15 @@ func (uc *CatalogUsecase) importSeasonsAndEpisodes(ctx context.Context, show *en
 		if s.SeasonNumber == 0 {
 			continue // skip specials — no season row was created for them
 		}
-		sd, err := uc.provider.GetSeason(ctx, ps.TMDBID, s.SeasonNumber)
-		if err != nil {
-			return err
-		}
+		sd := seasonDetails[s.SeasonNumber]
 		sid, ok := seasonID[s.SeasonNumber]
 		if !ok {
 			continue
 		}
 		for _, e := range sd.Episodes {
 			episodes = append(episodes, entity.Episode{
+				VoteAverage:   e.VoteAverage,
+				VoteCount:     e.VoteCount,
 				SeasonID:      sid,
 				ShowID:        show.ID,
 				TMDBID:        e.TMDBID,

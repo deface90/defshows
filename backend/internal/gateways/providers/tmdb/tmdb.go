@@ -114,6 +114,7 @@ func (p *Provider) GetShow(ctx context.Context, tmdbID int64) (*provider.Show, e
 	if s.Seasons != nil {
 		for _, sn := range *s.Seasons {
 			show.Seasons = append(show.Seasons, provider.Season{
+				VoteAverage:  float64(val(sn.VoteAverage)),
 				TMDBID:       sn.Id,
 				SeasonNumber: val(sn.SeasonNumber),
 				Name:         val(sn.Name),
@@ -146,6 +147,7 @@ func (p *Provider) GetSeason(ctx context.Context, tmdbID int64, seasonNumber int
 	}
 	d := resp.JSON200
 	season := &provider.Season{
+		VoteAverage:  float64(val(d.VoteAverage)),
 		TMDBID:       d.Id,
 		SeasonNumber: val(d.SeasonNumber),
 		Name:         val(d.Name),
@@ -169,6 +171,8 @@ func mapEpisode(e *tmdbclient.TvEpisode) *provider.Episode {
 		return nil
 	}
 	return &provider.Episode{
+		VoteAverage:   float64(val(e.VoteAverage)),
+		VoteCount:     val(e.VoteCount),
 		TMDBID:        e.Id,
 		SeasonNumber:  val(e.SeasonNumber),
 		EpisodeNumber: val(e.EpisodeNumber),

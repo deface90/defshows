@@ -50,7 +50,9 @@ func (r *CatalogRepository) UpsertShow(ctx context.Context, s *entity.Show) erro
 // GetShowByID returns a show by internal id or ErrNotFound.
 func (r *CatalogRepository) GetShowByID(ctx context.Context, id int64) (*entity.Show, error) {
 	var s entity.Show
-	err := r.db.WithContext(ctx).First(&s, id).Error
+	err := r.db.WithContext(ctx).
+		Select("shows.*, (SELECT COUNT(*) FROM seasons WHERE seasons.show_id = shows.id AND seasons.season_number > 0) AS season_count").
+		First(&s, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}

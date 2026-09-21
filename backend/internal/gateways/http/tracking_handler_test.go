@@ -94,7 +94,7 @@ func TestWebSlice_EndToEnd(t *testing.T) {
 	}
 	var list trackingapi.TrackedShowList
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
-	if len(list.Tracked) != 1 || list.Tracked[0].Progress.Total != 2 || list.Tracked[0].Progress.Watched != 0 {
+	if len(list.Tracked) != 1 || list.Tracked[0].Show.SeasonCount == nil || *list.Tracked[0].Show.SeasonCount != 1 || list.Tracked[0].Progress.Total != 2 || list.Tracked[0].Progress.Watched != 0 {
 		t.Fatalf("unexpected list: %+v", list.Tracked)
 	}
 

@@ -170,6 +170,7 @@ components:
     TvSeason:
       type: object
       properties:
+        vote_average: { type: number }
         id: { type: integer, format: int64 }
         season_number: { type: integer }
         name: { type: string }
@@ -180,6 +181,7 @@ components:
     TvSeasonDetail:
       type: object
       properties:
+        vote_average: { type: number }
         id: { type: integer, format: int64 }
         season_number: { type: integer }
         name: { type: string }
@@ -192,6 +194,8 @@ components:
     TvEpisode:
       type: object
       properties:
+        vote_average: { type: number }
+        vote_count: { type: integer, format: int64 }
         id: { type: integer, format: int64 }
         season_number: { type: integer }
         episode_number: { type: integer }

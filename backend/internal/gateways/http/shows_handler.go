@@ -126,6 +126,8 @@ func toAPIShowDetail(d *usecase.ShowDetail) showsapi.Show {
 	for _, e := range d.Episodes {
 		e := e
 		episodesBySeason[e.SeasonNumber] = append(episodesBySeason[e.SeasonNumber], showsapi.Episode{
+			VoteAverage:   f32(e.VoteAverage),
+			VoteCount:     i64(e.VoteCount),
 			Id:            e.ID,
 			SeasonNumber:  e.SeasonNumber,
 			EpisodeNumber: e.EpisodeNumber,
@@ -146,6 +148,7 @@ func toAPIShowDetail(d *usecase.ShowDetail) showsapi.Show {
 		}
 		count := s.EpisodeCount
 		seasons = append(seasons, showsapi.Season{
+			VoteAverage:  f32(s.VoteAverage),
 			Id:           s.ID,
 			SeasonNumber: s.SeasonNumber,
 			Name:         s.Name,
