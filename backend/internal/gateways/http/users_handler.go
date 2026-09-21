@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v4"
 
@@ -31,13 +32,31 @@ func NewUsersHandler(authUC *usecase.AuthUsecase, trackingUC *usecase.TrackingUs
 var _ usersapi.ServerInterface = (*UsersHandler)(nil)
 
 // ListUsers handles GET /users.
-func (h *UsersHandler) ListUsers(c echo.Context) error {
+func (h *UsersHandler) ListUsers(c echo.Context, params usersapi.ListUsersParams) error {
+	page, pageSize := 1, 20
+	if params.Page != nil {
+		page = *params.Page
+	}
+	if params.PageSize != nil {
+		pageSize = *params.PageSize
+	}
+	query := ""
+	if params.Q != nil {
+		query = strings.TrimSpace(*params.Q)
+	}
+	if page < 1 || page > 1000000 || pageSize < 1 || pageSize > 100 || utf8.RuneCountInString(query) > 100 {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid directory parameters")
+	}
 	ctx := c.Request().Context()
-	users, err := h.auth.ListUsers(ctx)
+	users, total, err := h.auth.ListUsers(ctx, query, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return err
 	}
-	counts, err := h.tracking.ShowsCountByUser(ctx)
+	ids := make([]int64, len(users))
+	for i := range users {
+		ids[i] = users[i].ID
+	}
+	counts, err := h.tracking.ShowsCountByUser(ctx, ids...)
 	if err != nil {
 		return err
 	}
@@ -52,7 +71,7 @@ func (h *UsersHandler) ListUsers(c echo.Context) error {
 			ShowsCount:  counts[u.ID],
 		})
 	}
-	return c.JSON(http.StatusOK, usersapi.UserList{Users: out})
+	return c.JSON(http.StatusOK, usersapi.UserList{Users: out, Total: total, Page: page, PageSize: pageSize})
 }
 
 // GetUserProfile handles GET /users/{userId}.
@@ -65,7 +84,7 @@ func (h *UsersHandler) GetUserProfile(c echo.Context, userID usersapi.UserId) er
 		}
 		return err
 	}
-	counts, err := h.tracking.ShowsCountByUser(ctx)
+	counts, err := h.tracking.ShowsCountByUser(ctx, userID)
 	if err != nil {
 		return err
 	}

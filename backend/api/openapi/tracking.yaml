@@ -157,6 +157,18 @@ paths:
           schema: { type: integer, format: int64 }
       responses:
         '204': { description: No Content }
+  /me/recommendations:
+    get:
+      operationId: getRecommendations
+      summary: Taste profile and catalog recommendations for the home dashboard
+      description: Derived from the user's tracked shows over the local catalog; cached per user with a TTL.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HomeRecommendations' }
+        '401': { $ref: '#/components/responses/Error' }
   /me/settings:
     get:
       operationId: getSettings
@@ -293,6 +305,37 @@ components:
         links:
           type: array
           items: { $ref: '#/components/schemas/Link' }
+    TasteGenre:
+      type: object
+      required: [id, name, weight]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        weight: { type: integer }
+    TasteLanguage:
+      type: object
+      required: [code, weight]
+      properties:
+        code: { type: string }
+        weight: { type: integer }
+    Taste:
+      type: object
+      required: [genres, languages]
+      properties:
+        genres:
+          type: array
+          items: { $ref: '#/components/schemas/TasteGenre' }
+        languages:
+          type: array
+          items: { $ref: '#/components/schemas/TasteLanguage' }
+    HomeRecommendations:
+      type: object
+      required: [taste, recommendations]
+      properties:
+        taste: { $ref: '#/components/schemas/Taste' }
+        recommendations:
+          type: array
+          items: { $ref: '#/components/schemas/ShowRef' }
     Settings:
       type: object
       required: [timezone, is_public]

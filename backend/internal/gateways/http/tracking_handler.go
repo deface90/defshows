@@ -15,12 +15,13 @@ import (
 // TrackingHandler implements the generated tracking ServerInterface.
 type TrackingHandler struct {
 	uc   *usecase.TrackingUsecase
+	home *usecase.HomeUsecase
 	auth *usecase.AuthUsecase
 }
 
 // NewTrackingHandler creates a TrackingHandler.
-func NewTrackingHandler(uc *usecase.TrackingUsecase, authUC *usecase.AuthUsecase) *TrackingHandler {
-	return &TrackingHandler{uc: uc, auth: authUC}
+func NewTrackingHandler(uc *usecase.TrackingUsecase, homeUC *usecase.HomeUsecase, authUC *usecase.AuthUsecase) *TrackingHandler {
+	return &TrackingHandler{uc: uc, home: homeUC, auth: authUC}
 }
 
 var _ trackingapi.ServerInterface = (*TrackingHandler)(nil)
@@ -52,6 +53,34 @@ func (h *TrackingHandler) ListTracked(c echo.Context, params trackingapi.ListTra
 		out = append(out, toAPITracked(list[i]))
 	}
 	return c.JSON(http.StatusOK, trackingapi.TrackedShowList{Tracked: out})
+}
+
+// GetRecommendations handles GET /me/recommendations.
+func (h *TrackingHandler) GetRecommendations(c echo.Context) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	home, err := h.home.TasteAndRecommendations(c.Request().Context(), uid)
+	if err != nil {
+		return err
+	}
+	recs := make([]trackingapi.ShowRef, 0, len(home.Recommendations))
+	for i := range home.Recommendations {
+		recs = append(recs, toAPIShowRef(&home.Recommendations[i]))
+	}
+	genres := make([]trackingapi.TasteGenre, 0, len(home.Taste.Genres))
+	for _, g := range home.Taste.Genres {
+		genres = append(genres, trackingapi.TasteGenre{Id: g.ID, Name: g.Name, Weight: g.Weight})
+	}
+	langs := make([]trackingapi.TasteLanguage, 0, len(home.Taste.Languages))
+	for _, l := range home.Taste.Languages {
+		langs = append(langs, trackingapi.TasteLanguage{Code: l.Code, Weight: l.Weight})
+	}
+	return c.JSON(http.StatusOK, trackingapi.HomeRecommendations{
+		Taste:           trackingapi.Taste{Genres: genres, Languages: langs},
+		Recommendations: recs,
+	})
 }
 
 // AddShow handles POST /me/shows.

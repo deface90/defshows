@@ -65,6 +65,7 @@ func main() {
 	userRepo := repository.NewUserRepository(gdb)
 	catalogRepo := repository.NewCatalogRepository(gdb)
 	trackingRepo := repository.NewTrackingRepository(gdb)
+	homeRepo := repository.NewHomeRepository(gdb)
 
 	notificationRepo := repository.NewNotificationRepository(gdb)
 	notesRepo := repository.NewNotesRepository(gdb)
@@ -83,13 +84,14 @@ func main() {
 		catalogUC.WithImageMirror(imageStore)
 	}
 	trackingUC := usecase.NewTrackingUsecase(trackingRepo, catalogUC)
+	homeUC := usecase.NewHomeUsecase(homeRepo)
 	notificationUC := usecase.NewNotificationUsecase(notificationRepo, userRepo, cfg.Telegram.Username, cfg.Notifier.LinkTTL)
 	notesUC := usecase.NewNotesUsecase(notesRepo)
 
 	authH := httpapi.NewAuthHandler(authUC).
 		WithOAuth(httpapi.BuildOAuthRegistry(cfg.OAuth), cfg.OAuth.RedirectBaseURL, cfg.OAuth.FrontendURL)
 	showsH := httpapi.NewShowsHandler(catalogUC)
-	trackingH := httpapi.NewTrackingHandler(trackingUC, authUC)
+	trackingH := httpapi.NewTrackingHandler(trackingUC, homeUC, authUC)
 	notificationsH := httpapi.NewNotificationsHandler(notificationUC)
 	notesH := httpapi.NewNotesHandler(notesUC)
 	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb))

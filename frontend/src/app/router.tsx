@@ -4,6 +4,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AdminDubbingPage } from '@/pages/admin/AdminDubbingPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { OAuthCallbackPage } from '@/pages/OAuthCallbackPage'
+import { HomePage } from '@/pages/HomePage'
 import { MyShowsPage } from '@/pages/MyShowsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
@@ -15,32 +16,42 @@ import { UnwatchedPage } from '@/pages/UnwatchedPage'
 import { UserProfilePage } from '@/pages/UserProfilePage'
 import { UsersPage } from '@/pages/UsersPage'
 import { Layout } from '@/shared/ui/Layout'
+import { RootShell } from './RootShell'
 import { RequireAuth, RequireRole } from './guards'
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
-  { path: '/auth/callback', element: <OAuthCallbackPage /> },
   {
-    element: <RequireAuth />,
+    element: <RootShell />,
     children: [
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      { path: '/auth/callback', element: <OAuthCallbackPage /> },
       {
         path: '/',
         element: <Layout />,
         children: [
-          { index: true, element: <MyShowsPage /> },
-          { path: 'unwatched', element: <UnwatchedPage /> },
+          // Public routes: guests and users. `/` is the smart home (landing vs
+          // dashboard); the catalog is browsable without an account.
+          { index: true, element: <HomePage /> },
           { path: 'search', element: <SearchPage /> },
           { path: 'discover', element: <DiscoverPage /> },
           { path: 'catalog/:tmdbId', element: <CatalogShowPage /> },
-          { path: 'shows/:id', element: <ShowDetailPage /> },
-          { path: 'users', element: <UsersPage /> },
-          { path: 'users/:id', element: <UserProfilePage /> },
-          { path: 'notifications', element: <NotificationsPage /> },
-          { path: 'settings', element: <SettingsPage /> },
+          // Private routes: everything bound to a user's account.
           {
-            element: <RequireRole role="admin" />,
-            children: [{ path: 'admin', element: <AdminDubbingPage /> }],
+            element: <RequireAuth />,
+            children: [
+              { path: 'my', element: <MyShowsPage /> },
+              { path: 'unwatched', element: <UnwatchedPage /> },
+              { path: 'shows/:id', element: <ShowDetailPage /> },
+              { path: 'users', element: <UsersPage /> },
+              { path: 'users/:id', element: <UserProfilePage /> },
+              { path: 'notifications', element: <NotificationsPage /> },
+              { path: 'settings', element: <SettingsPage /> },
+              {
+                element: <RequireRole role="admin" />,
+                children: [{ path: 'admin', element: <AdminDubbingPage /> }],
+              },
+            ],
           },
           { path: '*', element: <NotFoundPage /> },
         ],

@@ -2,9 +2,10 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { server } from '@/shared/testing/mswServer'
 import { renderWithProviders } from '@/test/render'
+import { useAuthStore } from '@/shared/auth/authStore'
 import { CatalogShowPage } from './CatalogShowPage'
 
 const base = 'http://localhost:8080'
@@ -19,6 +20,17 @@ function renderPage() {
 }
 
 describe('CatalogShowPage', () => {
+  // Adding is gated behind auth; sign in so the click posts instead of opening
+  // the auth modal.
+  beforeEach(() =>
+    useAuthStore.setState({
+      isAuthenticated: true,
+      accessToken: 'token',
+      user: { id: 1, display_name: 'U', role: 'user', timezone: 'UTC' },
+    }),
+  )
+  afterEach(() => useAuthStore.getState().clear())
+
   it('shows read-only details and changes the action after adding', async () => {
     let added = false
     server.use(

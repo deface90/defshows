@@ -29,7 +29,7 @@ type TrackingRepo interface {
 	AddLink(ctx context.Context, link *entity.UserShowLink) error
 	ListLinks(ctx context.Context, userShowID int64) ([]entity.UserShowLink, error)
 	DeleteLink(ctx context.Context, userShowID, linkID int64) error
-	CountByUsers(ctx context.Context) (map[int64]int, error)
+	CountByUsers(ctx context.Context, userIDs ...int64) (map[int64]int, error)
 }
 
 // Catalog is the catalog dependency of TrackingUsecase.
@@ -87,8 +87,8 @@ func (uc *TrackingUsecase) AddShow(ctx context.Context, userID, tmdbID int64) (*
 }
 
 // ShowsCountByUser returns the number of tracked shows per user id.
-func (uc *TrackingUsecase) ShowsCountByUser(ctx context.Context) (map[int64]int, error) {
-	return uc.repo.CountByUsers(ctx)
+func (uc *TrackingUsecase) ShowsCountByUser(ctx context.Context, userIDs ...int64) (map[int64]int, error) {
+	return uc.repo.CountByUsers(ctx, userIDs...)
 }
 
 // RemoveShow removes a show from the user's list.

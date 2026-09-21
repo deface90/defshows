@@ -123,3 +123,35 @@ func TestUserRepository_RefreshTokens(t *testing.T) {
 		t.Fatalf("want ErrNotFound, got %v", err)
 	}
 }
+
+func TestUserRepository_DirectoryPaginationAndLiteralSearch(t *testing.T) {
+	db := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, db, "users")
+	repo := repository.NewUserRepository(db)
+	ctx := t.Context()
+	for i, name := range []string{"Alice", "Alice", "Bob_", "Bob%", "Charlie"} {
+		u := newUser(string(rune('a'+i)) + "@example.com")
+		u.DisplayName = name
+		if err := repo.CreateUser(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, total, err := repo.ListUsers(ctx, "alice", 1, 0)
+	if err != nil || total != 2 || len(first) != 1 {
+		t.Fatalf("first page: %+v %d %v", first, total, err)
+	}
+	second, total, err := repo.ListUsers(ctx, "ALICE", 1, 1)
+	if err != nil || total != 2 || len(second) != 1 || second[0].ID <= first[0].ID {
+		t.Fatalf("unstable pages: %+v %d %v", second, total, err)
+	}
+	for _, tc := range []struct{ q, name string }{{"%", "Bob%"}, {"_", "Bob_"}} {
+		users, total, err := repo.ListUsers(ctx, tc.q, 20, 0)
+		if err != nil || total != 1 || len(users) != 1 || users[0].DisplayName != tc.name {
+			t.Fatalf("literal search %q: %+v %d %v", tc.q, users, total, err)
+		}
+	}
+	users, total, err := repo.ListUsers(ctx, "", 2, 10)
+	if err != nil || total != 5 || len(users) != 0 {
+		t.Fatalf("out of range: %+v %d %v", users, total, err)
+	}
+}

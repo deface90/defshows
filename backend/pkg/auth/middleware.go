@@ -26,6 +26,22 @@ func (m *JWTManager) RequireAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+// OptionalAuth parses a Bearer access token when present and valid, storing the
+// claims in the request context, but never rejects the request. Public read
+// routes use it so handlers can enrich responses for authenticated callers
+// (e.g. "tracked" markers) while still serving guests.
+func (m *JWTManager) OptionalAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		header := c.Request().Header.Get("Authorization")
+		if strings.HasPrefix(header, "Bearer ") {
+			if claims, err := m.Parse(strings.TrimPrefix(header, "Bearer ")); err == nil {
+				c.Set(contextKeyClaims, claims)
+			}
+		}
+		return next(c)
+	}
+}
+
 // RequireRole is echo middleware that enforces a role. It must run after
 // RequireAuth.
 func RequireRole(role string) echo.MiddlewareFunc {

@@ -170,6 +170,12 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// HomeRecommendations defines model for HomeRecommendations.
+type HomeRecommendations struct {
+	Recommendations []ShowRef `json:"recommendations"`
+	Taste           Taste     `json:"taste"`
+}
+
 // Link defines model for Link.
 type Link struct {
 	Id    int64    `json:"id"`
@@ -225,6 +231,25 @@ type ShowRef struct {
 
 // ShowRefAiringStatus defines model for ShowRef.AiringStatus.
 type ShowRefAiringStatus string
+
+// Taste defines model for Taste.
+type Taste struct {
+	Genres    []TasteGenre    `json:"genres"`
+	Languages []TasteLanguage `json:"languages"`
+}
+
+// TasteGenre defines model for TasteGenre.
+type TasteGenre struct {
+	Id     int64  `json:"id"`
+	Name   string `json:"name"`
+	Weight int    `json:"weight"`
+}
+
+// TasteLanguage defines model for TasteLanguage.
+type TasteLanguage struct {
+	Code   string `json:"code"`
+	Weight int    `json:"weight"`
+}
 
 // TrackedShow defines model for TrackedShow.
 type TrackedShow struct {
@@ -299,6 +324,9 @@ type UpdateLinkJSONRequestBody = UpdateLinkRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetRecommendations Taste profile and catalog recommendations for the home dashboard
+	// (GET /me/recommendations)
+	GetRecommendations(ctx echo.Context) error
 	// GetSettings Get user settings
 	// (GET /me/settings)
 	GetSettings(ctx echo.Context) error
@@ -346,6 +374,15 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// GetRecommendations converts echo context to params.
+func (w *ServerInterfaceWrapper) GetRecommendations(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetRecommendations(ctx)
+	return err
 }
 
 // GetSettings converts echo context to params.
@@ -644,6 +681,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/me/shows/:showId/links", wrapper.AddLink, options.OperationMiddlewares["addLink"]...)
 	router.DELETE(options.BaseURL+"/me/shows/:showId/links/:linkId", wrapper.DeleteLink, options.OperationMiddlewares["deleteLink"]...)
 	router.PATCH(options.BaseURL+"/me/shows/:showId/links/:linkId", wrapper.UpdateLink, options.OperationMiddlewares["updateLink"]...)
+	router.GET(options.BaseURL+"/me/recommendations", wrapper.GetRecommendations, options.OperationMiddlewares["getRecommendations"]...)
 	router.GET(options.BaseURL+"/me/settings", wrapper.GetSettings, options.OperationMiddlewares["getSettings"]...)
 	router.PATCH(options.BaseURL+"/me/settings", wrapper.UpdateSettings, options.OperationMiddlewares["updateSettings"]...)
 
@@ -654,34 +692,38 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"7L7s/h8AAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

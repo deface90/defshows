@@ -37,6 +37,7 @@ func newWebServer(t *testing.T) *echo.Echo {
 	authUC := usecase.NewAuthUsecase(userRepo, jwtMgr, time.Hour)
 	catalogUC := usecase.NewCatalogUsecase(catalogRepo, fakeShowProvider{})
 	trackingUC := usecase.NewTrackingUsecase(trackingRepo, catalogUC)
+	homeUC := usecase.NewHomeUsecase(repository.NewHomeRepository(gdb))
 	notificationUC := usecase.NewNotificationUsecase(notificationRepo, userRepo, "defShowsBot", time.Hour)
 	notesUC := usecase.NewNotesUsecase(notesRepo)
 	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb))
@@ -45,7 +46,7 @@ func newWebServer(t *testing.T) *echo.Echo {
 	return httpapi.NewWebRouter(
 		httpapi.NewAuthHandler(authUC),
 		httpapi.NewShowsHandler(catalogUC),
-		httpapi.NewTrackingHandler(trackingUC, authUC),
+		httpapi.NewTrackingHandler(trackingUC, homeUC, authUC),
 		httpapi.NewNotificationsHandler(notificationUC),
 		httpapi.NewNotesHandler(notesUC),
 		adminH,

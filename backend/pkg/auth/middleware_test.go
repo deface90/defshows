@@ -48,6 +48,48 @@ func TestRequireAuth(t *testing.T) {
 	}
 }
 
+func TestOptionalAuth(t *testing.T) {
+	m := auth.NewJWTManager("secret", time.Hour)
+	token, _ := m.Generate(7, "user")
+
+	tests := []struct {
+		name       string
+		authHeader string
+		wantClaims bool
+	}{
+		{name: "no header passes as guest", authHeader: "", wantClaims: false},
+		{name: "invalid token passes as guest", authHeader: "Bearer nope", wantClaims: false},
+		{name: "valid token populates claims", authHeader: "Bearer " + token, wantClaims: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			var gotClaims bool
+			h := m.OptionalAuth(func(c echo.Context) error {
+				_, gotClaims = auth.ClaimsFromContext(c)
+				return c.String(http.StatusOK, "ok")
+			})
+			if err := h(c); err != nil {
+				e.HTTPErrorHandler(err, c)
+			}
+			// OptionalAuth never rejects: always reaches the handler with 200.
+			if rec.Code != http.StatusOK {
+				t.Fatalf("want 200, got %d", rec.Code)
+			}
+			if gotClaims != tt.wantClaims {
+				t.Fatalf("claims present: want %v, got %v", tt.wantClaims, gotClaims)
+			}
+		})
+	}
+}
+
 func TestRequireRole(t *testing.T) {
 	m := auth.NewJWTManager("secret", time.Hour)
 

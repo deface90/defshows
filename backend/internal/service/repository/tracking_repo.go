@@ -57,7 +57,10 @@ func (r *TrackingRepository) ListUserShows(ctx context.Context, userID int64, st
 
 // CountByUsers returns the number of tracked shows per user, keyed by user id,
 // in a single grouped query (users with none are absent from the map).
-func (r *TrackingRepository) CountByUsers(ctx context.Context) (map[int64]int, error) {
+func (r *TrackingRepository) CountByUsers(ctx context.Context, userIDs ...int64) (map[int64]int, error) {
+	if len(userIDs) == 0 {
+		return map[int64]int{}, nil
+	}
 	type row struct {
 		UserID int64
 		Count  int
@@ -65,6 +68,7 @@ func (r *TrackingRepository) CountByUsers(ctx context.Context) (map[int64]int, e
 	var rows []row
 	err := r.db.WithContext(ctx).
 		Model(&entity.UserShow{}).
+		Where("user_id IN ?", userIDs).
 		Select("user_id, count(*) as count").
 		Group("user_id").
 		Scan(&rows).Error

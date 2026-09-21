@@ -21,7 +21,11 @@ function renderAt(id: number) {
 
 describe('UserProfilePage', () => {
   beforeEach(() => {
-    useAuthStore.setState({ user: { id: 3, display_name: 'Me', role: 'user', timezone: 'UTC' } })
+    useAuthStore.setState({
+      isAuthenticated: true,
+      accessToken: 'token',
+      user: { id: 3, display_name: 'Me', role: 'user', timezone: 'UTC' },
+    })
     server.use(http.get(`${base}/me/shows`, () => HttpResponse.json({ tracked: [] })))
   })
   afterEach(() => useAuthStore.getState().clear())

@@ -64,6 +64,17 @@ type UserShowLink struct {
 // TableName maps UserShowLink to the user_show_links table.
 func (UserShowLink) TableName() string { return "user_show_links" }
 
+// UserHomeCache stores the pre-computed heavy part of a user's home (taste
+// profile + recommendations) as JSON, refreshed on demand past a TTL.
+type UserHomeCache struct {
+	UserID     int64  `gorm:"primaryKey"`
+	Payload    []byte `gorm:"type:jsonb"`
+	ComputedAt time.Time
+}
+
+// TableName maps UserHomeCache to the user_home_cache table.
+func (UserHomeCache) TableName() string { return "user_home_cache" }
+
 // DubbingStudio is an admin-managed dubbing reference.
 type DubbingStudio struct {
 	ID      int64 `gorm:"primaryKey"`

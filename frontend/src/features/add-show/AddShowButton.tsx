@@ -6,11 +6,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import { addShow } from '@/shared/api/tracking/endpoints'
 import { getGetTrackedQueryKey, getListTrackedQueryKey } from '@/shared/api/tracking/endpoints'
+import { useRequireAuth } from '@/shared/auth/useRequireAuth'
 
 export function AddShowButton({ tmdbId, addedShowId, disabled = false, label = 'Добавить' }: { tmdbId: number; addedShowId?: number; disabled?: boolean; label?: string }) {
   const [added, setAdded] = useState<number>()
   const [alreadyAdded, setAlreadyAdded] = useState(false)
   const queryClient = useQueryClient()
+  const requireAuth = useRequireAuth()
 
   const mutation = useMutation({
     mutationFn: () => addShow({ tmdb_id: tmdbId }),
@@ -36,7 +38,12 @@ export function AddShowButton({ tmdbId, addedShowId, disabled = false, label = '
   if (alreadyAdded) return <Button size="xs" disabled>Уже добавлен</Button>
 
   return (
-    <Button disabled={disabled} size="xs" loading={mutation.isPending} onClick={() => mutation.mutate()}>
+    <Button
+      disabled={disabled}
+      size="xs"
+      loading={mutation.isPending}
+      onClick={() => requireAuth(() => mutation.mutate())}
+    >
       {label}
     </Button>
   )

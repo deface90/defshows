@@ -9,7 +9,12 @@ import { register as registerUser } from '@/shared/api/auth/endpoints'
 import { applySession } from '@/shared/auth/session'
 import { registerSchema, type RegisterInput } from './schemas'
 
-export function RegisterForm() {
+/**
+ * RegisterForm creates an account. By default it navigates home on success;
+ * pass `onAuthed` (e.g. from the AuthModal) to stay in place and let the caller
+ * finish a pending action instead.
+ */
+export function RegisterForm({ onAuthed }: { onAuthed?: () => void } = {}) {
   const navigate = useNavigate()
   const [apiError, setApiError] = useState('')
   const {
@@ -22,7 +27,8 @@ export function RegisterForm() {
     mutationFn: (input: RegisterInput) => registerUser({ email: input.email, password: input.password }),
     onSuccess: (res) => {
       applySession(res)
-      navigate('/', { replace: true })
+      if (onAuthed) onAuthed()
+      else navigate('/', { replace: true })
     },
     onError: (err) => {
       if (isAxiosError(err) && err.response?.status === 409) {

@@ -48,6 +48,40 @@ func TestUsers_DirectoryAndVisibility(t *testing.T) {
 		t.Fatalf("want 2 users, got %d", len(list.Users))
 	}
 
+	for _, tc := range []struct {
+		path  string
+		total int64
+		count int
+		name  string
+	}{
+		{"/users?page=1&page_size=1", 2, 1, "alice"},
+		{"/users?page=2&page_size=1", 2, 1, "bob"},
+		{"/users?q=ALIce&page_size=1", 1, 1, "alice"},
+		{"/users?page=3&page_size=1", 2, 0, ""},
+		{"/users?q=missing", 0, 0, ""},
+	} {
+		response := doJSON(t, e, http.MethodGet, tc.path, alice.Tokens.AccessToken, nil)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", tc.path, response.Code, response.Body.String())
+		}
+		var page usersapi.UserList
+		if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != tc.total || len(page.Users) != tc.count {
+			t.Fatalf("%s: %+v", tc.path, page)
+		}
+		if tc.count > 0 && page.Users[0].DisplayName != tc.name {
+			t.Fatalf("%s: wrong user %+v", tc.path, page.Users)
+		}
+	}
+	for _, path := range []string{"/users?page=0", "/users?page=-1", "/users?page=1000001", "/users?page_size=101", "/users?page_size=0", "/users?page=abc"} {
+		response := doJSON(t, e, http.MethodGet, path, alice.Tokens.AccessToken, nil)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("%s: got %d", path, response.Code)
+		}
+	}
+
 	// Bob is private by default → Alice is forbidden.
 	rec = doJSON(t, e, http.MethodGet, bobShows, alice.Tokens.AccessToken, nil)
 	if rec.Code != http.StatusForbidden {

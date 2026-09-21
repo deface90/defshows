@@ -39,7 +39,7 @@ type UserRepo interface {
 	CreateUser(ctx context.Context, u *entity.User) error
 	FindUserByEmail(ctx context.Context, email string) (*entity.User, error)
 	FindUserByID(ctx context.Context, id int64) (*entity.User, error)
-	ListUsers(ctx context.Context) ([]entity.User, error)
+	ListUsers(ctx context.Context, query string, limit, offset int) ([]entity.User, int64, error)
 	UpdateTimezone(ctx context.Context, userID int64, tz string) error
 	SetPublic(ctx context.Context, userID int64, public bool) error
 	SaveRefreshToken(ctx context.Context, rt *entity.RefreshToken) error
@@ -288,9 +288,9 @@ func (uc *AuthUsecase) SetProfileVisibility(ctx context.Context, userID int64, p
 	return uc.repo.FindUserByID(ctx, userID)
 }
 
-// ListUsers returns all users for the public directory.
-func (uc *AuthUsecase) ListUsers(ctx context.Context) ([]entity.User, error) {
-	return uc.repo.ListUsers(ctx)
+// ListUsers returns one filtered page of the public directory and its total size.
+func (uc *AuthUsecase) ListUsers(ctx context.Context, query string, limit, offset int) ([]entity.User, int64, error) {
+	return uc.repo.ListUsers(ctx, query, limit, offset)
 }
 
 // Logout revokes the family the presented refresh token belongs to.

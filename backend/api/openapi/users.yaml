@@ -8,13 +8,24 @@ paths:
   /users:
     get:
       operationId: listUsers
-      summary: List all users (public directory)
+      summary: Search the public user directory with pagination
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema: { $ref: '#/components/schemas/UserList' }
+        '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
   /users/{userId}:
     get:
@@ -75,8 +86,11 @@ components:
         shows_count: { type: integer }
     UserList:
       type: object
-      required: [users]
+      required: [users, total, page, page_size]
       properties:
+        total: { type: integer, format: int64 }
+        page: { type: integer }
+        page_size: { type: integer }
         users:
           type: array
           items: { $ref: '#/components/schemas/UserSummary' }

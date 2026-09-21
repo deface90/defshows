@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -66,17 +67,21 @@ func (r *UserRepository) FindUserByID(ctx context.Context, id int64) (*entity.Us
 	return &u, nil
 }
 
-// ListUsers returns all users ordered by display name then email, for the
-// public users directory.
-func (r *UserRepository) ListUsers(ctx context.Context) ([]entity.User, error) {
-	var users []entity.User
-	err := r.db.WithContext(ctx).
-		Order("display_name ASC, email ASC, id ASC").
-		Find(&users).Error
-	if err != nil {
-		return nil, err
+// ListUsers searches displayed names and reads only the requested directory page.
+func (r *UserRepository) ListUsers(ctx context.Context, query string, limit, offset int) ([]entity.User, int64, error) {
+	const displayName = "COALESCE(NULLIF(display_name, ''), NULLIF(split_part(email, '@', 1), ''), 'Пользователь #' || id::text)"
+	q := r.db.WithContext(ctx).Model(&entity.User{})
+	if query != "" {
+		literal := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
+		q = q.Where(displayName+" ILIKE ?", "%"+literal+"%")
 	}
-	return users, nil
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var users []entity.User
+	err := q.Order("LOWER(" + displayName + ") ASC, id ASC").Limit(limit).Offset(offset).Find(&users).Error
+	return users, total, err
 }
 
 // SetPublic toggles a user's profile visibility.

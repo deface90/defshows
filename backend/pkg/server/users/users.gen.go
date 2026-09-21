@@ -118,7 +118,10 @@ type TrackedShowList struct {
 
 // UserList defines model for UserList.
 type UserList struct {
-	Users []UserSummary `json:"users"`
+	Page     int           `json:"page"`
+	PageSize int           `json:"page_size"`
+	Total    int64         `json:"total"`
+	Users    []UserSummary `json:"users"`
 }
 
 // UserProfile defines model for UserProfile.
@@ -153,11 +156,18 @@ type UserSummary struct {
 // UserId defines model for UserId.
 type UserId = int64
 
+// ListUsersParams defines parameters for ListUsers.
+type ListUsersParams struct {
+	Q        *string `form:"q,omitempty" json:"q,omitempty"`
+	Page     *int    `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int    `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// ListUsers List all users (public directory)
+	// ListUsers Search the public user directory with pagination
 	// (GET /users)
-	ListUsers(ctx echo.Context) error
+	ListUsers(ctx echo.Context, params ListUsersParams) error
 	// GetUserProfile One user's public profile metadata
 	// (GET /users/{userId})
 	GetUserProfile(ctx echo.Context, userId UserId) error
@@ -175,8 +185,31 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) ListUsers(ctx echo.Context) error {
 	var err error
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUsersParams
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", ctx.QueryParams(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter q: %s", err))
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", ctx.QueryParams(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page: %s", err))
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", ctx.QueryParams(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page_size: %s", err))
+	}
+
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ListUsers(ctx)
+	err = w.Handler.ListUsers(ctx, params)
 	return err
 }
 
@@ -270,24 +303,26 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"vk+hD30m8jPtMO+vd9e7PwMAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

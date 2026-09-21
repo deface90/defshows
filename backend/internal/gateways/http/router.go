@@ -32,6 +32,19 @@ var authPublicPaths = map[string]bool{
 	"/images/tmdb/:size/:filename": true,
 }
 
+// authOptionalPaths are catalog read routes reachable without a token. When a
+// valid Bearer token is present its claims are parsed so handlers can enrich the
+// response (e.g. "tracked" markers); an absent or invalid token passes through
+// as a guest instead of returning 401.
+var authOptionalPaths = map[string]bool{
+	"/shows":                  true, // ListShows (local catalog search)
+	"/shows/:id":              true, // GetShow
+	"/shows/search":           true, // SearchShows
+	"/shows/discover":         true, // DiscoverShows
+	"/shows/discover/filters": true, // GetDiscoveryFilters
+	"/shows/tmdb/:tmdb_id":    true, // GetShowByTMDB
+}
+
 // NewAuthRouter builds the echo router for the auth service. Every route except
 // the public auth endpoints requires a valid Bearer access token.
 func NewAuthRouter(h *AuthHandler, jwt *auth.JWTManager) *echo.Echo {
@@ -53,7 +66,7 @@ func NewWebRouter(authH *AuthHandler, showsH *ShowsHandler, trackingH *TrackingH
 	if len(corsOrigins) > 0 {
 		e.Use(corsMiddleware(corsOrigins))
 	}
-	e.Use(requireAuthExcept(jwt, authPublicPaths))
+	e.Use(authGuard(jwt, authPublicPaths, authOptionalPaths))
 	e.Use(requireAdminForAdminPaths())
 	e.GET("/images/tmdb/:size/:filename", serveTMDBImage(imageClient))
 	if imageStore != nil {
@@ -116,6 +129,25 @@ func corsMiddleware(origins []string) echo.MiddlewareFunc {
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete, http.MethodOptions},
 		AllowHeaders: []string{echo.HeaderAuthorization, echo.HeaderContentType},
 	})
+}
+
+// authGuard classifies each route into one of three tiers by its matched path:
+// fully public (no token needed), optional-auth (token parsed if present, never
+// rejected), or protected (valid token required). It replaces the binary
+// public/protected split for routers that expose public catalog reads.
+func authGuard(jwt *auth.JWTManager, public, optional map[string]bool) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			switch {
+			case public[c.Path()]:
+				return next(c)
+			case optional[c.Path()]:
+				return jwt.OptionalAuth(next)(c)
+			default:
+				return jwt.RequireAuth(next)(c)
+			}
+		}
+	}
 }
 
 // requireAuthExcept enforces JWT auth on all routes whose matched path is not in

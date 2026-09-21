@@ -1,5 +1,5 @@
 import { Anchor, Button, Card, Divider, Stack, Text, Title } from '@mantine/core'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { MyShowRow } from '@/entities/show/MyShowRow'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
 import { useListTracked } from '@/shared/api/tracking/endpoints'
@@ -14,6 +14,9 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
  */
 export function UserProfilePage() {
   const { id } = useParams()
+  const location = useLocation()
+  const from = location.state?.directoryFrom
+  const directoryPath = typeof from === 'string' && /^\/users(?:\?.*)?$/.test(from) ? from : '/users'
   const userId = Number(id)
   const me = useAuthStore((s) => s.user)
   const isSelf = me?.id === userId
@@ -32,7 +35,7 @@ export function UserProfilePage() {
 
   return (
     <Stack gap="lg">
-      <Anchor component={Link} to="/users" size="sm" c="dimmed">
+      <Anchor component={Link} to={directoryPath} size="sm" c="dimmed">
         ← Пользователи
       </Anchor>
 

@@ -7,6 +7,7 @@
 
 export * from './error';
 export * from './errorResponse';
+export * from './listUsersParams';
 export * from './progress';
 export * from './showRef';
 export * from './showRefAiringStatus';

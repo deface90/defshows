@@ -2,6 +2,7 @@ import {
   ActionIcon,
   Box,
   Burger,
+  Button,
   Container,
   Drawer,
   Group,
@@ -11,26 +12,35 @@ import {
   useMantineColorScheme,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { QueryErrorBoundary } from '@/app/QueryErrorBoundary'
 import { logout } from '@/shared/api/auth/endpoints'
 import { getRefreshToken, useAuthStore } from '@/shared/auth/authStore'
 
-const navItems = [
-  { to: '/', label: 'Мои сериалы', end: true },
+// Public nav is shown to everyone; the catalog is browsable without an account.
+const publicNavItems = [
   { to: '/search', label: 'Поиск' },
   { to: '/discover', label: 'Подбор' },
+]
+
+// Authenticated users additionally get their account-bound sections.
+const userNavItems = [
+  { to: '/my', label: 'Мои сериалы' },
+  ...publicNavItems,
   { to: '/users', label: 'Пользователи' },
   { to: '/notifications', label: 'Уведомления' },
 ]
 
 export function Layout() {
   const navigate = useNavigate()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const user = useAuthStore((s) => s.user)
   const clear = useAuthStore((s) => s.clear)
   const { setColorScheme } = useMantineColorScheme()
   const computed = useComputedColorScheme('dark')
   const [drawerOpen, drawer] = useDisclosure(false)
+
+  const navItems = isAuthenticated ? userNavItems : publicNavItems
 
   const onLogout = async () => {
     const rt = getRefreshToken()
@@ -69,7 +79,6 @@ export function Layout() {
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    end={item.end}
                     className={({ isActive }) => `app-navlink${isActive ? ' active' : ''}`}
                   >
                     {item.label}
@@ -85,23 +94,34 @@ export function Layout() {
               >
                 {computed === 'dark' ? '🌞' : '🌙'}
               </ActionIcon>
-              <Menu withinPortal>
-                <Menu.Target>
-                  <ActionIcon variant="default" aria-label="Меню пользователя">
-                    👤
-                  </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Label>{user?.email ?? user?.display_name ?? 'Аккаунт'}</Menu.Label>
-                  {user?.role === 'admin' && (
-                    <Menu.Item onClick={() => navigate('/admin')}>Админка</Menu.Item>
-                  )}
-                  <Menu.Item onClick={() => navigate('/settings')}>Настройки</Menu.Item>
-                  <Menu.Item color="red" onClick={onLogout}>
-                    Выйти
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
+              {isAuthenticated ? (
+                <Menu withinPortal>
+                  <Menu.Target>
+                    <ActionIcon variant="default" aria-label="Меню пользователя">
+                      👤
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Label>{user?.email ?? user?.display_name ?? 'Аккаунт'}</Menu.Label>
+                    {user?.role === 'admin' && (
+                      <Menu.Item onClick={() => navigate('/admin')}>Админка</Menu.Item>
+                    )}
+                    <Menu.Item onClick={() => navigate('/settings')}>Настройки</Menu.Item>
+                    <Menu.Item color="red" onClick={onLogout}>
+                      Выйти
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              ) : (
+                <Group gap="xs" wrap="nowrap" visibleFrom="xs">
+                  <Button component={Link} to="/login" variant="subtle" size="compact-sm">
+                    Войти
+                  </Button>
+                  <Button component={Link} to="/register" color="orange" size="compact-sm">
+                    Начать
+                  </Button>
+                </Group>
+              )}
               <Burger
                 opened={drawerOpen}
                 onClick={drawer.toggle}
@@ -127,13 +147,22 @@ export function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.end}
               onClick={drawer.close}
               className={({ isActive }) => `app-drawer-link${isActive ? ' active' : ''}`}
             >
               {item.label}
             </NavLink>
           ))}
+          {!isAuthenticated && (
+            <Group gap="xs" mt="sm">
+              <Button component={Link} to="/login" variant="default" onClick={drawer.close}>
+                Войти
+              </Button>
+              <Button component={Link} to="/register" color="orange" onClick={drawer.close}>
+                Начать
+              </Button>
+            </Group>
+          )}
         </Stack>
       </Drawer>
 

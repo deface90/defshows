@@ -8,7 +8,12 @@ import { login } from '@/shared/api/auth/endpoints'
 import { applySession } from '@/shared/auth/session'
 import { loginSchema, type LoginInput } from './schemas'
 
-export function LoginForm() {
+/**
+ * LoginForm authenticates the user. By default it navigates home on success;
+ * pass `onAuthed` (e.g. from the AuthModal) to stay in place and let the caller
+ * finish a pending action instead.
+ */
+export function LoginForm({ onAuthed }: { onAuthed?: () => void } = {}) {
   const navigate = useNavigate()
   const [apiError, setApiError] = useState('')
   const {
@@ -21,7 +26,8 @@ export function LoginForm() {
     mutationFn: (input: LoginInput) => login(input),
     onSuccess: (res) => {
       applySession(res)
-      navigate('/', { replace: true })
+      if (onAuthed) onAuthed()
+      else navigate('/', { replace: true })
     },
     onError: () => setApiError('Неверный email или пароль'),
   })

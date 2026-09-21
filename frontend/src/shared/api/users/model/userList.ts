@@ -7,5 +7,8 @@
 import type { UserSummary } from './userSummary';
 
 export interface UserList {
+  total: number;
+  page: number;
+  page_size: number;
   users: UserSummary[];
 }
