@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"html"
 	"net/url"
 	"time"
 
@@ -32,9 +33,10 @@ var (
 const passwordResetTTL = time.Hour
 
 // Mailer sends transactional email (password-reset links). It is optional: when
-// nil, RequestPasswordReset is a no-op beyond token creation.
+// nil, RequestPasswordReset is a no-op beyond token creation. text is a
+// plain-text fallback; html is the rich body.
 type Mailer interface {
-	Send(ctx context.Context, to, subject, body string) error
+	Send(ctx context.Context, to, subject, text, html string) error
 }
 
 // refreshReuseGrace tolerates benign refresh-token races: multiple tabs (or a
@@ -386,10 +388,27 @@ func (uc *AuthUsecase) RequestPasswordReset(ctx context.Context, email string) e
 		return nil
 	}
 	link := uc.frontendURL + "/reset-password?token=" + url.QueryEscape(raw)
-	body := "Здравствуйте!\n\nВы запросили сброс пароля в defShows. " +
+	text := "Здравствуйте!\n\nВы запросили сброс пароля в defShows. " +
 		"Перейдите по ссылке, чтобы задать новый пароль (действует 1 час):\n\n" +
 		link + "\n\nЕсли вы этого не делали, просто проигнорируйте это письмо."
-	return uc.mailer.Send(ctx, *u.Email, "Сброс пароля — defShows", body)
+	return uc.mailer.Send(ctx, *u.Email, "Сброс пароля — defShows", text, resetEmailHTML(link))
+}
+
+// resetEmailHTML renders the HTML body of the password-reset email. The link is
+// HTML-escaped since it is interpolated into both an href and visible text.
+func resetEmailHTML(link string) string {
+	safe := html.EscapeString(link)
+	return `<!DOCTYPE html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;line-height:1.5">` +
+		`<p>Здравствуйте!</p>` +
+		`<p>Вы запросили сброс пароля в <strong>defShows</strong>. ` +
+		`Нажмите кнопку, чтобы задать новый пароль — ссылка действует 1 час:</p>` +
+		`<p><a href="` + safe + `" ` +
+		`style="display:inline-block;padding:12px 24px;background:#e8590c;color:#fff;` +
+		`text-decoration:none;border-radius:6px;font-weight:bold">Сбросить пароль</a></p>` +
+		`<p style="font-size:13px;color:#555">Или откройте ссылку вручную:<br>` +
+		`<a href="` + safe + `">` + safe + `</a></p>` +
+		`<p style="font-size:13px;color:#888">Если вы этого не делали, просто проигнорируйте это письмо.</p>` +
+		`</body></html>`
 }
 
 // ResetPassword consumes a reset token, sets the new password, and revokes every

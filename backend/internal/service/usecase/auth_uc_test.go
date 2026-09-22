@@ -189,9 +189,9 @@ type fakeMailer struct {
 	to, subj, body string
 }
 
-func (m *fakeMailer) Send(_ context.Context, to, subject, body string) error {
+func (m *fakeMailer) Send(_ context.Context, to, subject, text, _ string) error {
 	m.count++
-	m.to, m.subj, m.body = to, subject, body
+	m.to, m.subj, m.body = to, subject, text
 	return nil
 }
 

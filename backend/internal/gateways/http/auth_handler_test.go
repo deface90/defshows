@@ -32,9 +32,9 @@ type captureMailer struct {
 	body  string
 }
 
-func (m *captureMailer) Send(_ context.Context, _, _, body string) error {
+func (m *captureMailer) Send(_ context.Context, _, _, text, _ string) error {
 	m.count++
-	m.body = body
+	m.body = text
 	return nil
 }
 
