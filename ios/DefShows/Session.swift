@@ -53,16 +53,18 @@ final class Session: ObservableObject {
 
     func mutate(_ path: String, method: String = "POST", body: [String: Any]? = nil) async throws {
         _ = try await authorized(path, method: method, body: body)
+        if path.hasPrefix("me/shows") { collectionDidChange() }
     }
 
     func addShow(tmdbID: Int) async throws {
         try await mutate("me/shows", body: ["tmdb_id": tmdbID])
-        collectionRevision += 1
     }
 
-    func setWatched(showID: Int, episodeID: Int, watched: Bool) async throws {
+    func collectionDidChange() { collectionRevision += 1 }
+
+    func setWatched(showID: Int, episodeID: Int, watched: Bool, notifyCollection: Bool = true) async throws {
         _ = try await authorized("me/shows/\(showID)/episodes/\(episodeID)/watch", method: watched ? "POST" : "DELETE")
-        collectionRevision += 1
+        if notifyCollection { collectionDidChange() }
     }
 
     func logout() async throws {

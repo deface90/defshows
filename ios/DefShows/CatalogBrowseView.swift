@@ -136,8 +136,8 @@ struct CatalogShowView: View {
             }
             if busy { ProgressView() }
             if let detail {
+                ShowInformation(show: detail)
                 Section {
-                    CatalogRow(title: detail.title, poster: detail.posterUrl)
                     if let trackedID {
                         NavigationLink("Открыть в моих сериалах") { ShowView(showID: trackedID) }
                     } else {
@@ -156,13 +156,14 @@ struct CatalogShowView: View {
                     }
                     if adding { ProgressView() }
                 }
-                if let overview = detail.overview, !overview.isEmpty {
-                    Section("О сериале") { Text(overview) }
-                }
                 ForEach((detail.seasons ?? []).newestFirst) { season in
                     Section(season.name.isEmpty ? "Сезон \(season.seasonNumber)" : season.name) {
+                        Text("Серий: \(season.episodes.count)").font(.caption).foregroundStyle(.secondary)
+                        if let rating = season.voteAverage, rating > 0 {
+                            Text(String(format: "★ %.1f", rating)).font(.caption).foregroundStyle(.orange)
+                        }
                         ForEach(season.episodes.sorted { $0.episodeNumber < $1.episodeNumber }) { episode in
-                            Text("\(episode.episodeNumber). \(episode.name)")
+                            EpisodeInformation(episode: episode)
                         }
                     }
                 }

@@ -8,9 +8,9 @@ let package = Package(
     products: [.library(name: "DefShowsModels", targets: ["DefShowsModels"])],
     targets: [
         .target(name: "DefShowsModels", path: "DefShows", exclude: [
-            "Assets.xcassets",
+            "Assets.xcassets", "PushNotifications.swift", "DefShows.entitlements",
             "DefShowsApp.swift", "Keychain.swift", "Session.swift", "LibraryView.swift",
-            "ShowView.swift", "MainTabsView.swift", "CatalogBrowseView.swift",
+            "ShowView.swift", "ShowInformation.swift", "ShowNotesView.swift", "MainTabsView.swift", "CatalogBrowseView.swift",
             "NotificationsView.swift", "UsersView.swift", "SettingsView.swift"
         ], sources: ["Models.swift", "BrowseModels.swift"]),
         .testTarget(name: "DefShowsModelsTests", dependencies: ["DefShowsModels"], path: "Tests")

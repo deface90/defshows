@@ -13,13 +13,7 @@ struct CatalogItem: Decodable, Identifiable {
     let voteAverage: Double?
     var id: Int { tmdbId }
 }
-struct CatalogDetail: Decodable {
-    let id: Int
-    let title: String
-    let overview: String?
-    let posterUrl: String?
-    let seasons: [Season]?
-}
+typealias CatalogDetail = ShowDetail
 struct DiscoveryFilters: Decodable {
     let genres: [CatalogGenre]
     let countries: [CatalogCountry]
