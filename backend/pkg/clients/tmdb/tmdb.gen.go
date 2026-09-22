@@ -15,6 +15,24 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for TrendingTvParamsTimeWindow.
+const (
+	Day  TrendingTvParamsTimeWindow = "day"
+	Week TrendingTvParamsTimeWindow = "week"
+)
+
+// Valid indicates whether the value is a known member of the TrendingTvParamsTimeWindow enum.
+func (e TrendingTvParamsTimeWindow) Valid() bool {
+	switch e {
+	case Day:
+		return true
+	case Week:
+		return true
+	default:
+		return false
+	}
+}
+
 // Country defines model for Country.
 type Country struct {
 	EnglishName string  `json:"english_name"`
@@ -127,6 +145,9 @@ type SearchTvParams struct {
 	Page  *int   `form:"page,omitempty" json:"page,omitempty"`
 }
 
+// TrendingTvParamsTimeWindow defines parameters for TrendingTv.
+type TrendingTvParamsTimeWindow string
+
 // GetTvShowParams defines parameters for GetTvShow.
 type GetTvShowParams struct {
 	AppendToResponse *string `form:"append_to_response,omitempty" json:"append_to_response,omitempty"`
@@ -218,6 +239,9 @@ type ClientInterface interface {
 	// SearchTv performs a GET /search/tv (the `SearchTv` operationId) request.
 	SearchTv(ctx context.Context, params *SearchTvParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// TrendingTv performs a GET /trending/tv/{time_window} (the `TrendingTv` operationId) request.
+	TrendingTv(ctx context.Context, timeWindow TrendingTvParamsTimeWindow, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetTvShow performs a GET /tv/{series_id} (the `GetTvShow` operationId) request.
 	GetTvShow(ctx context.Context, seriesId int64, params *GetTvShowParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -267,6 +291,19 @@ func (c *Client) TvGenres(ctx context.Context, reqEditors ...RequestEditorFn) (*
 // SearchTv performs a GET /search/tv (the `SearchTv` operationId) request.
 func (c *Client) SearchTv(ctx context.Context, params *SearchTvParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchTvRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TrendingTv performs a GET /trending/tv/{time_window} (the `TrendingTv` operationId) request.
+func (c *Client) TrendingTv(ctx context.Context, timeWindow TrendingTvParamsTimeWindow, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTrendingTvRequest(c.Server, timeWindow)
 	if err != nil {
 		return nil, err
 	}
@@ -446,6 +483,40 @@ func NewSearchTvRequest(server string, params *SearchTvParams) (*http.Request, e
 	return req, nil
 }
 
+// NewTrendingTvRequest constructs an http.Request for the TrendingTv method
+func NewTrendingTvRequest(server string, timeWindow TrendingTvParamsTimeWindow) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "time_window", timeWindow, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/trending/tv/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetTvShowRequest constructs an http.Request for the GetTvShow method
 func NewGetTvShowRequest(server string, seriesId int64, params *GetTvShowParams) (*http.Request, error) {
 	var err error
@@ -611,6 +682,11 @@ type ClientWithResponsesInterface interface {
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchTvWithResponse(ctx context.Context, params *SearchTvParams, reqEditors ...RequestEditorFn) (*SearchTvResponse, error)
+
+	// TrendingTvWithResponse performs a GET /trending/tv/{time_window} (the `TrendingTv` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	TrendingTvWithResponse(ctx context.Context, timeWindow TrendingTvParamsTimeWindow, reqEditors ...RequestEditorFn) (*TrendingTvResponse, error)
 
 	// GetTvShowWithResponse performs a GET /tv/{series_id} (the `GetTvShow` operationId) request.
 	//
@@ -787,6 +863,47 @@ func (r SearchTvResponse) ContentType() string {
 	return ""
 }
 
+type TrendingTvResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TvSearchPage
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r TrendingTvResponse) GetJSON200() *TvSearchPage {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r TrendingTvResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TrendingTvResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TrendingTvResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TrendingTvResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetTvShowResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -913,6 +1030,17 @@ func (c *ClientWithResponses) SearchTvWithResponse(ctx context.Context, params *
 	return ParseSearchTvResponse(rsp)
 }
 
+// TrendingTvWithResponse performs a GET /trending/tv/{time_window} (the `TrendingTv` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) TrendingTvWithResponse(ctx context.Context, timeWindow TrendingTvParamsTimeWindow, reqEditors ...RequestEditorFn) (*TrendingTvResponse, error) {
+	rsp, err := c.TrendingTv(ctx, timeWindow, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTrendingTvResponse(rsp)
+}
+
 // GetTvShowWithResponse performs a GET /tv/{series_id} (the `GetTvShow` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -1022,6 +1150,32 @@ func ParseSearchTvResponse(rsp *http.Response) (*SearchTvResponse, error) {
 	}
 
 	response := &SearchTvResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TvSearchPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTrendingTvResponse parses an HTTP response from a TrendingTvWithResponse call
+func ParseTrendingTvResponse(rsp *http.Response) (*TrendingTvResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TrendingTvResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

@@ -40,6 +40,31 @@ func TestDiscoverFiltersAndPagination(t *testing.T) {
 	}
 }
 
+func TestTrending(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/3/trending/tv/week" {
+			t.Errorf("path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("api_key"); got != "test-key" {
+			t.Errorf("api_key: %s", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"page":1,"total_pages":1,"total_results":1,"results":[{"id":123,"name":"Test","vote_average":8.5,"vote_count":400}]}`))
+	}))
+	defer srv.Close()
+	p, err := tmdb.New(srv.URL+"/3", "test-key", "ru-RU", srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := p.Trending(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.TotalResults != 1 || len(page.Results) != 1 || page.Results[0].TMDBID != 123 {
+		t.Fatalf("page: %+v", page)
+	}
+}
+
 func TestDiscoveryReferencesCached(t *testing.T) {
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

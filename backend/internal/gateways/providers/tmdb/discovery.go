@@ -45,6 +45,21 @@ func (p *Provider) Discover(ctx context.Context, opts provider.DiscoverOptions) 
 	return provider.DiscoveryPage{Results: summaries(page.Results), Page: val(page.Page), TotalPages: min(val(page.TotalPages), 500), TotalResults: val(page.TotalResults)}, nil
 }
 
+// Trending returns TV shows trending on TMDB this week — a lighter-weight,
+// unfiltered pick for surfacing "what's popular right now" without a discovery
+// query (the picker's/home page's default view).
+func (p *Provider) Trending(ctx context.Context) (provider.DiscoveryPage, error) {
+	resp, err := p.client.TrendingTvWithResponse(ctx, tmdbclient.Week, p.editor)
+	if err != nil {
+		return provider.DiscoveryPage{}, fmt.Errorf("tmdb: trending: %w", safeRequestError(err))
+	}
+	if resp.JSON200 == nil {
+		return provider.DiscoveryPage{}, fmt.Errorf("tmdb: trending: unexpected status %d", resp.StatusCode())
+	}
+	page := resp.JSON200
+	return provider.DiscoveryPage{Results: summaries(page.Results), Page: val(page.Page), TotalPages: min(val(page.TotalPages), 500), TotalResults: val(page.TotalResults)}, nil
+}
+
 func summaries(results *[]tmdbclient.TvSearchResult) []provider.ShowSummary {
 	out := []provider.ShowSummary{}
 	if results == nil {

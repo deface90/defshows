@@ -17,6 +17,20 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TvSearchPage' }
+  /trending/tv/{time_window}:
+    get:
+      operationId: trendingTv
+      parameters:
+        - name: time_window
+          in: path
+          required: true
+          schema: { type: string, enum: [day, week] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TvSearchPage' }
   /genre/tv/list:
     get:
       operationId: tvGenres

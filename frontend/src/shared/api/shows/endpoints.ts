@@ -240,6 +240,99 @@ export function useDiscoverShows<TData = Awaited<ReturnType<typeof discoverShows
 
 
 /**
+ * @summary TV shows currently trending on TMDB
+ */
+export const trendingShows = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<DiscoveryResults>(
+      {url: `/shows/trending`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getTrendingShowsQueryKey = () => {
+    return [
+    `/shows/trending`
+    ] as const;
+    }
+
+
+export const getTrendingShowsQueryOptions = <TData = Awaited<ReturnType<typeof trendingShows>>, TError = ErrorResponse>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof trendingShows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTrendingShowsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof trendingShows>>> = ({ signal }) => trendingShows(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof trendingShows>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TrendingShowsQueryResult = NonNullable<Awaited<ReturnType<typeof trendingShows>>>
+export type TrendingShowsQueryError = ErrorResponse
+
+
+export function useTrendingShows<TData = Awaited<ReturnType<typeof trendingShows>>, TError = ErrorResponse>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof trendingShows>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof trendingShows>>,
+          TError,
+          Awaited<ReturnType<typeof trendingShows>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTrendingShows<TData = Awaited<ReturnType<typeof trendingShows>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof trendingShows>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof trendingShows>>,
+          TError,
+          Awaited<ReturnType<typeof trendingShows>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTrendingShows<TData = Awaited<ReturnType<typeof trendingShows>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof trendingShows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary TV shows currently trending on TMDB
+ */
+
+export function useTrendingShows<TData = Awaited<ReturnType<typeof trendingShows>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof trendingShows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTrendingShowsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
  * @summary Search TMDB for shows to add
  */
 export const searchShows = (

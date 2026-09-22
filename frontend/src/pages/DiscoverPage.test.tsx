@@ -26,6 +26,9 @@ beforeEach(() => {
         { tmdb_id: 1399, title: 'Game of Thrones' },
       ] })
     }),
+    http.get(`${base}/shows/trending`, () => HttpResponse.json({ page: 1, total_pages: 1, total_results: 1, results: [
+      { tmdb_id: 66732, title: 'Stranger Things' },
+    ] })),
   )
 })
 
@@ -34,9 +37,10 @@ describe('DiscoverPage', () => {
     const user = userEvent.setup()
     renderWithProviders(<DiscoverPage />, { route: '/discover' })
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Жанры' })).toBeEnabled())
-    // No search runs until the user submits the form.
+    // No search runs until the user submits the form; trending fills the initial view.
     expect(queries).toHaveLength(0)
-    expect(screen.getByText('Задайте условия подбора')).toBeInTheDocument()
+    expect(screen.getByText('Сейчас в тренде')).toBeInTheDocument()
+    expect(await screen.findByText('Stranger Things')).toBeInTheDocument()
 
     await user.click(screen.getByRole('combobox', { name: 'Жанры' }))
     await user.click(await screen.findByRole('option', { name: /Драма/ }))
@@ -71,8 +75,8 @@ describe('DiscoverPage', () => {
     expect(queries[0].get('page')).toBe('2')
     expect(screen.getByLabelText('Премьера с')).toHaveValue('2000-01-01')
     await user.click(screen.getByRole('button', { name: 'Сбросить' }))
-    // Reset clears the URL → back to the "waiting for input" prompt, no new search.
-    await waitFor(() => expect(screen.getByText('Задайте условия подбора')).toBeInTheDocument())
+    // Reset clears the URL → back to the trending default view, no new discover search.
+    await waitFor(() => expect(screen.getByText('Сейчас в тренде')).toBeInTheDocument())
     expect(screen.getByLabelText('Рейтинг TMDB от')).toHaveValue('0')
     await user.clear(screen.getByLabelText('Рейтинг TMDB от'))
     await user.type(screen.getByLabelText('Рейтинг TMDB от'), '9')

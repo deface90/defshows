@@ -1,5 +1,6 @@
-import { Button, Card, Container, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { Box, Button, Card, Container, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import { Link } from 'react-router-dom'
+import { TrendingShows } from '@/features/trending/TrendingShows'
 
 const features = [
   {
@@ -53,6 +54,10 @@ export function LandingView() {
           </Card>
         ))}
       </SimpleGrid>
+
+      <Box mt={64}>
+        <TrendingShows limit={6} />
+      </Box>
     </Container>
   )
 }

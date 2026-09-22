@@ -33,6 +33,19 @@ final class Session: ObservableObject {
         signedIn = true
     }
 
+    func register(email: String, password: String) async throws {
+        do {
+            let data = try await send("auth/register", method: "POST", body: ["email": email, "password": password])
+            let response = try decoder.decode(AuthResponse.self, from: data)
+            try persist(response.tokens)
+            signedIn = true
+        } catch let error as HTTPFailure where error.status == 409 {
+            // The server's message is English ("email already registered"); the
+            // app is Russian-only, so localize this one expected case ourselves.
+            throw APIError(message: "Этот email уже зарегистрирован")
+        }
+    }
+
     func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {
         let data = try await authorized(path, query: query)
         return try decoder.decode(T.self, from: data)

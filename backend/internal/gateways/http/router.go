@@ -44,6 +44,7 @@ var authOptionalPaths = map[string]bool{
 	"/shows/search":           true, // SearchShows
 	"/shows/discover":         true, // DiscoverShows
 	"/shows/discover/filters": true, // GetDiscoveryFilters
+	"/shows/trending":         true, // TrendingShows
 	"/shows/tmdb/:tmdb_id":    true, // GetShowByTMDB
 }
 

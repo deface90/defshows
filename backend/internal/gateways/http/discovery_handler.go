@@ -51,6 +51,15 @@ func (h *ShowsHandler) DiscoverShows(c echo.Context, params showsapi.DiscoverSho
 	return c.JSON(http.StatusOK, showsapi.DiscoveryResults{Results: toAPISummaries(page.Results), Page: page.Page, TotalPages: page.TotalPages, TotalResults: page.TotalResults})
 }
 
+func (h *ShowsHandler) TrendingShows(c echo.Context) error {
+	page, err := h.uc.Trending(c.Request().Context())
+	if err != nil {
+		slog.ErrorContext(c.Request().Context(), "provider trending failed", "error", err)
+		return echo.NewHTTPError(http.StatusBadGateway, "provider trending failed")
+	}
+	return c.JSON(http.StatusOK, showsapi.DiscoveryResults{Results: toAPISummaries(page.Results), Page: page.Page, TotalPages: page.TotalPages, TotalResults: page.TotalResults})
+}
+
 func (h *ShowsHandler) GetDiscoveryFilters(c echo.Context) error {
 	filters, err := h.uc.DiscoveryFilters(c.Request().Context())
 	if err != nil {

@@ -24,3 +24,5 @@ npm-debug.log*
 docs
 /backend/deploy/docker-compose.prod.yml
 /logo.png
+
+ios/DefShows.xcodeproj/project.xcworkspace*

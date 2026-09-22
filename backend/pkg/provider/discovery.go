@@ -6,6 +6,7 @@ import "context"
 type DiscoveryProvider interface {
 	Discover(context.Context, DiscoverOptions) (DiscoveryPage, error)
 	DiscoveryFilters(context.Context) (DiscoveryFilters, error)
+	Trending(context.Context) (DiscoveryPage, error)
 }
 
 type DiscoverOptions struct {

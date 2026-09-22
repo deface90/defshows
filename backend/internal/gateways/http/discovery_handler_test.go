@@ -27,6 +27,9 @@ func (p *discoverShowProvider) Discover(_ context.Context, opts provider.Discove
 func (p *discoverShowProvider) DiscoveryFilters(context.Context) (provider.DiscoveryFilters, error) {
 	return provider.DiscoveryFilters{Genres: []provider.Genre{{TMDBID: 18, Name: "Драма"}}, Countries: []provider.Country{{Code: "US", Name: "United States"}}}, nil
 }
+func (p *discoverShowProvider) Trending(context.Context) (provider.DiscoveryPage, error) {
+	return provider.DiscoveryPage{Page: 1, TotalPages: 1, TotalResults: 1, Results: []provider.ShowSummary{{TMDBID: 1399, Title: "Test", VoteAverage: 8.5, VoteCount: 500}}}, nil
+}
 
 func TestDiscoveryHTTP(t *testing.T) {
 	p := &discoverShowProvider{}
@@ -60,5 +63,16 @@ func TestDiscoveryHTTP(t *testing.T) {
 	}
 	if len(refs.Genres) != 1 || refs.Genres[0].Id != 18 || len(refs.Countries) != 1 || refs.Countries[0].Code != "US" {
 		t.Fatalf("references: %+v", refs)
+	}
+	rec = doJSON(t, e, http.MethodGet, "/shows/trending", "", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("trending: %d (%s)", rec.Code, rec.Body.String())
+	}
+	var trending showsapi.DiscoveryResults
+	if err := json.Unmarshal(rec.Body.Bytes(), &trending); err != nil {
+		t.Fatal(err)
+	}
+	if trending.TotalResults != 1 || len(trending.Results) != 1 || trending.Results[0].TmdbId != 1399 {
+		t.Fatalf("trending: %+v", trending)
 	}
 }

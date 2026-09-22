@@ -2,6 +2,7 @@ import { Badge, Box, Button, Card, Divider, Group, SimpleGrid, Stack, Text, Titl
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
+import { TrendingShows } from '@/features/trending/TrendingShows'
 import { MyShowRow } from '@/entities/show/MyShowRow'
 import { Poster } from '@/entities/show/Poster'
 import { useGetRecommendations, useListTracked } from '@/shared/api/tracking/endpoints'
@@ -131,6 +132,8 @@ export function DashboardView() {
           <RecommendationsBlock />
         </>
       )}
+
+      {query.isSuccess && <TrendingShows />}
     </Stack>
   )
 }

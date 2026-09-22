@@ -50,3 +50,11 @@ func (uc *CatalogUsecase) DiscoveryFilters(ctx context.Context) (provider.Discov
 	}
 	return p.DiscoveryFilters(ctx)
 }
+
+func (uc *CatalogUsecase) Trending(ctx context.Context) (provider.DiscoveryPage, error) {
+	p, ok := uc.provider.(provider.DiscoveryProvider)
+	if !ok {
+		return provider.DiscoveryPage{}, errors.New("provider does not support discovery")
+	}
+	return p.Trending(ctx)
+}

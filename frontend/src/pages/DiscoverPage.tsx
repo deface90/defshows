@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ShowCard } from '@/entities/show/ShowCard'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
-import { useDiscoverShows, useGetDiscoveryFilters } from '@/shared/api/shows/endpoints'
+import { useDiscoverShows, useGetDiscoveryFilters, useTrendingShows } from '@/shared/api/shows/endpoints'
 import type { DiscoverShowsParams } from '@/shared/api/shows/model'
 import { useListTracked } from '@/shared/api/tracking/endpoints'
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
@@ -62,6 +62,7 @@ export function DiscoverPage() {
   // URL that already carries filters); an empty URL means "waiting for input".
   const hasQuery = searchParams.toString().length > 0
   const results = useDiscoverShows(applied, { query: { enabled: hasQuery && !invalid(applied), retry: false } })
+  const trending = useTrendingShows({ query: { enabled: !hasQuery, retry: false } })
   const tracked = useListTracked(undefined, { query: { retry: false } })
   const genres = draft.genres?.split(/[,|]/).filter(Boolean) ?? []
   const countries = (references.data?.countries ?? []).map((country) => ({
@@ -101,7 +102,23 @@ export function DiscoverPage() {
           </Group>
         </Stack>
       </Card>
-      {!hasQuery && <EmptyState title="Задайте условия подбора" description="Выберите фильтры и нажмите «Подобрать»." />}
+      {!hasQuery && <>
+        <div>
+          <Title order={4}>Сейчас в тренде</Title>
+          <Text c="dimmed" size="sm">Задайте фильтры выше, чтобы сузить подборку</Text>
+        </div>
+        {trending.isLoading && <LoadingState />}
+        {trending.isError && <Stack><ErrorState message="Не удалось загрузить тренды" /><Button variant="subtle" onClick={() => trending.refetch()}>Повторить</Button></Stack>}
+        {trending.isSuccess && (trending.data.results.length === 0 ? <EmptyState title="Сейчас нет данных о трендах" /> : (
+          <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }}>
+            {trending.data.results.map((show) => <ShowCard
+              key={show.tmdb_id} show={show}
+              to={`/catalog/${show.tmdb_id}?from=${encodeURIComponent('/discover')}`}
+              action={<AddShowButton tmdbId={show.tmdb_id} disabled={!tracked.isSuccess} addedShowId={tracked.data?.tracked.find((item) => item.show.tmdb_id === show.tmdb_id)?.show.id} />}
+            />)}
+          </SimpleGrid>
+        ))}
+      </>}
       {hasQuery && invalid(applied) && <ErrorState message="Некорректные параметры в ссылке. Измените фильтры или сбросьте их." />}
       {results.isLoading && <LoadingState />}
       {results.isError && <Stack><ErrorState message="Не удалось подобрать сериалы" /><Button variant="subtle" onClick={() => results.refetch()}>Повторить подбор</Button></Stack>}
