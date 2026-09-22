@@ -1,6 +1,12 @@
 import SwiftUI
 
+private struct ShowSheetItem: Identifiable {
+    let id: Int
+}
+
 struct MainTabsView: View {
+    @State private var openShow: ShowSheetItem?
+
     var body: some View {
         TabView {
             LibraryView().tabItem { Label("Мои сериалы", systemImage: "tv") }
@@ -12,6 +18,13 @@ struct MainTabsView: View {
                 .tabItem { Label("Уведомления", systemImage: "bell") }
             NavigationStack { MoreView() }
                 .tabItem { Label("Ещё", systemImage: "ellipsis.circle") }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pushOpenShow)) { note in
+            guard let showID = note.object as? Int else { return }
+            openShow = ShowSheetItem(id: showID)
+        }
+        .sheet(item: $openShow) { item in
+            NavigationStack { ShowView(showID: item.id) }
         }
     }
 }

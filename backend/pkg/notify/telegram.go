@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -30,11 +31,15 @@ func NewTelegramChannel(baseURL, token string, client *http.Client) *TelegramCha
 	return &TelegramChannel{baseURL: baseURL, token: token, client: client}
 }
 
-// Send delivers a message via sendMessage.
+// Send delivers a message via sendMessage. msg.Target is the chat id.
 func (t *TelegramChannel) Send(ctx context.Context, msg Message) error {
+	chatID, err := strconv.ParseInt(msg.Target, 10, 64)
+	if err != nil {
+		return fmt.Errorf("telegram: invalid target %q: %w", msg.Target, err)
+	}
 	body, err := json.Marshal(map[string]any{
-		"chat_id": msg.ChatID,
-		"text":    msg.Text,
+		"chat_id": chatID,
+		"text":    msg.Body,
 	})
 	if err != nil {
 		return err

@@ -27,7 +27,7 @@ func TestTelegramChannel_Send(t *testing.T) {
 	defer srv.Close()
 
 	ch := notify.NewTelegramChannel(srv.URL, "test-token", srv.Client())
-	if err := ch.Send(context.Background(), notify.Message{ChatID: 42, Text: "hi"}); err != nil {
+	if err := ch.Send(context.Background(), notify.Message{Target: "42", Body: "hi"}); err != nil {
 		t.Fatalf("send: %v", err)
 	}
 	if int64(gotChatID) != 42 {
@@ -42,7 +42,7 @@ func TestTelegramChannel_Send_Error(t *testing.T) {
 	defer srv.Close()
 
 	ch := notify.NewTelegramChannel(srv.URL, "t", srv.Client())
-	if err := ch.Send(context.Background(), notify.Message{ChatID: 1, Text: "x"}); err == nil {
+	if err := ch.Send(context.Background(), notify.Message{Target: "1", Body: "x"}); err == nil {
 		t.Fatal("expected error on 500")
 	}
 }

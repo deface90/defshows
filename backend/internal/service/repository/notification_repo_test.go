@@ -51,14 +51,14 @@ func TestNotificationRepository_PrefsAndDedup(t *testing.T) {
 	}
 
 	// Pending telegram requires a linked chat.
-	if pend, _ := repo.PendingTelegram(ctx, 10); len(pend) != 0 {
+	if pend, _ := repo.Pending(ctx, "telegram", 10); len(pend) != 0 {
 		t.Fatalf("want 0 pending without chat, got %d", len(pend))
 	}
 	if err := repository.NewUserRepository(gdb).SetTelegramChatID(ctx, user.ID, 555); err != nil {
 		t.Fatalf("set chat: %v", err)
 	}
-	pend, _ := repo.PendingTelegram(ctx, 10)
-	if len(pend) != 1 || pend[0].ChatID != 555 {
+	pend, _ := repo.Pending(ctx, "telegram", 10)
+	if len(pend) != 1 || pend[0].Target != "555" {
 		t.Fatalf("pending: %+v", pend)
 	}
 
@@ -66,7 +66,7 @@ func TestNotificationRepository_PrefsAndDedup(t *testing.T) {
 	if err := repo.MarkSent(ctx, pend[0].ID); err != nil {
 		t.Fatalf("mark sent: %v", err)
 	}
-	if pend, _ := repo.PendingTelegram(ctx, 10); len(pend) != 0 {
+	if pend, _ := repo.Pending(ctx, "telegram", 10); len(pend) != 0 {
 		t.Fatalf("want 0 pending after sent, got %d", len(pend))
 	}
 }
@@ -134,5 +134,107 @@ func TestNotificationRepository_ReleaseCandidatesAndLinkTokens(t *testing.T) {
 	_ = repo.CreateLinkToken(ctx, exp)
 	if _, err := repo.ConsumeLinkToken(ctx, "tok2"); !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("want ErrNotFound for expired, got %v", err)
+	}
+}
+
+func TestNotificationRepository_APNsChannel(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "users", "shows")
+	repo := repository.NewNotificationRepository(gdb)
+	userRepo := repository.NewUserRepository(gdb)
+	ctx := context.Background()
+
+	user := &entity.User{Email: strptr("apns@example.com"), Role: entity.RoleUser, Timezone: "UTC"}
+	if err := gdb.Create(user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	// Pending apns requires a linked device token.
+	if pend, _ := repo.Pending(ctx, "apns", 10); len(pend) != 0 {
+		t.Fatalf("want 0 pending without token, got %d", len(pend))
+	}
+	if err := userRepo.SetAPNsToken(ctx, user.ID, "device-token-1"); err != nil {
+		t.Fatalf("set apns token: %v", err)
+	}
+
+	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, Channel: "apns", Status: entity.NotifyPending, ScheduledFor: time.Now(), DedupeKey: "apns-k1", Payload: "hi"}
+	if _, err := repo.CreateNotificationIfAbsent(ctx, n); err != nil {
+		t.Fatalf("create notification: %v", err)
+	}
+	pend, _ := repo.Pending(ctx, "apns", 10)
+	if len(pend) != 1 || pend[0].Target != "device-token-1" || pend[0].Body != "hi" {
+		t.Fatalf("pending: %+v", pend)
+	}
+
+	// A second user stealing the same device token unlinks it from the first.
+	other := &entity.User{Email: strptr("apns2@example.com"), Role: entity.RoleUser, Timezone: "UTC"}
+	if err := gdb.Create(other).Error; err != nil {
+		t.Fatalf("seed other user: %v", err)
+	}
+	if err := userRepo.SetAPNsToken(ctx, other.ID, "device-token-1"); err != nil {
+		t.Fatalf("steal apns token: %v", err)
+	}
+	tok, err := userRepo.APNsToken(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("apns token: %v", err)
+	}
+	if tok != nil {
+		t.Fatalf("want original owner's token cleared, got %v", *tok)
+	}
+}
+
+func TestNotificationRepository_UpcomingCandidates(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "users", "shows")
+	repo := repository.NewNotificationRepository(gdb)
+	trackingRepo := repository.NewTrackingRepository(gdb)
+	ctx := context.Background()
+
+	chat := int64(77)
+	user := &entity.User{Email: strptr("upcoming@example.com"), Role: entity.RoleUser, Timezone: "UTC", TelegramChatID: &chat}
+	if err := gdb.Create(user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	show := &entity.Show{TMDBID: 901, Title: "Upcoming Show", AiringStatus: entity.AiringNow}
+	if err := gdb.Create(show).Error; err != nil {
+		t.Fatalf("seed show: %v", err)
+	}
+	season := &entity.Season{ShowID: show.ID, SeasonNumber: 2, EpisodeCount: 1}
+	gdb.Create(season)
+	soon := time.Now().Add(12 * time.Hour)
+	premiere := &entity.Episode{SeasonID: season.ID, ShowID: show.ID, SeasonNumber: 2, EpisodeNumber: 1, Name: "Premiere", AirDate: &soon}
+	if err := gdb.Create(premiere).Error; err != nil {
+		t.Fatalf("seed episode: %v", err)
+	}
+	us := &entity.UserShow{UserID: user.ID, ShowID: show.ID, Status: entity.StatusWatching}
+	if err := trackingRepo.AddUserShow(ctx, us); err != nil {
+		t.Fatalf("add user show: %v", err)
+	}
+
+	now := time.Now()
+	epCands, err := repo.EpisodeUpcomingCandidates(ctx, now)
+	if err != nil {
+		t.Fatalf("episode upcoming: %v", err)
+	}
+	if len(epCands) != 1 || epCands[0].EpisodeID != premiere.ID {
+		t.Fatalf("want 1 upcoming episode candidate, got %+v", epCands)
+	}
+
+	seasonCands, err := repo.SeasonUpcomingCandidates(ctx, now)
+	if err != nil {
+		t.Fatalf("season upcoming: %v", err)
+	}
+	if len(seasonCands) != 1 || seasonCands[0].EpisodeID != premiere.ID {
+		t.Fatalf("want 1 upcoming season candidate, got %+v", seasonCands)
+	}
+
+	// Outside the default 24h lead time: no candidates.
+	far := time.Now().Add(72 * time.Hour)
+	premiere.AirDate = &far
+	if err := gdb.Save(premiere).Error; err != nil {
+		t.Fatalf("push air date: %v", err)
+	}
+	if cands, _ := repo.EpisodeUpcomingCandidates(ctx, now); len(cands) != 0 {
+		t.Fatalf("want 0 candidates beyond lead time, got %d", len(cands))
 	}
 }

@@ -47,6 +47,12 @@ type Prefs struct {
 	WeeklyDigest   bool   `json:"weekly_digest"`
 }
 
+// RegisterDeviceTokenRequest defines model for RegisterDeviceTokenRequest.
+type RegisterDeviceTokenRequest struct {
+	Platform string `json:"platform"`
+	Token    string `json:"token"`
+}
+
 // TelegramLink defines model for TelegramLink.
 type TelegramLink struct {
 	Url string `json:"url"`
@@ -65,11 +71,20 @@ type UpdatePrefsRequest struct {
 	WeeklyDigest   *bool `json:"weekly_digest,omitempty"`
 }
 
+// RegisterDeviceTokenJSONRequestBody defines body for RegisterDeviceToken for application/json ContentType.
+type RegisterDeviceTokenJSONRequestBody = RegisterDeviceTokenRequest
+
 // UpdatePrefsJSONRequestBody defines body for UpdatePrefs for application/json ContentType.
 type UpdatePrefsJSONRequestBody = UpdatePrefsRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// UnregisterDeviceToken Unregister this device's push token
+	// (DELETE /me/device-token)
+	UnregisterDeviceToken(ctx echo.Context) error
+	// RegisterDeviceToken Register this device's push token
+	// (POST /me/device-token)
+	RegisterDeviceToken(ctx echo.Context) error
 	// ListNotifications In-app notification feed
 	// (GET /me/notifications)
 	ListNotifications(ctx echo.Context) error
@@ -96,6 +111,24 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// UnregisterDeviceToken converts echo context to params.
+func (w *ServerInterfaceWrapper) UnregisterDeviceToken(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UnregisterDeviceToken(ctx)
+	return err
+}
+
+// RegisterDeviceToken converts echo context to params.
+func (w *ServerInterfaceWrapper) RegisterDeviceToken(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.RegisterDeviceToken(ctx)
+	return err
 }
 
 // ListNotifications converts echo context to params.
@@ -220,6 +253,8 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/me/notifications/:id/read", wrapper.MarkNotificationRead, options.OperationMiddlewares["markNotificationRead"]...)
 	router.GET(options.BaseURL+"/me/notifications/prefs", wrapper.GetPrefs, options.OperationMiddlewares["getPrefs"]...)
 	router.PATCH(options.BaseURL+"/me/notifications/prefs", wrapper.UpdatePrefs, options.OperationMiddlewares["updatePrefs"]...)
+	router.DELETE(options.BaseURL+"/me/device-token", wrapper.UnregisterDeviceToken, options.OperationMiddlewares["unregisterDeviceToken"]...)
+	router.POST(options.BaseURL+"/me/device-token", wrapper.RegisterDeviceToken, options.OperationMiddlewares["registerDeviceToken"]...)
 	router.GET(options.BaseURL+"/me/telegram", wrapper.GetTelegramStatus, options.OperationMiddlewares["getTelegramStatus"]...)
 	router.GET(options.BaseURL+"/me/telegram/link", wrapper.GetTelegramLink, options.OperationMiddlewares["getTelegramLink"]...)
 
@@ -230,21 +265,22 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"zFbRbts2FP0VgRuwFyVy12APfsuGtcjWdUXSoQ9BYDDStcWGItl7rxYYgf59ICnZkszE2dAOebIsUuee",
-	"c0ieywdR2sZZA4ZJLB8EAjlrCMKfXxEt+ofSGgbD/lE6p1UpWVlTfCZr/Dsqa2ikf/oeYS2W4rtij1rE",
-	"USoiWtd1uaiASlTOg4ilGAbyHmha26F1gKwipQaI5Ab8I28diKUgRmU24XOEL61CqMTyejfxJh8m2tvP",
-	"ULLocvHeslr3It6Anz8vY0YzwgvF0NAxhWPcC4bG1+qLS0S5PSA5LXOMaoA8oFoiSIZqJTlhSi5UULe2",
-	"2PgJQhn+6UzsCinDsAH0E53caiurJAjCZODWWg3S+BFiyS0lP4ovjq2TqgY2O7C+3p5SPhaZcukDwpoS",
-	"1tTSGNBJduAU2QpWCBokQVqdBlmtWDWwqm2LY5kj4wgkWbMilshpmHuAO71dVWoDlJwy82TObVZjDpjv",
-	"hB4yTrn1ETRsUDbvlLk7NK1FfXzV/KSnoK9222IKrpW5g+oZFvQTUzX+cpVkCEt+CV/a3tJpnZe2ujMR",
-	"AbdsUfH2ymdHJH0LEgHPW673/94MB/e3Tx9FH5ABPIzuD3LN7GK2KrO2gYVi7UcqWF/V9p6ycZRQdv7h",
-	"QuTib0CKIbw4fXW68HKsAyOdEkvx+nRx+jocQ64DwaKB4iAZNxBEe/djSlViKd4p4km9cKhHreXHxeKr",
-	"NZaDOE/0mD9/99rOFq8eA9uxK0btqG0aiVuxFBfmRDqXjcVn61gqP7SlcEMeJc15CxwD6xt6Egs8YsRE",
-	"2lvgqS5PHhBMCRT7Apf1oYjRKRTx6ALxz7bafjUJiXPeTWOCsYXuRZgYuT7hY3Kb+DZ3InXIW2cpsVX+",
-	"kHh3rvXkKF3G5jhTfeZ/pizf2+yX3oYpW4+acQ3ZfW01hI2cScpC100zfVBVVwy3gMepjnleDj0cZQMM",
-	"Pl+vH4TyxHygiFwYGaJMVWK+qPlogY5eXbqbf2uGD4Kz/xYEwTqZkTIbPVvvuYPc98KncmDWL7/hXp5V",
-	"es6m/lQD14Bhp7QE+ANlA0omy9K2hjNFWd+q57IL3V8vjmkP15D/QXmo8xzdF0QtZDKzBk789WCvugJw",
-	"QW/EGXp42Nnj7n190910/wQAAP//",
+	"zFbfb9s2EP5XCG5AX5TIXYM9+C370SJb1xVOij4EgcFIZ4s1RbK8UwMj0P8+kJRtSabjrGuyvsnm6bvv",
+	"Pp6+u3temNoaDZqQT++5A7RGI4QfvztnnH8ojCbQ5B+FtUoWgqTR+Sc02v+HRQW18E8/OljwKf8h36Hm",
+	"8RTziNa2bcZLwMJJ60H4lG8Osg5omNs6Y8GRjJRqQBRL8I+0tsCnHMlJvQyvO/jcSAcln15vA2+yTaC5",
+	"/QQF8Tbj7wzJRVfEa/Dx4zS6FxH+kAQ1Hquwj3tBUPtcXXLhnFjvkRymOUY1QO5RLRwIgnIuKCFKxmWo",
+	"bmFc7QO41PTzGd8mkppgCc4HWrFWRpRJEAeDg1tjFAjtT5AENZh8Kf5x7J5kuWGzBevy7Shl/SJTKr13",
+	"sMCENJXQGlSSHViJpoS5AwUCIV2dAlHOSdYwr0zj+mX2hEMQaPQcSThKw9wBrNR6XsolYDJkpMmY2yjH",
+	"GDDbFrrPOKXWDJYSCdxv8EUWcGVWoGfwuem4DSW0SpBvnvQN+1ePX3EMy3ZYKVJXoGDpRP1W6tU+jcap",
+	"43l80EPQl9teHYIrqVdQPuJeusBUjg+2FAShDw9q+b213KiIgFs0TtL60htaJH0LwoE7b6ja/Xq9cZM/",
+	"Pl7xzrUDeDjduUtFZKPhS70wgYUk5U9KWFxW5g5Z39+Qnb+/4Bn/Ag7jZJicvjyd+HKMBS2s5FP+6nRy",
+	"+ip4A1WBYF5DXoZOPtn2YwkKKAjs9Y/mWfIp/6Ddfu8Hv+lNvZ8mZxGjP6PeGfZrNwTbjJ9NXh6aBVuo",
+	"vDfWmroWbj0gwKiSyCLxF8hsgxWL/L0Xm3hpQ/azA9xDu/1iyvU3G9UPOEQ7/CjINdA+o4Cz4/K1WeiJ",
+	"vRG+hISmbyXSoAf3u2HyzWTd2zsSy9Dff/4nfS70ibCW9Ytni5gqIUtuN4MzKc4boDhZn1CTmOCAEIPS",
+	"3gAN6/LkwYEuAOMCQ0WV+OZ3zvxEX0vC+x/1lfwfIkauD+iYbBO/j50IFWZw2pv+Em51rtTgU5rFLe7f",
+	"ecOArUdlVAG7q4yC0MhMIAvrYZrpvSzbfLOuHqba5znbLJtO1EDgZ+71PZeemB8yPONahPEmSz6+1Kx3",
+	"QUd37Pbma4zy7OuMIEgnGEq9VKP7HitI3X70kA+Mdqgn7OVRpsc09ccKqAozAViD4F4g26AwURSm0cQk",
+	"sm59G5edq27lPFZ7WE2fofKQ5zF1XyA2wAQzGk78yrirugSwod6Is9nrQmf3N7rrm/am/ScAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

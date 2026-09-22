@@ -16,7 +16,7 @@ type fakeSenderRepo struct {
 	failed  []int64
 }
 
-func (f *fakeSenderRepo) PendingTelegram(context.Context, int) ([]repository.PendingNotification, error) {
+func (f *fakeSenderRepo) Pending(context.Context, string, int) ([]repository.PendingNotification, error) {
 	return f.pending, nil
 }
 func (f *fakeSenderRepo) MarkSent(_ context.Context, id int64) error {
@@ -29,11 +29,11 @@ func (f *fakeSenderRepo) MarkFailed(_ context.Context, id int64) error {
 }
 
 type fakeChannel struct {
-	failChatID int64
+	failTarget string
 }
 
 func (f fakeChannel) Send(_ context.Context, msg notify.Message) error {
-	if msg.ChatID == f.failChatID {
+	if msg.Target == f.failTarget {
 		return errors.New("boom")
 	}
 	return nil
@@ -41,10 +41,10 @@ func (f fakeChannel) Send(_ context.Context, msg notify.Message) error {
 
 func TestNotifySender_RunOnce(t *testing.T) {
 	repo := &fakeSenderRepo{pending: []repository.PendingNotification{
-		{ID: 1, ChatID: 111, Payload: "ok"},
-		{ID: 2, ChatID: 222, Payload: "boom"},
+		{ID: 1, Target: "111", Body: "ok"},
+		{ID: 2, Target: "222", Body: "boom"},
 	}}
-	s := workers.NewNotifySender(repo, fakeChannel{failChatID: 222}, quietLogger(), 100)
+	s := workers.NewNotifySender(repo, "telegram", fakeChannel{failTarget: "222"}, quietLogger(), 100)
 
 	sent, failed, err := s.RunOnce(context.Background())
 	if err != nil {

@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/deface90/defshows/backend/internal/service/repository"
@@ -11,30 +12,32 @@ import (
 
 // SenderRepo is the storage dependency of NotifySender.
 type SenderRepo interface {
-	PendingTelegram(ctx context.Context, limit int) ([]repository.PendingNotification, error)
+	Pending(ctx context.Context, channel string, limit int) ([]repository.PendingNotification, error)
 	MarkSent(ctx context.Context, id int64) error
 	MarkFailed(ctx context.Context, id int64) error
 }
 
-// NotifySender delivers pending notifications via a channel.
+// NotifySender delivers a channel's pending notifications.
 type NotifySender struct {
-	repo    SenderRepo
-	channel notify.Channel
-	logger  *slog.Logger
-	batch   int
+	repo        SenderRepo
+	channelName string
+	channel     notify.Channel
+	logger      *slog.Logger
+	batch       int
 }
 
-// NewNotifySender creates a NotifySender.
-func NewNotifySender(repo SenderRepo, channel notify.Channel, logger *slog.Logger, batch int) *NotifySender {
+// NewNotifySender creates a NotifySender for one channel ("telegram" or
+// "apns").
+func NewNotifySender(repo SenderRepo, channelName string, channel notify.Channel, logger *slog.Logger, batch int) *NotifySender {
 	if batch <= 0 {
 		batch = 100
 	}
-	return &NotifySender{repo: repo, channel: channel, logger: logger, batch: batch}
+	return &NotifySender{repo: repo, channelName: channelName, channel: channel, logger: logger, batch: batch}
 }
 
 // RunOnce sends one batch of pending notifications.
 func (s *NotifySender) RunOnce(ctx context.Context) (sent, failed int, err error) {
-	pending, err := s.repo.PendingTelegram(ctx, s.batch)
+	pending, err := s.repo.Pending(ctx, s.channelName, s.batch)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -42,7 +45,11 @@ func (s *NotifySender) RunOnce(ctx context.Context) (sent, failed int, err error
 		if ctx.Err() != nil {
 			return sent, failed, ctx.Err()
 		}
-		sendErr := s.channel.Send(ctx, notify.Message{ChatID: p.ChatID, Text: p.Payload})
+		var data map[string]string
+		if p.ShowID != nil {
+			data = map[string]string{"show_id": strconv.FormatInt(*p.ShowID, 10)}
+		}
+		sendErr := s.channel.Send(ctx, notify.Message{Target: p.Target, Title: p.Title, Body: p.Body, Data: data})
 		if sendErr != nil {
 			failed++
 			s.logger.Warn("send failed", "notification_id", p.ID, "err", sendErr)

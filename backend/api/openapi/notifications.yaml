@@ -58,6 +58,24 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Prefs' }
+  /me/device-token:
+    post:
+      operationId: registerDeviceToken
+      summary: Register this device's push token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceTokenRequest' }
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: unregisterDeviceToken
+      summary: Unregister this device's push token
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Error' }
   /me/telegram:
     get:
       operationId: getTelegramStatus
@@ -126,6 +144,12 @@ components:
         season_start: { type: boolean }
         weekly_digest: { type: boolean }
         lead_time_hours: { type: integer }
+    RegisterDeviceTokenRequest:
+      type: object
+      required: [token, platform]
+      properties:
+        token: { type: string }
+        platform: { type: string }
     TelegramLink:
       type: object
       required: [url]

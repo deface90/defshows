@@ -1,7 +1,9 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct DefShowsApp: App {
+    @UIApplicationDelegateAdaptor(NotificationDelegate.self) private var appDelegate
     @StateObject private var session = Session()
     @State private var error: String?
 
@@ -16,10 +18,26 @@ struct DefShowsApp: App {
             .task {
                 do { try session.restore() }
                 catch { self.error = error.localizedDescription }
+                if session.signedIn { await requestPushAuthorization() }
+            }
+            .onChange(of: session.signedIn) { _, signedIn in
+                if signedIn { Task { await requestPushAuthorization() } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .apnsDeviceTokenRegistered)) { note in
+                guard let token = note.object as? String else { return }
+                Task { try? await session.registerDeviceToken(token) }
             }
             .alert("Не удалось восстановить вход", isPresented: Binding(
                 get: { error != nil }, set: { if !$0 { error = nil } }
             )) { Button("OK") { error = nil } } message: { Text(error ?? "") }
+        }
+    }
+
+    @MainActor
+    private func requestPushAuthorization() async {
+        let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+        if granted {
+            await UIApplication.shared.registerForRemoteNotifications()
         }
     }
 }

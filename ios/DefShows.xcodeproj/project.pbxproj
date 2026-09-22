@@ -18,6 +18,7 @@
 		6A483D94B26B20FA07B3CE2C /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC09F46F50ADFB3B6F55FE8 /* Session.swift */; };
 		993A6F0DC816349E9715E5C7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3D9C034DEADFF47588DBB4E1 /* Assets.xcassets */; };
 		D7F75D686A4146F8487DE07B /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9319EF0F1C94DCA2E6C710D4 /* Keychain.swift */; };
+		D8E9F0A1B2C3D4E5F6071829 /* PushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B2C3D4E5F60718293A4B5C6 /* PushNotifications.swift */; };
 		E0841AC22D9099DA311BA5B9 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F599E52CBFF89DFA6A2A406 /* NotificationsView.swift */; };
 		FF9567E8CD97D13B24358D0C /* UsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DADBC1E25F32A0E2C71BD4 /* UsersView.swift */; };
 /* End PBXBuildFile section */
@@ -28,6 +29,8 @@
 		2F63A6DBFFB53BEE6503B124 /* MainTabsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabsView.swift; sourceTree = "<group>"; };
 		38A007151ABE87CC01A5B6E9 /* DefShows.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = DefShows.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3D9C034DEADFF47588DBB4E1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4A1B2C3D4E5F60718293A4B5 /* DefShows.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DefShows.entitlements; sourceTree = "<group>"; };
+		5B2C3D4E5F60718293A4B5C6 /* PushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotifications.swift; sourceTree = "<group>"; };
 		78CA6240E3980DB0AB7F7AF9 /* BrowseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseModels.swift; sourceTree = "<group>"; };
 		8E0816A0329CA1F4A5ADF67A /* CatalogBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogBrowseView.swift; sourceTree = "<group>"; };
 		9319EF0F1C94DCA2E6C710D4 /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
@@ -66,6 +69,8 @@
 				19BFBC84FD9B2B92C10227AA /* Models.swift */,
 				CAC09F46F50ADFB3B6F55FE8 /* Session.swift */,
 				B82C0B542028ECD8FB953D4C /* ShowView.swift */,
+				5B2C3D4E5F60718293A4B5C6 /* PushNotifications.swift */,
+				4A1B2C3D4E5F60718293A4B5 /* DefShows.entitlements */,
 			);
 			path = DefShows;
 			sourceTree = "<group>";
@@ -162,6 +167,7 @@
 				487C502A5481E87001E8CC43 /* Models.swift in Sources */,
 				6A483D94B26B20FA07B3CE2C /* Session.swift in Sources */,
 				0CD5584196D0CE3008B85EB7 /* ShowView.swift in Sources */,
+				D8E9F0A1B2C3D4E5F6071829 /* PushNotifications.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -173,6 +179,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = DefShows/DefShows.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -198,6 +205,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = DefShows/DefShows.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;

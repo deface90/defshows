@@ -30,16 +30,28 @@ type TelegramLinker interface {
 	TelegramChatID(ctx context.Context, userID int64) (*int64, error)
 }
 
+// DeviceTokenLinker reads and sets a user's APNs device token.
+type DeviceTokenLinker interface {
+	SetAPNsToken(ctx context.Context, userID int64, token string) error
+	ClearAPNsToken(ctx context.Context, userID int64) error
+}
+
+// NotificationUsers is the user-storage dependency of NotificationUsecase.
+type NotificationUsers interface {
+	TelegramLinker
+	DeviceTokenLinker
+}
+
 // NotificationUsecase implements the user-facing notification workflow.
 type NotificationUsecase struct {
 	repo        NotificationRepo
-	users       TelegramLinker
+	users       NotificationUsers
 	botUsername string
 	linkTTL     time.Duration
 }
 
 // NewNotificationUsecase creates a NotificationUsecase.
-func NewNotificationUsecase(repo NotificationRepo, users TelegramLinker, botUsername string, linkTTL time.Duration) *NotificationUsecase {
+func NewNotificationUsecase(repo NotificationRepo, users NotificationUsers, botUsername string, linkTTL time.Duration) *NotificationUsecase {
 	if linkTTL <= 0 {
 		linkTTL = 15 * time.Minute
 	}
@@ -116,6 +128,18 @@ func (uc *NotificationUsecase) GenerateTelegramLink(ctx context.Context, userID 
 		return "", err
 	}
 	return fmt.Sprintf("https://t.me/%s?start=%s", uc.botUsername, token), nil
+}
+
+// RegisterDeviceToken links an APNs device token to the user, so they start
+// receiving push notifications on that device.
+func (uc *NotificationUsecase) RegisterDeviceToken(ctx context.Context, userID int64, token string) error {
+	return uc.users.SetAPNsToken(ctx, userID, token)
+}
+
+// UnregisterDeviceToken unlinks the user's APNs device token (called on
+// logout so a signed-out device stops receiving pushes for that account).
+func (uc *NotificationUsecase) UnregisterDeviceToken(ctx context.Context, userID int64) error {
+	return uc.users.ClearAPNsToken(ctx, userID)
 }
 
 // LinkTelegram consumes a link token and connects the chat to the user.

@@ -66,11 +66,21 @@ final class Session: ObservableObject {
     }
 
     func logout() async throws {
+        // Best-effort: don't let a failed unregister block logout.
+        try? await unregisterDeviceToken()
         // Keep the local session if revocation fails so logout can be retried.
         if let tokens {
             _ = try await send("auth/logout", method: "POST", body: ["refresh_token": tokens.refreshToken])
         }
         try clear()
+    }
+
+    func registerDeviceToken(_ token: String) async throws {
+        try await mutate("me/device-token", body: ["token": token, "platform": "ios"])
+    }
+
+    func unregisterDeviceToken() async throws {
+        try await mutate("me/device-token", method: "DELETE")
     }
 
     func posterURL(_ source: String?) -> URL? {

@@ -68,7 +68,8 @@ func (f *fakeNotifRepo) ConsumeLinkToken(_ context.Context, token string) (int64
 }
 
 type fakeLinker struct {
-	linked map[int64]int64 // userID -> chatID
+	linked  map[int64]int64 // userID -> chatID
+	devices map[int64]string
 }
 
 func (f *fakeLinker) SetTelegramChatID(_ context.Context, userID, chatID int64) error {
@@ -84,6 +85,19 @@ func (f *fakeLinker) TelegramChatID(_ context.Context, userID int64) (*int64, er
 		return &chatID, nil
 	}
 	return nil, nil
+}
+
+func (f *fakeLinker) SetAPNsToken(_ context.Context, userID int64, token string) error {
+	if f.devices == nil {
+		f.devices = map[int64]string{}
+	}
+	f.devices[userID] = token
+	return nil
+}
+
+func (f *fakeLinker) ClearAPNsToken(_ context.Context, userID int64) error {
+	delete(f.devices, userID)
+	return nil
 }
 
 func TestNotificationUsecase_TelegramLinkFlow(t *testing.T) {

@@ -23,6 +23,7 @@ type Config struct {
 	OMDb     OMDb
 	Worker   Worker
 	Telegram Telegram
+	APNs     APNs
 	Notifier Notifier
 	OAuth    OAuth
 	Seed     Seed
@@ -94,6 +95,22 @@ type Telegram struct {
 	Token    string
 	Username string
 	BaseURL  string
+}
+
+// APNs holds Apple Push Notification service settings for the iOS app.
+// KeyPEM is the full contents of the .p8 provider auth key downloaded from
+// the Apple Developer portal.
+type APNs struct {
+	TeamID     string
+	KeyID      string
+	KeyPEM     string
+	Topic      string
+	Production bool
+}
+
+// Enabled reports whether APNs is configured enough to send push notifications.
+func (a APNs) Enabled() bool {
+	return a.TeamID != "" && a.KeyID != "" && a.KeyPEM != ""
 }
 
 // Notifier holds notification worker settings.
@@ -193,6 +210,13 @@ func Load() (Config, error) {
 			Username: getEnv("TELEGRAM_BOT_USERNAME", ""),
 			BaseURL:  getEnv("TELEGRAM_API_BASE_URL", "https://api.telegram.org"),
 		},
+		APNs: APNs{
+			TeamID:     getEnv("APNS_TEAM_ID", ""),
+			KeyID:      getEnv("APNS_KEY_ID", ""),
+			KeyPEM:     getEnv("APNS_KEY", ""),
+			Topic:      getEnv("APNS_TOPIC", "com.defshows.ios"),
+			Production: getEnvBool("APNS_PRODUCTION", true),
+		},
 		Proxy: getEnv("PROXY_URL", ""),
 		S3: S3{
 			Endpoint:           getEnv("S3_ENDPOINT", ""),
@@ -288,6 +312,15 @@ func getEnvDuration(key string, def time.Duration) time.Duration {
 	if v, ok := os.LookupEnv(key); ok && v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			return d
+		}
+	}
+	return def
+}
+
+func getEnvBool(key string, def bool) bool {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
 		}
 	}
 	return def

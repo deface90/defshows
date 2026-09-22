@@ -171,6 +171,51 @@ func (r *UserRepository) TelegramChatID(ctx context.Context, userID int64) (*int
 	return u.TelegramChatID, nil
 }
 
+// SetAPNsToken links an APNs device token to a user, stealing it from any
+// other user it was previously registered to (a device token migrates when
+// someone logs into a different account on the same phone).
+func (r *UserRepository) SetAPNsToken(ctx context.Context, userID int64, token string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&entity.User{}).
+			Where("apns_device_token = ? AND id != ?", token, userID).
+			Updates(map[string]any{"apns_device_token": nil, "updated_at": time.Now()}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&entity.User{}).
+			Where("id = ?", userID).
+			Updates(map[string]any{"apns_device_token": token, "updated_at": time.Now()}).Error
+	})
+}
+
+// ClearAPNsToken unlinks a user's APNs device token.
+func (r *UserRepository) ClearAPNsToken(ctx context.Context, userID int64) error {
+	return r.db.WithContext(ctx).Model(&entity.User{}).
+		Where("id = ?", userID).
+		Updates(map[string]any{"apns_device_token": nil, "updated_at": time.Now()}).Error
+}
+
+// ClearAPNsTokenByToken unlinks whichever user currently holds this device
+// token (used when Apple reports it as unregistered).
+func (r *UserRepository) ClearAPNsTokenByToken(ctx context.Context, token string) error {
+	return r.db.WithContext(ctx).Model(&entity.User{}).
+		Where("apns_device_token = ?", token).
+		Updates(map[string]any{"apns_device_token": nil, "updated_at": time.Now()}).Error
+}
+
+// APNsToken returns the user's linked APNs device token, or nil if unlinked.
+func (r *UserRepository) APNsToken(ctx context.Context, userID int64) (*string, error) {
+	var u entity.User
+	err := r.db.WithContext(ctx).Select("apns_device_token").
+		Where("id = ?", userID).First(&u).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return u.APNsDeviceToken, nil
+}
+
 // FindIdentity returns a linked identity or ErrNotFound.
 func (r *UserRepository) FindIdentity(ctx context.Context, provider, providerUserID string) (*entity.UserIdentity, error) {
 	var id entity.UserIdentity

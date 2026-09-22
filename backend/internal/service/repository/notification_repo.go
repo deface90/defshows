@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -89,21 +90,22 @@ func (r *NotificationRepository) MarkAllRead(ctx context.Context, userID int64) 
 		Update("read_at", time.Now()).Error
 }
 
-// PendingNotification is a pending row joined with its target Telegram chat.
+// PendingNotification is a pending row joined with its delivery target.
+// Target is the chat id (as text) for telegram, or the device token for
+// apns; ShowID is only populated for apns (used for the push's deep link).
 type PendingNotification struct {
-	ID      int64
-	ChatID  int64
-	Payload string
+	ID     int64
+	Target string
+	Title  string
+	Body   string
+	ShowID *int64
 }
 
-// PendingTelegram returns pending telegram notifications ready to send.
-func (r *NotificationRepository) PendingTelegram(ctx context.Context, limit int) ([]PendingNotification, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 100
-	}
-	var out []PendingNotification
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT n.id AS id, u.telegram_chat_id AS chat_id, n.payload AS payload
+// pendingQueries maps a channel name to the SQL that finds its pending,
+// deliverable notifications.
+var pendingQueries = map[string]string{
+	"telegram": `
+		SELECT n.id AS id, u.telegram_chat_id::text AS target, '' AS title, n.payload AS body, n.show_id AS show_id
 		FROM notifications n
 		JOIN users u ON u.id = n.user_id
 		WHERE n.status = 'pending'
@@ -111,7 +113,31 @@ func (r *NotificationRepository) PendingTelegram(ctx context.Context, limit int)
 		  AND n.scheduled_for <= now()
 		  AND u.telegram_chat_id IS NOT NULL
 		ORDER BY n.scheduled_for
-		LIMIT ?`, limit).Scan(&out).Error
+		LIMIT ?`,
+	"apns": `
+		SELECT n.id AS id, u.apns_device_token AS target, 'defShows' AS title, n.payload AS body, n.show_id AS show_id
+		FROM notifications n
+		JOIN users u ON u.id = n.user_id
+		WHERE n.status = 'pending'
+		  AND n.channel = 'apns'
+		  AND n.scheduled_for <= now()
+		  AND u.apns_device_token IS NOT NULL
+		ORDER BY n.scheduled_for
+		LIMIT ?`,
+}
+
+// Pending returns pending notifications for a channel ("telegram" or "apns")
+// ready to send.
+func (r *NotificationRepository) Pending(ctx context.Context, channel string, limit int) ([]PendingNotification, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	query, ok := pendingQueries[channel]
+	if !ok {
+		return nil, fmt.Errorf("repository: unknown notification channel %q", channel)
+	}
+	var out []PendingNotification
+	err := r.db.WithContext(ctx).Raw(query, limit).Scan(&out).Error
 	return out, err
 }
 
@@ -128,38 +154,99 @@ func (r *NotificationRepository) MarkFailed(ctx context.Context, id int64) error
 		Update("status", entity.NotifyFailed).Error
 }
 
-// ReleaseCandidate is a newly-aired episode a user should be notified about.
-type ReleaseCandidate struct {
-	UserID        int64
-	ShowID        int64
-	EpisodeID     int64
-	ShowTitle     string
-	SeasonNumber  int
-	EpisodeNumber int
+// EventCandidate is a user+episode pair that should be notified about, along
+// with the channels currently available to reach that user.
+type EventCandidate struct {
+	UserID         int64
+	ShowID         int64
+	EpisodeID      int64
+	ShowTitle      string
+	SeasonNumber   int
+	EpisodeNumber  int
+	TelegramChatID *int64
+	APNsToken      *string
 }
 
 // ReleasedEpisodeCandidates finds aired-but-unwatched episodes for watching
-// users who have Telegram linked and episode_release enabled.
-func (r *NotificationRepository) ReleasedEpisodeCandidates(ctx context.Context, since time.Time) ([]ReleaseCandidate, error) {
-	var out []ReleaseCandidate
+// users who have episode_release enabled and at least one delivery channel
+// linked.
+func (r *NotificationRepository) ReleasedEpisodeCandidates(ctx context.Context, since time.Time) ([]EventCandidate, error) {
+	var out []EventCandidate
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT us.user_id      AS user_id,
-		       e.show_id       AS show_id,
-		       e.id            AS episode_id,
-		       s.title         AS show_title,
-		       e.season_number AS season_number,
-		       e.episode_number AS episode_number
+		SELECT us.user_id           AS user_id,
+		       e.show_id            AS show_id,
+		       e.id                 AS episode_id,
+		       s.title              AS show_title,
+		       e.season_number      AS season_number,
+		       e.episode_number     AS episode_number,
+		       u.telegram_chat_id   AS telegram_chat_id,
+		       u.apns_device_token  AS apns_token
 		FROM episodes e
 		JOIN shows s       ON s.id = e.show_id
 		JOIN user_shows us ON us.show_id = e.show_id AND us.status = 'watching'
-		JOIN users u       ON u.id = us.user_id AND u.telegram_chat_id IS NOT NULL
+		JOIN users u       ON u.id = us.user_id
 		LEFT JOIN notification_prefs p ON p.user_id = us.user_id
 		LEFT JOIN user_episodes ue ON ue.user_show_id = us.id AND ue.episode_id = e.id AND ue.watched = true
 		WHERE e.air_date IS NOT NULL
 		  AND e.air_date <= now()::date
 		  AND e.air_date >= ?
 		  AND COALESCE(p.episode_release, true) = true
+		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL)
 		  AND ue.id IS NULL`, since).Scan(&out).Error
+	return out, err
+}
+
+// EpisodeUpcomingCandidates finds not-yet-aired episodes of watched shows
+// whose air date falls within each user's configured lead time.
+func (r *NotificationRepository) EpisodeUpcomingCandidates(ctx context.Context, now time.Time) ([]EventCandidate, error) {
+	var out []EventCandidate
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT us.user_id           AS user_id,
+		       e.show_id            AS show_id,
+		       e.id                 AS episode_id,
+		       s.title              AS show_title,
+		       e.season_number      AS season_number,
+		       e.episode_number     AS episode_number,
+		       u.telegram_chat_id   AS telegram_chat_id,
+		       u.apns_device_token  AS apns_token
+		FROM episodes e
+		JOIN shows s       ON s.id = e.show_id
+		JOIN user_shows us ON us.show_id = e.show_id AND us.status = 'watching'
+		JOIN users u       ON u.id = us.user_id
+		LEFT JOIN notification_prefs p ON p.user_id = us.user_id
+		WHERE e.air_date IS NOT NULL
+		  AND e.air_date::timestamptz > ?::timestamptz
+		  AND e.air_date::timestamptz <= (?::timestamptz + (COALESCE(p.lead_time_hours, 24) || ' hours')::interval)
+		  AND COALESCE(p.episode_release, true) = true
+		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL)`, now, now).Scan(&out).Error
+	return out, err
+}
+
+// SeasonUpcomingCandidates finds not-yet-aired season premieres (episode 1)
+// of watched shows whose air date falls within each user's configured lead
+// time.
+func (r *NotificationRepository) SeasonUpcomingCandidates(ctx context.Context, now time.Time) ([]EventCandidate, error) {
+	var out []EventCandidate
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT us.user_id           AS user_id,
+		       e.show_id            AS show_id,
+		       e.id                 AS episode_id,
+		       s.title              AS show_title,
+		       e.season_number      AS season_number,
+		       e.episode_number     AS episode_number,
+		       u.telegram_chat_id   AS telegram_chat_id,
+		       u.apns_device_token  AS apns_token
+		FROM episodes e
+		JOIN shows s       ON s.id = e.show_id
+		JOIN user_shows us ON us.show_id = e.show_id AND us.status = 'watching'
+		JOIN users u       ON u.id = us.user_id
+		LEFT JOIN notification_prefs p ON p.user_id = us.user_id
+		WHERE e.air_date IS NOT NULL
+		  AND e.episode_number = 1
+		  AND e.air_date::timestamptz > ?::timestamptz
+		  AND e.air_date::timestamptz <= (?::timestamptz + (COALESCE(p.lead_time_hours, 24) || ' hours')::interval)
+		  AND COALESCE(p.season_start, true) = true
+		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL)`, now, now).Scan(&out).Error
 	return out, err
 }
 

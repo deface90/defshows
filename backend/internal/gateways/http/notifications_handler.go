@@ -125,6 +125,34 @@ func (h *NotificationsHandler) GetTelegramLink(c echo.Context) error {
 	return c.JSON(http.StatusOK, notificationsapi.TelegramLink{Url: url})
 }
 
+// RegisterDeviceToken handles POST /me/device-token.
+func (h *NotificationsHandler) RegisterDeviceToken(c echo.Context) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	var req notificationsapi.RegisterDeviceTokenRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if err := h.uc.RegisterDeviceToken(c.Request().Context(), uid, req.Token); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// UnregisterDeviceToken handles DELETE /me/device-token.
+func (h *NotificationsHandler) UnregisterDeviceToken(c echo.Context) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	if err := h.uc.UnregisterDeviceToken(c.Request().Context(), uid); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func toAPIPrefs(p *entity.NotificationPref) notificationsapi.Prefs {
 	return notificationsapi.Prefs{
 		EpisodeRelease: p.EpisodeRelease,

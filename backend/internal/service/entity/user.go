@@ -14,16 +14,17 @@ const (
 
 // User is an account. Email/PasswordHash are nil for social-only accounts.
 type User struct {
-	ID             int64 `gorm:"primaryKey"`
-	Email          *string
-	PasswordHash   *string
-	DisplayName    string
-	Role           Role
-	Timezone       string
-	IsPublic       bool
-	TelegramChatID *int64
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID              int64 `gorm:"primaryKey"`
+	Email           *string
+	PasswordHash    *string
+	DisplayName     string
+	Role            Role
+	Timezone        string
+	IsPublic        bool
+	TelegramChatID  *int64
+	APNsDeviceToken *string `gorm:"column:apns_device_token"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // TableName maps User to the users table.

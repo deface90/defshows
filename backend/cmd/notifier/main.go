@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -54,7 +55,7 @@ func main() {
 	channel := notify.NewTelegramChannel(cfg.Telegram.BaseURL, cfg.Telegram.Token, sendClient)
 
 	scanner := workers.NewNotifyScanner(notificationRepo, logger, cfg.Notifier.Lookback)
-	sender := workers.NewNotifySender(notificationRepo, channel, logger, 100)
+	sender := workers.NewNotifySender(notificationRepo, "telegram", channel, logger, 100)
 	linkUC := usecase.NewNotificationUsecase(notificationRepo, userRepo, cfg.Telegram.Username, cfg.Notifier.LinkTTL)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -68,6 +69,17 @@ func main() {
 		go sender.Run(ctx, cfg.Notifier.SendInterval)
 		pollClient := &http.Client{Timeout: 40 * time.Second, Transport: proxyTransport}
 		go pollTelegram(ctx, logger, cfg.Telegram, pollClient, channel, linkUC)
+	}
+
+	if !cfg.APNs.Enabled() {
+		logger.Warn("APNS_TEAM_ID/APNS_KEY_ID/APNS_KEY not set — push sender disabled")
+	} else {
+		apnsChannel, err := notify.NewAPNsChannel(cfg.APNs.TeamID, cfg.APNs.KeyID, cfg.APNs.KeyPEM, cfg.APNs.Topic, cfg.APNs.Production, sendClient)
+		if err != nil {
+			log.Fatalf("notifier: apns: %v", err)
+		}
+		apnsSender := workers.NewNotifySender(notificationRepo, "apns", apnsChannel, logger, 100)
+		go apnsSender.Run(ctx, cfg.Notifier.SendInterval)
 	}
 
 	logger.Info("notifier started")
@@ -104,7 +116,7 @@ func pollTelegram(ctx context.Context, logger *slog.Logger, tg config.Telegram, 
 				logger.Warn("telegram link failed", "err", err)
 				reply = "Ссылка недействительна или истекла. Запросите новую в defShows."
 			}
-			_ = channel.Send(ctx, notify.Message{ChatID: chatID, Text: reply})
+			_ = channel.Send(ctx, notify.Message{Target: strconv.FormatInt(chatID, 10), Body: reply})
 		}
 	}
 }
