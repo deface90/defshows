@@ -4,7 +4,8 @@ import Combine
 @MainActor
 final class Session: ObservableObject {
     @Published private(set) var signedIn = false
-    @Published var server = UserDefaults.standard.string(forKey: "apiServer") ?? ""
+    // Public API prefix from the deployed web client configuration.
+    private let server = "https://shows.deface.dev/api"
     private var tokens: Tokens?
     private var refreshTask: Task<Tokens, Error>?
     private let decoder: JSONDecoder = {
@@ -19,22 +20,15 @@ final class Session: ObservableObject {
     }()
 
     func restore() throws {
-        guard !server.isEmpty, let data = try Keychain.read(server: server) else { return }
+        guard let data = try Keychain.read(server: server) else { return }
         tokens = try JSONDecoder().decode(Tokens.self, from: data)
         signedIn = true
     }
 
     func login(email: String, password: String) async throws {
-        server = server.trimmingCharacters(in: .whitespacesAndNewlines)
-        while server.hasSuffix("/") { server.removeLast() }
-        guard let url = URL(string: server), url.scheme == "https", url.host != nil,
-              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else {
-            throw APIError(message: "Укажи HTTPS-адрес API, например https://example.com/api.")
-        }
         let data = try await send("auth/login", method: "POST", body: ["email": email, "password": password])
         let response = try decoder.decode(AuthResponse.self, from: data)
         try persist(response.tokens)
-        UserDefaults.standard.set(server, forKey: "apiServer")
         signedIn = true
     }
 

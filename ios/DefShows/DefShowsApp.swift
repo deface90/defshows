@@ -41,11 +41,6 @@ struct LoginView: View {
                         Text("Войди в существующий аккаунт defShows.").foregroundStyle(.secondary)
                     }.padding(.vertical)
                 }
-                Section("Сервер") {
-                    TextField("https://example.com/api", text: $session.server)
-                        .keyboardType(.URL).textContentType(.URL)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
-                }
                 Section("Аккаунт") {
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress).textContentType(.username)
@@ -71,7 +66,7 @@ struct LoginView: View {
                             Spacer()
                         }
                     }
-                    .disabled(email.isEmpty || password.isEmpty || session.server.isEmpty || busy)
+                    .disabled(email.isEmpty || password.isEmpty || busy)
                 }
             }
             .disabled(busy)
