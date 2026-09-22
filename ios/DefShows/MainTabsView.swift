@@ -26,6 +26,9 @@ struct MoreView: View {
                 NavigationLink { UsersView() } label: { Label("Пользователи", systemImage: "person.2") }
                 NavigationLink { SettingsView() } label: { Label("Настройки", systemImage: "gearshape") }
             }
+            Section("О сервисе") {
+                PrivacyPolicyLink()
+            }
             Section {
                 Button(role: .destructive) {
                     busy = true
@@ -60,5 +63,16 @@ struct CatalogRow: View {
                 if let subtitle, !subtitle.isEmpty { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
             }
         }.padding(.vertical, 3)
+    }
+}
+
+struct PrivacyPolicyLink: View {
+    private static let destination = URL(string: "https://shows.deface.dev/privacy")!
+
+    var body: some View {
+        Link(destination: Self.destination) {
+            Label("Политика конфиденциальности", systemImage: "hand.raised")
+        }
+        .accessibilityHint("Открывает политику конфиденциальности в браузере")
     }
 }

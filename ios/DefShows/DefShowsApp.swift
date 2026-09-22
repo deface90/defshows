@@ -68,6 +68,9 @@ struct LoginView: View {
                     }
                     .disabled(email.isEmpty || password.isEmpty || busy)
                 }
+                Section {
+                    PrivacyPolicyLink()
+                }
             }
             .disabled(busy)
             .navigationTitle("defShows")

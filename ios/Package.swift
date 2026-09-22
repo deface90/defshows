@@ -8,6 +8,7 @@ let package = Package(
     products: [.library(name: "DefShowsModels", targets: ["DefShowsModels"])],
     targets: [
         .target(name: "DefShowsModels", path: "DefShows", exclude: [
+            "Assets.xcassets",
             "DefShowsApp.swift", "Keychain.swift", "Session.swift", "LibraryView.swift",
             "ShowView.swift", "MainTabsView.swift", "CatalogBrowseView.swift",
             "NotificationsView.swift", "UsersView.swift", "SettingsView.swift"
