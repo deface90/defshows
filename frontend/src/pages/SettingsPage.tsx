@@ -1,6 +1,7 @@
 import { Divider, Stack, Title } from '@mantine/core'
 import { PrefsForm } from '@/features/notif-prefs/PrefsForm'
 import { VisibilityToggle } from '@/features/profile/VisibilityToggle'
+import { ChangePasswordForm } from '@/features/profile/ChangePasswordForm'
 import { LinkTelegramButton } from '@/features/telegram-link/LinkTelegramButton'
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
@@ -11,6 +12,7 @@ export function SettingsPage() {
     <Stack>
       <Title order={3}>Настройки</Title>
       <VisibilityToggle />
+      <ChangePasswordForm />
       <PrefsForm />
       <Divider my="sm" />
       <LinkTelegramButton />

@@ -70,3 +70,18 @@ type OAuthHandoff struct {
 
 // TableName maps OAuthHandoff to the oauth_handoff_codes table.
 func (OAuthHandoff) TableName() string { return "oauth_handoff_codes" }
+
+// PasswordResetToken is a single-use, short-lived token delivered by email that
+// lets a user set a new password without being logged in. Only its hash is
+// stored; UsedAt marks consumption so a token cannot be replayed.
+type PasswordResetToken struct {
+	ID        int64 `gorm:"primaryKey"`
+	UserID    int64
+	TokenHash string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedAt time.Time
+}
+
+// TableName maps PasswordResetToken to the password_reset_tokens table.
+func (PasswordResetToken) TableName() string { return "password_reset_tokens" }

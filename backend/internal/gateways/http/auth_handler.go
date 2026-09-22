@@ -115,6 +115,57 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// PasswordForgot handles POST /auth/password/forgot. It always returns 204 so
+// the response never reveals whether an email is registered.
+func (h *AuthHandler) PasswordForgot(c echo.Context) error {
+	var req authapi.ForgotPasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if err := h.uc.RequestPasswordReset(c.Request().Context(), string(req.Email)); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// PasswordReset handles POST /auth/password/reset.
+func (h *AuthHandler) PasswordReset(c echo.Context) error {
+	var req authapi.ResetPasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if err := h.uc.ResetPassword(c.Request().Context(), req.Token, req.NewPassword); err != nil {
+		if errors.Is(err, usecase.ErrInvalidResetToken) {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid or expired reset token")
+		}
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// PasswordChange handles POST /auth/password/change.
+func (h *AuthHandler) PasswordChange(c echo.Context) error {
+	claims, ok := auth.ClaimsFromContext(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	var req authapi.ChangePasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	u, pair, err := h.uc.ChangePassword(c.Request().Context(), claims.UserID, req.CurrentPassword, req.NewPassword, c.Request().UserAgent())
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrInvalidCredentials):
+			return echo.NewHTTPError(http.StatusUnauthorized, "invalid current password")
+		case errors.Is(err, usecase.ErrNoPassword):
+			return echo.NewHTTPError(http.StatusBadRequest, "account has no password set")
+		}
+		return err
+	}
+	return c.JSON(http.StatusOK, authapi.AuthResponse{User: toAPIUser(u), Tokens: toAPITokens(pair)})
+}
+
 // OauthRedirect handles GET /auth/oauth/{provider}.
 func (h *AuthHandler) OauthRedirect(c echo.Context, provider string) error {
 	p, ok := h.oauth.Get(provider)

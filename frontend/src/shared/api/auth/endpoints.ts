@@ -21,13 +21,16 @@ import type {
 
 import type {
   AuthResponse,
+  ChangePasswordRequest,
   ErrorResponse,
+  ForgotPasswordRequest,
   LoginRequest,
   LogoutRequest,
   OAuthExchangeRequest,
   OauthCallbackParams,
   RefreshRequest,
   RegisterRequest,
+  ResetPasswordRequest,
   TokenPair,
   User
 } from './model';
@@ -420,6 +423,291 @@ export function useLogout<TData = Awaited<ReturnType<typeof logout>>, TError = u
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getLogoutQueryOptions(logoutRequest,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Request a password-reset email
+ */
+export const passwordForgot = (
+    forgotPasswordRequest: ForgotPasswordRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/auth/password/forgot`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: forgotPasswordRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getPasswordForgotQueryKey = (forgotPasswordRequest?: ForgotPasswordRequest,) => {
+    return [
+    'POST', `/auth/password/forgot`, forgotPasswordRequest
+    ] as const;
+    }
+
+
+export const getPasswordForgotQueryOptions = <TData = Awaited<ReturnType<typeof passwordForgot>>, TError = ErrorResponse>(forgotPasswordRequest: ForgotPasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordForgot>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPasswordForgotQueryKey(forgotPasswordRequest);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof passwordForgot>>> = ({ signal }) => passwordForgot(forgotPasswordRequest, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof passwordForgot>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PasswordForgotQueryResult = NonNullable<Awaited<ReturnType<typeof passwordForgot>>>
+export type PasswordForgotQueryError = ErrorResponse
+
+
+export function usePasswordForgot<TData = Awaited<ReturnType<typeof passwordForgot>>, TError = ErrorResponse>(
+ forgotPasswordRequest: ForgotPasswordRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordForgot>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof passwordForgot>>,
+          TError,
+          Awaited<ReturnType<typeof passwordForgot>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePasswordForgot<TData = Awaited<ReturnType<typeof passwordForgot>>, TError = ErrorResponse>(
+ forgotPasswordRequest: ForgotPasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordForgot>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof passwordForgot>>,
+          TError,
+          Awaited<ReturnType<typeof passwordForgot>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePasswordForgot<TData = Awaited<ReturnType<typeof passwordForgot>>, TError = ErrorResponse>(
+ forgotPasswordRequest: ForgotPasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordForgot>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Request a password-reset email
+ */
+
+export function usePasswordForgot<TData = Awaited<ReturnType<typeof passwordForgot>>, TError = ErrorResponse>(
+ forgotPasswordRequest: ForgotPasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordForgot>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPasswordForgotQueryOptions(forgotPasswordRequest,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Set a new password using a reset token
+ */
+export const passwordReset = (
+    resetPasswordRequest: ResetPasswordRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/auth/password/reset`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: resetPasswordRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getPasswordResetQueryKey = (resetPasswordRequest?: ResetPasswordRequest,) => {
+    return [
+    'POST', `/auth/password/reset`, resetPasswordRequest
+    ] as const;
+    }
+
+
+export const getPasswordResetQueryOptions = <TData = Awaited<ReturnType<typeof passwordReset>>, TError = ErrorResponse>(resetPasswordRequest: ResetPasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordReset>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPasswordResetQueryKey(resetPasswordRequest);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof passwordReset>>> = ({ signal }) => passwordReset(resetPasswordRequest, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof passwordReset>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PasswordResetQueryResult = NonNullable<Awaited<ReturnType<typeof passwordReset>>>
+export type PasswordResetQueryError = ErrorResponse
+
+
+export function usePasswordReset<TData = Awaited<ReturnType<typeof passwordReset>>, TError = ErrorResponse>(
+ resetPasswordRequest: ResetPasswordRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordReset>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof passwordReset>>,
+          TError,
+          Awaited<ReturnType<typeof passwordReset>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePasswordReset<TData = Awaited<ReturnType<typeof passwordReset>>, TError = ErrorResponse>(
+ resetPasswordRequest: ResetPasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordReset>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof passwordReset>>,
+          TError,
+          Awaited<ReturnType<typeof passwordReset>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePasswordReset<TData = Awaited<ReturnType<typeof passwordReset>>, TError = ErrorResponse>(
+ resetPasswordRequest: ResetPasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordReset>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Set a new password using a reset token
+ */
+
+export function usePasswordReset<TData = Awaited<ReturnType<typeof passwordReset>>, TError = ErrorResponse>(
+ resetPasswordRequest: ResetPasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordReset>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPasswordResetQueryOptions(resetPasswordRequest,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Change the current user's password
+ */
+export const passwordChange = (
+    changePasswordRequest: ChangePasswordRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AuthResponse>(
+      {url: `/auth/password/change`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: changePasswordRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getPasswordChangeQueryKey = (changePasswordRequest?: ChangePasswordRequest,) => {
+    return [
+    'POST', `/auth/password/change`, changePasswordRequest
+    ] as const;
+    }
+
+
+export const getPasswordChangeQueryOptions = <TData = Awaited<ReturnType<typeof passwordChange>>, TError = ErrorResponse>(changePasswordRequest: ChangePasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordChange>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPasswordChangeQueryKey(changePasswordRequest);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof passwordChange>>> = ({ signal }) => passwordChange(changePasswordRequest, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof passwordChange>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PasswordChangeQueryResult = NonNullable<Awaited<ReturnType<typeof passwordChange>>>
+export type PasswordChangeQueryError = ErrorResponse
+
+
+export function usePasswordChange<TData = Awaited<ReturnType<typeof passwordChange>>, TError = ErrorResponse>(
+ changePasswordRequest: ChangePasswordRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordChange>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof passwordChange>>,
+          TError,
+          Awaited<ReturnType<typeof passwordChange>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePasswordChange<TData = Awaited<ReturnType<typeof passwordChange>>, TError = ErrorResponse>(
+ changePasswordRequest: ChangePasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordChange>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof passwordChange>>,
+          TError,
+          Awaited<ReturnType<typeof passwordChange>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePasswordChange<TData = Awaited<ReturnType<typeof passwordChange>>, TError = ErrorResponse>(
+ changePasswordRequest: ChangePasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordChange>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Change the current user's password
+ */
+
+export function usePasswordChange<TData = Awaited<ReturnType<typeof passwordChange>>, TError = ErrorResponse>(
+ changePasswordRequest: ChangePasswordRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof passwordChange>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPasswordChangeQueryOptions(changePasswordRequest,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

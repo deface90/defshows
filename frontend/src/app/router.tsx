@@ -3,6 +3,8 @@ import { CatalogShowPage } from '@/pages/CatalogShowPage'
 import { createBrowserRouter } from 'react-router-dom'
 import { AdminDubbingPage } from '@/pages/admin/AdminDubbingPage'
 import { LoginPage } from '@/pages/LoginPage'
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { OAuthCallbackPage } from '@/pages/OAuthCallbackPage'
 import { HomePage } from '@/pages/HomePage'
 import { LegalPage } from '@/pages/LegalPage'
@@ -27,6 +29,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
       { path: '/auth/callback', element: <OAuthCallbackPage /> },
       {
         path: '/',

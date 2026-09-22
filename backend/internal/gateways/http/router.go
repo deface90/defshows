@@ -24,6 +24,8 @@ var authPublicPaths = map[string]bool{
 	"/auth/login":                    true,
 	"/auth/refresh":                  true,
 	"/auth/logout":                   true,
+	"/auth/password/forgot":          true,
+	"/auth/password/reset":           true,
 	"/auth/oauth/:provider":          true,
 	"/auth/oauth/:provider/callback": true,
 	"/auth/oauth/exchange":           true,

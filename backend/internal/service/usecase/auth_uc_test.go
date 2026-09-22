@@ -3,6 +3,7 @@ package usecase_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ type fakeRepo struct {
 	refresh    map[string]*entity.RefreshToken
 	identities []*entity.UserIdentity
 	handoffs   map[string]int64
+	resets     map[string]*entity.PasswordResetToken
 	nextUID    int64
 	nextRTID   int64
 }
@@ -29,6 +31,7 @@ func newFake() *fakeRepo {
 		emailIndex: map[string]int64{},
 		refresh:    map[string]*entity.RefreshToken{},
 		handoffs:   map[string]int64{},
+		resets:     map[string]*entity.PasswordResetToken{},
 	}
 }
 
@@ -148,6 +151,50 @@ func (f *fakeRepo) RevokeFamily(_ context.Context, family string) error {
 	return nil
 }
 
+func (f *fakeRepo) UpdatePasswordHash(_ context.Context, id int64, hash string) error {
+	if u, ok := f.users[id]; ok {
+		u.PasswordHash = &hash
+	}
+	return nil
+}
+
+func (f *fakeRepo) RevokeUserTokens(_ context.Context, userID int64) error {
+	for _, rt := range f.refresh {
+		if rt.UserID == userID && rt.RevokedAt == nil {
+			now := time.Now()
+			rt.RevokedAt = &now
+		}
+	}
+	return nil
+}
+
+func (f *fakeRepo) CreatePasswordResetToken(_ context.Context, userID int64, hash string, expiresAt time.Time) error {
+	f.resets[hash] = &entity.PasswordResetToken{UserID: userID, TokenHash: hash, ExpiresAt: expiresAt}
+	return nil
+}
+
+func (f *fakeRepo) ConsumePasswordResetToken(_ context.Context, hash string) (int64, error) {
+	t, ok := f.resets[hash]
+	if !ok || t.UsedAt != nil || time.Now().After(t.ExpiresAt) {
+		return 0, repository.ErrNotFound
+	}
+	now := time.Now()
+	t.UsedAt = &now
+	return t.UserID, nil
+}
+
+// fakeMailer records the last message sent so tests can assert delivery.
+type fakeMailer struct {
+	count          int
+	to, subj, body string
+}
+
+func (m *fakeMailer) Send(_ context.Context, to, subject, body string) error {
+	m.count++
+	m.to, m.subj, m.body = to, subject, body
+	return nil
+}
+
 func (f *fakeRepo) activeTokens() int {
 	n := 0
 	for _, rt := range f.refresh {
@@ -171,6 +218,10 @@ func (f *fakeRepo) backdateRevoked(age time.Duration) {
 
 func newUC(repo usecase.UserRepo) *usecase.AuthUsecase {
 	return usecase.NewAuthUsecase(repo, auth.NewJWTManager("test-secret", time.Hour), time.Hour)
+}
+
+func newUCWithMailer(repo usecase.UserRepo, m usecase.Mailer) *usecase.AuthUsecase {
+	return newUC(repo).WithMailer(m, "https://app.example")
 }
 
 func TestAuth_SeedAdmin(t *testing.T) {
@@ -316,5 +367,142 @@ func TestAuth_Refresh_Errors(t *testing.T) {
 	}
 	if _, err := uc.Refresh(ctx, pair.RefreshToken, "agent"); !errors.Is(err, usecase.ErrInvalidRefresh) {
 		t.Fatalf("want ErrInvalidRefresh for expired, got %v", err)
+	}
+}
+
+func TestAuth_ChangePassword(t *testing.T) {
+	repo := newFake()
+	uc := newUC(repo)
+	ctx := context.Background()
+
+	u, _, err := uc.Register(ctx, "cp@b.c", "oldpass1", "agent")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	// A second login opens another session, so there are two active tokens.
+	if _, _, err := uc.Login(ctx, "cp@b.c", "oldpass1", "agent"); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if repo.activeTokens() != 2 {
+		t.Fatalf("want 2 active tokens before change, got %d", repo.activeTokens())
+	}
+
+	// Wrong current password is rejected.
+	if _, _, err := uc.ChangePassword(ctx, u.ID, "wrong", "newpass1", "agent"); !errors.Is(err, usecase.ErrInvalidCredentials) {
+		t.Fatalf("want ErrInvalidCredentials, got %v", err)
+	}
+
+	// Success: all prior sessions revoked, one fresh session issued.
+	_, pair, err := uc.ChangePassword(ctx, u.ID, "oldpass1", "newpass1", "agent")
+	if err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	if pair.RefreshToken == "" {
+		t.Fatal("expected a fresh token pair")
+	}
+	if repo.activeTokens() != 1 {
+		t.Fatalf("want 1 active token after change, got %d", repo.activeTokens())
+	}
+	// The new password logs in; the old one does not.
+	if _, _, err := uc.Login(ctx, "cp@b.c", "newpass1", "agent"); err != nil {
+		t.Fatalf("login with new password: %v", err)
+	}
+	if _, _, err := uc.Login(ctx, "cp@b.c", "oldpass1", "agent"); !errors.Is(err, usecase.ErrInvalidCredentials) {
+		t.Fatalf("old password should fail, got %v", err)
+	}
+}
+
+func TestAuth_ChangePassword_SocialOnly(t *testing.T) {
+	repo := newFake()
+	uc := newUC(repo)
+	ctx := context.Background()
+
+	email := "social@b.c"
+	_ = repo.CreateUser(ctx, &entity.User{Email: &email, Role: entity.RoleUser}) // no password hash
+	u, _ := repo.FindUserByEmail(ctx, email)
+
+	if _, _, err := uc.ChangePassword(ctx, u.ID, "anything", "newpass1", "agent"); !errors.Is(err, usecase.ErrNoPassword) {
+		t.Fatalf("want ErrNoPassword, got %v", err)
+	}
+}
+
+func TestAuth_PasswordReset_Flow(t *testing.T) {
+	repo := newFake()
+	mail := &fakeMailer{}
+	uc := newUCWithMailer(repo, mail)
+	ctx := context.Background()
+
+	if _, _, err := uc.Register(ctx, "reset@b.c", "oldpass1", "agent"); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	// Request emails a link and stores exactly one token.
+	if err := uc.RequestPasswordReset(ctx, "reset@b.c"); err != nil {
+		t.Fatalf("request reset: %v", err)
+	}
+	if mail.count != 1 || mail.to != "reset@b.c" {
+		t.Fatalf("expected one email to reset@b.c, got count=%d to=%q", mail.count, mail.to)
+	}
+	if len(repo.resets) != 1 {
+		t.Fatalf("want 1 reset token stored, got %d", len(repo.resets))
+	}
+	// Extract the raw token from the emailed link.
+	const marker = "token="
+	i := strings.Index(mail.body, marker)
+	if i < 0 {
+		t.Fatalf("no token in email body: %q", mail.body)
+	}
+	raw := strings.TrimSpace(mail.body[i+len(marker):])
+	if j := strings.IndexAny(raw, "\r\n"); j >= 0 {
+		raw = raw[:j]
+	}
+
+	// Reset succeeds, revokes existing sessions, and sets the new password.
+	if err := uc.ResetPassword(ctx, raw, "newpass1"); err != nil {
+		t.Fatalf("reset password: %v", err)
+	}
+	if repo.activeTokens() != 0 {
+		t.Fatalf("want 0 active tokens after reset, got %d", repo.activeTokens())
+	}
+	if _, _, err := uc.Login(ctx, "reset@b.c", "newpass1", "agent"); err != nil {
+		t.Fatalf("login with reset password: %v", err)
+	}
+
+	// The token is single-use.
+	if err := uc.ResetPassword(ctx, raw, "another1"); !errors.Is(err, usecase.ErrInvalidResetToken) {
+		t.Fatalf("want ErrInvalidResetToken on reuse, got %v", err)
+	}
+}
+
+func TestAuth_RequestPasswordReset_NoEnumeration(t *testing.T) {
+	ctx := context.Background()
+
+	// Unknown email: no token, no mail, no error.
+	repo := newFake()
+	mail := &fakeMailer{}
+	uc := newUCWithMailer(repo, mail)
+	if err := uc.RequestPasswordReset(ctx, "nobody@b.c"); err != nil {
+		t.Fatalf("unknown email should be a silent no-op, got %v", err)
+	}
+	if mail.count != 0 || len(repo.resets) != 0 {
+		t.Fatalf("unknown email must not send mail or store a token")
+	}
+
+	// Social-only account (no password): also a silent no-op.
+	email := "social@b.c"
+	_ = repo.CreateUser(ctx, &entity.User{Email: &email, Role: entity.RoleUser})
+	if err := uc.RequestPasswordReset(ctx, email); err != nil {
+		t.Fatalf("social-only should be a no-op, got %v", err)
+	}
+	if mail.count != 0 || len(repo.resets) != 0 {
+		t.Fatalf("social-only must not send mail or store a token")
+	}
+}
+
+func TestAuth_ResetPassword_InvalidToken(t *testing.T) {
+	repo := newFake()
+	uc := newUC(repo)
+	if err := uc.ResetPassword(context.Background(), "bogus", "newpass1"); !errors.Is(err, usecase.ErrInvalidResetToken) {
+		t.Fatalf("want ErrInvalidResetToken, got %v", err)
 	}
 }

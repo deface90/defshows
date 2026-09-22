@@ -12,6 +12,7 @@ import (
 	"github.com/deface90/defshows/backend/pkg/config"
 	"github.com/deface90/defshows/backend/pkg/db"
 	pkglog "github.com/deface90/defshows/backend/pkg/log"
+	"github.com/deface90/defshows/backend/pkg/mailer"
 )
 
 func main() {
@@ -35,7 +36,8 @@ func main() {
 
 	repo := repository.NewUserRepository(gdb)
 	jwtMgr := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.AccessTTL)
-	authUC := usecase.NewAuthUsecase(repo, jwtMgr, cfg.JWT.RefreshTTL)
+	authUC := usecase.NewAuthUsecase(repo, jwtMgr, cfg.JWT.RefreshTTL).
+		WithMailer(mailer.New(cfg.SMTP, logger), cfg.OAuth.FrontendURL)
 	handler := httpapi.NewAuthHandler(authUC).
 		WithOAuth(httpapi.BuildOAuthRegistry(cfg.OAuth), cfg.OAuth.RedirectBaseURL, cfg.OAuth.FrontendURL)
 

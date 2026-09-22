@@ -64,6 +64,49 @@ paths:
             schema: { $ref: '#/components/schemas/LogoutRequest' }
       responses:
         '204': { description: No Content }
+  /auth/password/forgot:
+    post:
+      operationId: passwordForgot
+      summary: Request a password-reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ForgotPasswordRequest' }
+      responses:
+        '204': { description: No Content }
+        '400': { $ref: '#/components/responses/Error' }
+  /auth/password/reset:
+    post:
+      operationId: passwordReset
+      summary: Set a new password using a reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetPasswordRequest' }
+      responses:
+        '204': { description: No Content }
+        '400': { $ref: '#/components/responses/Error' }
+  /auth/password/change:
+    post:
+      operationId: passwordChange
+      summary: Change the current user's password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
   /auth/oauth/{provider}:
     get:
       operationId: oauthRedirect
@@ -169,6 +212,23 @@ components:
       required: [refresh_token]
       properties:
         refresh_token: { type: string }
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+    ResetPasswordRequest:
+      type: object
+      required: [token, new_password]
+      properties:
+        token: { type: string }
+        new_password: { type: string, minLength: 6 }
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password: { type: string }
+        new_password: { type: string, minLength: 6 }
     TokenPair:
       type: object
       required: [access_token, refresh_token]

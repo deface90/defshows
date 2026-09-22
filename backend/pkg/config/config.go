@@ -27,6 +27,7 @@ type Config struct {
 	OAuth    OAuth
 	Seed     Seed
 	S3       S3
+	SMTP     SMTP
 	// Proxy, when set, routes ALL outbound service traffic that can be blocked
 	// from the host (Telegram Bot API, TMDB API, image downloads) through a
 	// proxy — e.g. socks5://user:pass@host:1080 or http://host:3128.
@@ -49,6 +50,20 @@ type S3 struct {
 func (s S3) Enabled() bool {
 	return s.Endpoint != "" && s.Bucket != "" && s.AccessKey != "" && s.SecretKey != ""
 }
+
+// SMTP holds outbound email settings, used for password-reset delivery. When
+// not configured, services fall back to logging the reset link instead of
+// sending mail (see pkg/mailer).
+type SMTP struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	From     string
+}
+
+// Enabled reports whether SMTP is configured enough to send mail.
+func (s SMTP) Enabled() bool { return s.Host != "" && s.From != "" }
 
 // Seed holds optional bootstrap data applied on startup after migrations.
 type Seed struct {
@@ -185,6 +200,13 @@ func Load() (Config, error) {
 			AccessKey:          getEnv("S3_ACCESS_KEY", ""),
 			SecretKey:          getEnv("S3_SECRET_KEY", ""),
 			ImagePublicBaseURL: getEnv("IMAGE_PUBLIC_BASE_URL", "http://localhost:8080"),
+		},
+		SMTP: SMTP{
+			Host:     getEnv("SMTP_HOST", ""),
+			Port:     getEnvInt("SMTP_PORT", 587),
+			Username: getEnv("SMTP_USERNAME", ""),
+			Password: getEnv("SMTP_PASSWORD", ""),
+			From:     getEnv("SMTP_FROM", ""),
 		},
 		Notifier: Notifier{
 			ScanInterval: getEnvDuration("NOTIFIER_SCAN_INTERVAL", 15*time.Minute),

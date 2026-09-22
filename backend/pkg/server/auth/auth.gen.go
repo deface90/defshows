@@ -43,9 +43,20 @@ type AuthResponse struct {
 	User   User      `json:"user"`
 }
 
+// ChangePasswordRequest defines model for ChangePasswordRequest.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Message string `json:"message"`
+}
+
+// ForgotPasswordRequest defines model for ForgotPasswordRequest.
+type ForgotPasswordRequest struct {
+	Email openapi_types.Email `json:"email"`
 }
 
 // LoginRequest defines model for LoginRequest.
@@ -73,6 +84,12 @@ type RefreshRequest struct {
 type RegisterRequest struct {
 	Email    openapi_types.Email `json:"email"`
 	Password string              `json:"password"`
+}
+
+// ResetPasswordRequest defines model for ResetPasswordRequest.
+type ResetPasswordRequest struct {
+	NewPassword string `json:"new_password"`
+	Token       string `json:"token"`
 }
 
 // TokenPair defines model for TokenPair.
@@ -108,6 +125,15 @@ type LogoutJSONRequestBody = LogoutRequest
 // OauthExchangeJSONRequestBody defines body for OauthExchange for application/json ContentType.
 type OauthExchangeJSONRequestBody = OAuthExchangeRequest
 
+// PasswordChangeJSONRequestBody defines body for PasswordChange for application/json ContentType.
+type PasswordChangeJSONRequestBody = ChangePasswordRequest
+
+// PasswordForgotJSONRequestBody defines body for PasswordForgot for application/json ContentType.
+type PasswordForgotJSONRequestBody = ForgotPasswordRequest
+
+// PasswordResetJSONRequestBody defines body for PasswordReset for application/json ContentType.
+type PasswordResetJSONRequestBody = ResetPasswordRequest
+
 // RefreshJSONRequestBody defines body for Refresh for application/json ContentType.
 type RefreshJSONRequestBody = RefreshRequest
 
@@ -134,6 +160,15 @@ type ServerInterface interface {
 	// OauthCallback OAuth provider callback (redirects to the SPA with a handoff code)
 	// (GET /auth/oauth/{provider}/callback)
 	OauthCallback(ctx echo.Context, provider string, params OauthCallbackParams) error
+	// PasswordChange Change the current user's password
+	// (POST /auth/password/change)
+	PasswordChange(ctx echo.Context) error
+	// PasswordForgot Request a password-reset email
+	// (POST /auth/password/forgot)
+	PasswordForgot(ctx echo.Context) error
+	// PasswordReset Set a new password using a reset token
+	// (POST /auth/password/reset)
+	PasswordReset(ctx echo.Context) error
 	// Refresh Rotate a refresh token
 	// (POST /auth/refresh)
 	Refresh(ctx echo.Context) error
@@ -231,6 +266,33 @@ func (w *ServerInterfaceWrapper) OauthCallback(ctx echo.Context) error {
 	return err
 }
 
+// PasswordChange converts echo context to params.
+func (w *ServerInterfaceWrapper) PasswordChange(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PasswordChange(ctx)
+	return err
+}
+
+// PasswordForgot converts echo context to params.
+func (w *ServerInterfaceWrapper) PasswordForgot(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PasswordForgot(ctx)
+	return err
+}
+
+// PasswordReset converts echo context to params.
+func (w *ServerInterfaceWrapper) PasswordReset(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PasswordReset(ctx)
+	return err
+}
+
 // Refresh converts echo context to params.
 func (w *ServerInterfaceWrapper) Refresh(ctx echo.Context) error {
 	var err error
@@ -300,6 +362,9 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/auth/login", wrapper.Login, options.OperationMiddlewares["login"]...)
 	router.POST(options.BaseURL+"/auth/refresh", wrapper.Refresh, options.OperationMiddlewares["refresh"]...)
 	router.POST(options.BaseURL+"/auth/logout", wrapper.Logout, options.OperationMiddlewares["logout"]...)
+	router.POST(options.BaseURL+"/auth/password/forgot", wrapper.PasswordForgot, options.OperationMiddlewares["passwordForgot"]...)
+	router.POST(options.BaseURL+"/auth/password/reset", wrapper.PasswordReset, options.OperationMiddlewares["passwordReset"]...)
+	router.POST(options.BaseURL+"/auth/password/change", wrapper.PasswordChange, options.OperationMiddlewares["passwordChange"]...)
 	router.GET(options.BaseURL+"/auth/oauth/:provider", wrapper.OauthRedirect, options.OperationMiddlewares["oauthRedirect"]...)
 	router.GET(options.BaseURL+"/auth/oauth/:provider/callback", wrapper.OauthCallback, options.OperationMiddlewares["oauthCallback"]...)
 	router.POST(options.BaseURL+"/auth/oauth/exchange", wrapper.OauthExchange, options.OperationMiddlewares["oauthExchange"]...)
@@ -312,23 +377,26 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"RAHO5vuI/o/7qpADpCVDhEWRrOwJaz7/OwAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

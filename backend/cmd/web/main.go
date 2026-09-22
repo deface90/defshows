@@ -19,6 +19,7 @@ import (
 	"github.com/deface90/defshows/backend/pkg/db"
 	"github.com/deface90/defshows/backend/pkg/httpx"
 	pkglog "github.com/deface90/defshows/backend/pkg/log"
+	"github.com/deface90/defshows/backend/pkg/mailer"
 	"github.com/deface90/defshows/backend/pkg/storage"
 )
 
@@ -71,7 +72,8 @@ func main() {
 	notesRepo := repository.NewNotesRepository(gdb)
 
 	jwtMgr := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.AccessTTL)
-	authUC := usecase.NewAuthUsecase(userRepo, jwtMgr, cfg.JWT.RefreshTTL)
+	authUC := usecase.NewAuthUsecase(userRepo, jwtMgr, cfg.JWT.RefreshTTL).
+		WithMailer(mailer.New(cfg.SMTP, logger), cfg.OAuth.FrontendURL)
 
 	// Optionally bootstrap a default admin from env (idempotent).
 	if seeded, err := authUC.SeedAdmin(context.Background(), cfg.Seed.AdminEmail, cfg.Seed.AdminPassword); err != nil {

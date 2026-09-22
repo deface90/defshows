@@ -98,6 +98,58 @@ func (r *UserRepository) UpdateTimezone(ctx context.Context, userID int64, tz st
 		Updates(map[string]any{"timezone": tz, "updated_at": time.Now()}).Error
 }
 
+// UpdatePasswordHash sets a user's password hash.
+func (r *UserRepository) UpdatePasswordHash(ctx context.Context, userID int64, hash string) error {
+	return r.db.WithContext(ctx).Model(&entity.User{}).
+		Where("id = ?", userID).
+		Updates(map[string]any{"password_hash": hash, "updated_at": time.Now()}).Error
+}
+
+// RevokeUserTokens marks all still-active refresh tokens for a user revoked
+// (used after a password change or reset to log every session out).
+func (r *UserRepository) RevokeUserTokens(ctx context.Context, userID int64) error {
+	return r.db.WithContext(ctx).
+		Model(&entity.RefreshToken{}).
+		Where("user_id = ? AND revoked_at IS NULL", userID).
+		Update("revoked_at", time.Now()).Error
+}
+
+// CreatePasswordResetToken stores a single-use password-reset token.
+func (r *UserRepository) CreatePasswordResetToken(ctx context.Context, userID int64, hash string, expiresAt time.Time) error {
+	return r.db.WithContext(ctx).Create(&entity.PasswordResetToken{
+		UserID:    userID,
+		TokenHash: hash,
+		ExpiresAt: expiresAt,
+	}).Error
+}
+
+// ConsumePasswordResetToken atomically validates and marks a reset token used,
+// returning its user id. ErrNotFound if the token is missing, already used, or
+// expired.
+func (r *UserRepository) ConsumePasswordResetToken(ctx context.Context, hash string) (int64, error) {
+	var userID int64
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var t entity.PasswordResetToken
+		if err := tx.Where("token_hash = ?", hash).First(&t).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNotFound
+			}
+			return err
+		}
+		if t.UsedAt != nil || time.Now().After(t.ExpiresAt) {
+			return ErrNotFound
+		}
+		if err := tx.Model(&entity.PasswordResetToken{}).
+			Where("id = ? AND used_at IS NULL", t.ID).
+			Update("used_at", time.Now()).Error; err != nil {
+			return err
+		}
+		userID = t.UserID
+		return nil
+	})
+	return userID, err
+}
+
 // SetTelegramChatID links a Telegram chat to a user.
 func (r *UserRepository) SetTelegramChatID(ctx context.Context, userID, chatID int64) error {
 	return r.db.WithContext(ctx).Model(&entity.User{}).

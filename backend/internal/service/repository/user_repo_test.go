@@ -124,6 +124,70 @@ func TestUserRepository_RefreshTokens(t *testing.T) {
 	}
 }
 
+func TestUserRepository_PasswordAndResetTokens(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "users")
+	repo := repository.NewUserRepository(gdb)
+	ctx := context.Background()
+
+	u := newUser("carol@example.com")
+	if err := repo.CreateUser(ctx, u); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	// UpdatePasswordHash persists the new hash.
+	if err := repo.UpdatePasswordHash(ctx, u.ID, "new-hash"); err != nil {
+		t.Fatalf("update password hash: %v", err)
+	}
+	got, _ := repo.FindUserByID(ctx, u.ID)
+	if got.PasswordHash == nil || *got.PasswordHash != "new-hash" {
+		t.Fatalf("want new-hash, got %v", got.PasswordHash)
+	}
+
+	// RevokeUserTokens revokes every active token for the user.
+	for _, h := range []string{"a", "b"} {
+		if err := repo.SaveRefreshToken(ctx, &entity.RefreshToken{
+			UserID: u.ID, TokenHash: h, FamilyID: uuid.NewString(), ExpiresAt: time.Now().Add(time.Hour),
+		}); err != nil {
+			t.Fatalf("save refresh %s: %v", h, err)
+		}
+	}
+	if err := repo.RevokeUserTokens(ctx, u.ID); err != nil {
+		t.Fatalf("revoke user tokens: %v", err)
+	}
+	for _, h := range []string{"a", "b"} {
+		rt, _ := repo.FindRefreshByHash(ctx, h)
+		if rt.RevokedAt == nil {
+			t.Fatalf("token %s should be revoked", h)
+		}
+	}
+
+	// Reset token: create → consume once → second consume fails.
+	if err := repo.CreatePasswordResetToken(ctx, u.ID, "reset-hash", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("create reset token: %v", err)
+	}
+	uid, err := repo.ConsumePasswordResetToken(ctx, "reset-hash")
+	if err != nil || uid != u.ID {
+		t.Fatalf("consume: want uid %d, got %d err=%v", u.ID, uid, err)
+	}
+	if _, err := repo.ConsumePasswordResetToken(ctx, "reset-hash"); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("second consume: want ErrNotFound, got %v", err)
+	}
+
+	// Expired token cannot be consumed.
+	if err := repo.CreatePasswordResetToken(ctx, u.ID, "expired-hash", time.Now().Add(-time.Minute)); err != nil {
+		t.Fatalf("create expired token: %v", err)
+	}
+	if _, err := repo.ConsumePasswordResetToken(ctx, "expired-hash"); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("expired consume: want ErrNotFound, got %v", err)
+	}
+
+	// Unknown token → ErrNotFound.
+	if _, err := repo.ConsumePasswordResetToken(ctx, "nope"); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("unknown consume: want ErrNotFound, got %v", err)
+	}
+}
+
 func TestUserRepository_DirectoryPaginationAndLiteralSearch(t *testing.T) {
 	db := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, db, "users")

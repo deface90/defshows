@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"net/url"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,7 +24,18 @@ var (
 	ErrInvalidCredentials = errors.New("usecase: invalid credentials")
 	ErrInvalidRefresh     = errors.New("usecase: invalid refresh token")
 	ErrInvalidHandoff     = errors.New("usecase: invalid oauth handoff code")
+	ErrInvalidResetToken  = errors.New("usecase: invalid or expired reset token")
+	ErrNoPassword         = errors.New("usecase: account has no password set")
 )
+
+// passwordResetTTL is how long an emailed reset link stays valid.
+const passwordResetTTL = time.Hour
+
+// Mailer sends transactional email (password-reset links). It is optional: when
+// nil, RequestPasswordReset is a no-op beyond token creation.
+type Mailer interface {
+	Send(ctx context.Context, to, subject, body string) error
+}
 
 // refreshReuseGrace tolerates benign refresh-token races: multiple tabs (or a
 // reload firing while a refresh is in flight) can each present the same stored
@@ -42,10 +54,14 @@ type UserRepo interface {
 	ListUsers(ctx context.Context, query string, limit, offset int) ([]entity.User, int64, error)
 	UpdateTimezone(ctx context.Context, userID int64, tz string) error
 	SetPublic(ctx context.Context, userID int64, public bool) error
+	UpdatePasswordHash(ctx context.Context, userID int64, hash string) error
 	SaveRefreshToken(ctx context.Context, rt *entity.RefreshToken) error
 	FindRefreshByHash(ctx context.Context, hash string) (*entity.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, id int64) error
 	RevokeFamily(ctx context.Context, familyID string) error
+	RevokeUserTokens(ctx context.Context, userID int64) error
+	CreatePasswordResetToken(ctx context.Context, userID int64, hash string, expiresAt time.Time) error
+	ConsumePasswordResetToken(ctx context.Context, hash string) (int64, error)
 	FindIdentity(ctx context.Context, provider, providerUserID string) (*entity.UserIdentity, error)
 	CreateIdentity(ctx context.Context, id *entity.UserIdentity) error
 	CreateOAuthHandoff(ctx context.Context, code string, userID int64, expiresAt time.Time) error
@@ -61,10 +77,12 @@ type TokenPair struct {
 
 // AuthUsecase implements registration, login, and refresh-token rotation.
 type AuthUsecase struct {
-	repo       UserRepo
-	jwt        *auth.JWTManager
-	argon      auth.Argon2Params
-	refreshTTL time.Duration
+	repo        UserRepo
+	jwt         *auth.JWTManager
+	argon       auth.Argon2Params
+	refreshTTL  time.Duration
+	mailer      Mailer
+	frontendURL string
 }
 
 // NewAuthUsecase creates an AuthUsecase.
@@ -75,6 +93,14 @@ func NewAuthUsecase(repo UserRepo, jwt *auth.JWTManager, refreshTTL time.Duratio
 		argon:      auth.DefaultArgon2Params(),
 		refreshTTL: refreshTTL,
 	}
+}
+
+// WithMailer enables emailed password reset. frontendURL is the SPA base used to
+// build the reset link (${frontendURL}/reset-password?token=...).
+func (uc *AuthUsecase) WithMailer(m Mailer, frontendURL string) *AuthUsecase {
+	uc.mailer = m
+	uc.frontendURL = frontendURL
+	return uc
 }
 
 // Register creates a password account and returns an initial token pair.
@@ -303,6 +329,87 @@ func (uc *AuthUsecase) Logout(ctx context.Context, rawRefresh string) error {
 		return err
 	}
 	return uc.repo.RevokeFamily(ctx, rt.FamilyID)
+}
+
+// ChangePassword verifies the current password, sets a new one, revokes every
+// existing session, and issues a fresh token pair so the caller stays logged in.
+func (uc *AuthUsecase) ChangePassword(ctx context.Context, userID int64, current, newPassword, userAgent string) (*entity.User, *TokenPair, error) {
+	u, err := uc.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if u.PasswordHash == nil {
+		return nil, nil, ErrNoPassword // social-only account
+	}
+	if err := auth.VerifyPassword(current, *u.PasswordHash); err != nil {
+		return nil, nil, ErrInvalidCredentials
+	}
+	hash, err := auth.HashPassword(newPassword, uc.argon)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := uc.repo.UpdatePasswordHash(ctx, userID, hash); err != nil {
+		return nil, nil, err
+	}
+	if err := uc.repo.RevokeUserTokens(ctx, userID); err != nil {
+		return nil, nil, err
+	}
+	pair, err := uc.issueTokens(ctx, u, userAgent, uuid.NewString(), nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return u, pair, nil
+}
+
+// RequestPasswordReset issues a reset token and emails a link. To avoid leaking
+// which emails are registered it returns nil for unknown or social-only
+// accounts (no token, no mail).
+func (uc *AuthUsecase) RequestPasswordReset(ctx context.Context, email string) error {
+	u, err := uc.repo.FindUserByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	if u.PasswordHash == nil || u.Email == nil {
+		return nil // social-only: no password to reset
+	}
+	raw, err := randomToken()
+	if err != nil {
+		return err
+	}
+	if err := uc.repo.CreatePasswordResetToken(ctx, u.ID, hashToken(raw), time.Now().Add(passwordResetTTL)); err != nil {
+		return err
+	}
+	if uc.mailer == nil {
+		return nil
+	}
+	link := uc.frontendURL + "/reset-password?token=" + url.QueryEscape(raw)
+	body := "Здравствуйте!\n\nВы запросили сброс пароля в defShows. " +
+		"Перейдите по ссылке, чтобы задать новый пароль (действует 1 час):\n\n" +
+		link + "\n\nЕсли вы этого не делали, просто проигнорируйте это письмо."
+	return uc.mailer.Send(ctx, *u.Email, "Сброс пароля — defShows", body)
+}
+
+// ResetPassword consumes a reset token, sets the new password, and revokes every
+// existing session.
+func (uc *AuthUsecase) ResetPassword(ctx context.Context, token, newPassword string) error {
+	userID, err := uc.repo.ConsumePasswordResetToken(ctx, hashToken(token))
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrInvalidResetToken
+		}
+		return err
+	}
+	hash, err := auth.HashPassword(newPassword, uc.argon)
+	if err != nil {
+		return err
+	}
+	if err := uc.repo.UpdatePasswordHash(ctx, userID, hash); err != nil {
+		return err
+	}
+	return uc.repo.RevokeUserTokens(ctx, userID)
 }
 
 func (uc *AuthUsecase) issueTokens(ctx context.Context, u *entity.User, userAgent, familyID string, prevTokenID *int64) (*TokenPair, error) {

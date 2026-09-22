@@ -6,14 +6,17 @@
  */
 
 export * from './authResponse';
+export * from './changePasswordRequest';
 export * from './error';
 export * from './errorResponse';
+export * from './forgotPasswordRequest';
 export * from './loginRequest';
 export * from './logoutRequest';
 export * from './oauthCallbackParams';
 export * from './oAuthExchangeRequest';
 export * from './refreshRequest';
 export * from './registerRequest';
+export * from './resetPasswordRequest';
 export * from './tokenPair';
 export * from './user';
 export * from './userRole';

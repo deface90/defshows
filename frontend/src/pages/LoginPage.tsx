@@ -21,6 +21,11 @@ export function LoginPage() {
             Вход в трекер сериалов
           </Text>
           <LoginForm />
+          <Text size="sm" ta="center">
+            <Anchor component={Link} to="/forgot-password">
+              Забыли пароль?
+            </Anchor>
+          </Text>
           <Divider label="или" labelPosition="center" />
           {/*<OAuthButtons />*/}
           <Text size="sm" ta="center">
