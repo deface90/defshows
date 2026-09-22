@@ -1,5 +1,17 @@
 // !$*UTF8*$!
 { archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+78CA6240E3980DB0AB7F7AF9 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseModels.swift; sourceTree = "<group>"; };
+5B7D06AC9C18E35E46B433B7 = { isa = PBXBuildFile; fileRef = 78CA6240E3980DB0AB7F7AF9; };
+8E0816A0329CA1F4A5ADF67A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogBrowseView.swift; sourceTree = "<group>"; };
+0788B739C6993EA8D8215D2C = { isa = PBXBuildFile; fileRef = 8E0816A0329CA1F4A5ADF67A; };
+2F63A6DBFFB53BEE6503B124 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabsView.swift; sourceTree = "<group>"; };
+67276E216FF30D989774DDFF = { isa = PBXBuildFile; fileRef = 2F63A6DBFFB53BEE6503B124; };
+2F599E52CBFF89DFA6A2A406 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+E0841AC22D9099DA311BA5B9 = { isa = PBXBuildFile; fileRef = 2F599E52CBFF89DFA6A2A406; };
+A2FA5F4F5D336DC8ECDF4BC3 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+289C8D3C22097DA2A314830F = { isa = PBXBuildFile; fileRef = A2FA5F4F5D336DC8ECDF4BC3; };
+B1DADBC1E25F32A0E2C71BD4 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsersView.swift; sourceTree = "<group>"; };
+FF9567E8CD97D13B24358D0C = { isa = PBXBuildFile; fileRef = B1DADBC1E25F32A0E2C71BD4; };
 F67CAEFA2F861C9270BD9EED = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefShowsApp.swift; sourceTree = "<group>"; };
 2110551F5924EFD3621AE5BB = { isa = PBXBuildFile; fileRef = F67CAEFA2F861C9270BD9EED; };
 9319EF0F1C94DCA2E6C710D4 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
@@ -13,10 +25,10 @@ CAC09F46F50ADFB3B6F55FE8 = { isa = PBXFileReference; lastKnownFileType = sourcec
 B82C0B542028ECD8FB953D4C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowView.swift; sourceTree = "<group>"; };
 0CD5584196D0CE3008B85EB7 = { isa = PBXBuildFile; fileRef = B82C0B542028ECD8FB953D4C; };
 38A007151ABE87CC01A5B6E9 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = DefShows.app; sourceTree = BUILT_PRODUCTS_DIR; };
-482182478A3ECD4745BEA917 = { isa = PBXGroup; children = (F67CAEFA2F861C9270BD9EED,9319EF0F1C94DCA2E6C710D4,B6F36FFC5E43175067FCF6BF,19BFBC84FD9B2B92C10227AA,CAC09F46F50ADFB3B6F55FE8,B82C0B542028ECD8FB953D4C,); path = DefShows; sourceTree = "<group>"; };
+482182478A3ECD4745BEA917 = { isa = PBXGroup; children = (78CA6240E3980DB0AB7F7AF9,8E0816A0329CA1F4A5ADF67A,2F63A6DBFFB53BEE6503B124,2F599E52CBFF89DFA6A2A406,A2FA5F4F5D336DC8ECDF4BC3,B1DADBC1E25F32A0E2C71BD4,F67CAEFA2F861C9270BD9EED,9319EF0F1C94DCA2E6C710D4,B6F36FFC5E43175067FCF6BF,19BFBC84FD9B2B92C10227AA,CAC09F46F50ADFB3B6F55FE8,B82C0B542028ECD8FB953D4C,); path = DefShows; sourceTree = "<group>"; };
 FBDC4F23F93125BBEEAE800C = { isa = PBXGroup; children = (38A007151ABE87CC01A5B6E9,); name = Products; sourceTree = "<group>"; };
 B28B7AF69320201D1CF206EB = { isa = PBXGroup; children = (482182478A3ECD4745BEA917,FBDC4F23F93125BBEEAE800C,); sourceTree = "<group>"; };
-BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (2110551F5924EFD3621AE5BB,D7F75D686A4146F8487DE07B,375E7102E5615BC742ED6F79,487C502A5481E87001E8CC43,6A483D94B26B20FA07B3CE2C,0CD5584196D0CE3008B85EB7,); runOnlyForDeploymentPostprocessing = 0; };
+BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (5B7D06AC9C18E35E46B433B7,0788B739C6993EA8D8215D2C,67276E216FF30D989774DDFF,E0841AC22D9099DA311BA5B9,289C8D3C22097DA2A314830F,FF9567E8CD97D13B24358D0C,2110551F5924EFD3621AE5BB,D7F75D686A4146F8487DE07B,375E7102E5615BC742ED6F79,487C502A5481E87001E8CC43,6A483D94B26B20FA07B3CE2C,0CD5584196D0CE3008B85EB7,); runOnlyForDeploymentPostprocessing = 0; };
 7561BFB015D8F536760CB671 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 0189424A5A60FED329FA868E = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 89E1FD6268CC0F221A2BE178 = { isa = XCBuildConfiguration; buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf; }; name = Debug; };

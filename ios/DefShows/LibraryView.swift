@@ -6,7 +6,6 @@ struct LibraryView: View {
     @State private var query = ""
     @State private var loading = false
     @State private var loaded = false
-    @State private var loggingOut = false
     @State private var error: String?
 
     private var filtered: [TrackedShow] {
@@ -25,7 +24,7 @@ struct LibraryView: View {
                 if loading && !loaded {
                     ProgressView("Загружаем сериалы…")
                 } else if loaded && shows.isEmpty {
-                    ContentUnavailableView("Пока нет сериалов", systemImage: "tv", description: Text("Добавь сериалы в веб-версии — они появятся здесь."))
+                    ContentUnavailableView("Пока нет сериалов", systemImage: "tv", description: Text("Найди первый сериал во вкладке «Поиск» или «Подбор»."))
                 } else if loaded && filtered.isEmpty {
                     ContentUnavailableView.search(text: query)
                 }
@@ -56,18 +55,7 @@ struct LibraryView: View {
             .searchable(text: $query, prompt: "Найти в коллекции")
             .refreshable { await load() }
             .onAppear { Task { await load() } }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Выйти") {
-                        loggingOut = true
-                        Task {
-                            defer { loggingOut = false }
-                            do { try await session.logout() }
-                            catch { self.error = error.localizedDescription }
-                        }
-                    }.disabled(loggingOut || loading)
-                }
-            }
+            .onChange(of: session.collectionRevision) { _, _ in Task { await load() } }
         }
     }
 

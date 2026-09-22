@@ -24,7 +24,7 @@ struct ShowView: View {
                 if (detail.seasons ?? []).isEmpty {
                     ContentUnavailableView("Серии пока не загружены", systemImage: "tv")
                 }
-                ForEach((detail.seasons ?? []).sorted { $0.seasonNumber < $1.seasonNumber }) { season in
+                ForEach((detail.seasons ?? []).newestFirst) { season in
                     Section(season.name.isEmpty ? "Сезон \(season.seasonNumber)" : season.name) {
                         ForEach(season.episodes.sorted { $0.episodeNumber < $1.episodeNumber }) { episode in
                             Button {

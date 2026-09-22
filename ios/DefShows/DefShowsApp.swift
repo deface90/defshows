@@ -8,7 +8,7 @@ struct DefShowsApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if session.signedIn { LibraryView() }
+                if session.signedIn { MainTabsView() }
                 else { LoginView() }
             }
             .environmentObject(session)

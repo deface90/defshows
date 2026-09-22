@@ -4,6 +4,7 @@ import Combine
 @MainActor
 final class Session: ObservableObject {
     @Published private(set) var signedIn = false
+    @Published private(set) var collectionRevision = 0
     // Public API prefix from the deployed web client configuration.
     private let server = "https://shows.deface.dev/api"
     private var tokens: Tokens?
@@ -32,13 +33,23 @@ final class Session: ObservableObject {
         signedIn = true
     }
 
-    func get<T: Decodable>(_ path: String) async throws -> T {
-        let data = try await authorized(path)
+    func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {
+        let data = try await authorized(path, query: query)
         return try decoder.decode(T.self, from: data)
+    }
+
+    func mutate(_ path: String, method: String = "POST", body: [String: Any]? = nil) async throws {
+        _ = try await authorized(path, method: method, body: body)
+    }
+
+    func addShow(tmdbID: Int) async throws {
+        try await mutate("me/shows", body: ["tmdb_id": tmdbID])
+        collectionRevision += 1
     }
 
     func setWatched(showID: Int, episodeID: Int, watched: Bool) async throws {
         _ = try await authorized("me/shows/\(showID)/episodes/\(episodeID)/watch", method: watched ? "POST" : "DELETE")
+        collectionRevision += 1
     }
 
     func logout() async throws {
@@ -60,16 +71,16 @@ final class Session: ObservableObject {
         return URL(string: source, relativeTo: base)?.absoluteURL
     }
 
-    private func authorized(_ path: String, method: String = "GET") async throws -> Data {
+    private func authorized(_ path: String, method: String = "GET", body: [String: Any]? = nil, query: [URLQueryItem] = []) async throws -> Data {
         guard let current = tokens else { throw APIError(message: "Войди в аккаунт.") }
         do {
-            return try await send(path, method: method, access: current.accessToken)
+            return try await send(path, method: method, body: body, access: current.accessToken, query: query)
         } catch let error as HTTPFailure where error.status == 401 {
             // Another request may already have refreshed the same expired token.
             if tokens?.accessToken == current.accessToken { try await refresh() }
             guard let renewed = tokens else { throw APIError(message: "Войди в аккаунт заново.") }
             do {
-                return try await send(path, method: method, access: renewed.accessToken)
+                return try await send(path, method: method, body: body, access: renewed.accessToken, query: query)
             } catch let retry as HTTPFailure where retry.status == 401 {
                 try clear()
                 throw APIError(message: "Сессия истекла. Войди заново.")
@@ -106,9 +117,14 @@ final class Session: ObservableObject {
         signedIn = false
     }
 
-    private func send(_ path: String, method: String = "GET", body: [String: String]? = nil, access: String? = nil) async throws -> Data {
+    private func send(_ path: String, method: String = "GET", body: [String: Any]? = nil, access: String? = nil, query: [URLQueryItem] = []) async throws -> Data {
         guard let base = URL(string: server + "/") else { throw APIError(message: "Некорректный адрес API.") }
-        var request = URLRequest(url: base.appendingPathComponent(path))
+        guard var components = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false) else {
+            throw APIError(message: "Некорректный адрес запроса.")
+        }
+        if !query.isEmpty { components.queryItems = query }
+        guard let url = components.url else { throw APIError(message: "Некорректный адрес запроса.") }
+        var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let access { request.setValue("Bearer \(access)", forHTTPHeaderField: "Authorization") }

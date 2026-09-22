@@ -13,6 +13,7 @@ struct TrackedShow: Decodable, Identifiable {
     var id: Int { show.id }
 }
 struct ShowReference: Decodable {
+    let tmdbId: Int
     let id: Int
     let title: String
     let posterUrl: String?
@@ -56,4 +57,9 @@ struct Episode: Decodable, Identifiable {
 struct APIError: LocalizedError {
     let message: String
     var errorDescription: String? { message }
+}
+
+// Keep the same order in tracked and catalog detail screens.
+extension Array where Element == Season {
+    var newestFirst: [Season] { sorted { $0.seasonNumber > $1.seasonNumber } }
 }
