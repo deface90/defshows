@@ -11,6 +11,8 @@ Monorepo:
 | `backend/`  | Go (echo) — распределённый монолит: `auth`, `web`, `notifier`, `worker` |
 | `frontend/` | React 18 + Vite + TS (Mantine, TanStack Query)                          |
 
+Нативный iPhone-клиент: [ios/README.md](ios/README.md) (SwiftUI, iOS 17+).
+
 ## Архитектура
 
 Распределённый монолит: несколько бинарей (`cmd/*`) шарят одну Postgres БД, без шины

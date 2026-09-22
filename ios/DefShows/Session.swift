@@ -1,0 +1,140 @@
+import Foundation
+import Combine
+
+@MainActor
+final class Session: ObservableObject {
+    @Published private(set) var signedIn = false
+    @Published var server = UserDefaults.standard.string(forKey: "apiServer") ?? ""
+    private var tokens: Tokens?
+    private var refreshTask: Task<Tokens, Error>?
+    private let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }()
+    private let transport: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 30
+        return URLSession(configuration: configuration)
+    }()
+
+    func restore() throws {
+        guard !server.isEmpty, let data = try Keychain.read(server: server) else { return }
+        tokens = try JSONDecoder().decode(Tokens.self, from: data)
+        signedIn = true
+    }
+
+    func login(email: String, password: String) async throws {
+        server = server.trimmingCharacters(in: .whitespacesAndNewlines)
+        while server.hasSuffix("/") { server.removeLast() }
+        guard let url = URL(string: server), url.scheme == "https", url.host != nil,
+              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else {
+            throw APIError(message: "Укажи HTTPS-адрес API, например https://example.com/api.")
+        }
+        let data = try await send("auth/login", method: "POST", body: ["email": email, "password": password])
+        let response = try decoder.decode(AuthResponse.self, from: data)
+        try persist(response.tokens)
+        UserDefaults.standard.set(server, forKey: "apiServer")
+        signedIn = true
+    }
+
+    func get<T: Decodable>(_ path: String) async throws -> T {
+        let data = try await authorized(path)
+        return try decoder.decode(T.self, from: data)
+    }
+
+    func setWatched(showID: Int, episodeID: Int, watched: Bool) async throws {
+        _ = try await authorized("me/shows/\(showID)/episodes/\(episodeID)/watch", method: watched ? "POST" : "DELETE")
+    }
+
+    func logout() async throws {
+        // Keep the local session if revocation fails so logout can be retried.
+        if let tokens {
+            _ = try await send("auth/logout", method: "POST", body: ["refresh_token": tokens.refreshToken])
+        }
+        try clear()
+    }
+
+    func posterURL(_ source: String?) -> URL? {
+        guard let source, !source.isEmpty, let base = URL(string: server + "/") else { return nil }
+        if let url = URL(string: source), url.host == "image.tmdb.org" {
+            let parts = url.pathComponents
+            if parts.count == 5, parts[1] == "t", parts[2] == "p" {
+                return base.appendingPathComponent("images/tmdb/\(parts[3])/\(parts[4])")
+            }
+        }
+        return URL(string: source, relativeTo: base)?.absoluteURL
+    }
+
+    private func authorized(_ path: String, method: String = "GET") async throws -> Data {
+        guard let current = tokens else { throw APIError(message: "Войди в аккаунт.") }
+        do {
+            return try await send(path, method: method, access: current.accessToken)
+        } catch let error as HTTPFailure where error.status == 401 {
+            // Another request may already have refreshed the same expired token.
+            if tokens?.accessToken == current.accessToken { try await refresh() }
+            guard let renewed = tokens else { throw APIError(message: "Войди в аккаунт заново.") }
+            do {
+                return try await send(path, method: method, access: renewed.accessToken)
+            } catch let retry as HTTPFailure where retry.status == 401 {
+                try clear()
+                throw APIError(message: "Сессия истекла. Войди заново.")
+            }
+        }
+    }
+
+    private func refresh() async throws {
+        if let refreshTask { _ = try await refreshTask.value; return }
+        guard let current = tokens else { throw APIError(message: "Войди в аккаунт.") }
+        let task = Task { () throws -> Tokens in
+            let data = try await self.send("auth/refresh", method: "POST", body: ["refresh_token": current.refreshToken])
+            let renewed = try self.decoder.decode(Tokens.self, from: data)
+            try self.persist(renewed)
+            return renewed
+        }
+        refreshTask = task
+        defer { refreshTask = nil }
+        do { _ = try await task.value }
+        catch let failure as HTTPFailure where failure.status == 401 {
+            try clear()
+            throw APIError(message: "Сессия истекла. Войди заново.")
+        }
+    }
+
+    private func persist(_ value: Tokens) throws {
+        try Keychain.save(JSONEncoder().encode(value), server: server)
+        tokens = value
+    }
+
+    private func clear() throws {
+        try Keychain.delete(server: server)
+        tokens = nil
+        signedIn = false
+    }
+
+    private func send(_ path: String, method: String = "GET", body: [String: String]? = nil, access: String? = nil) async throws -> Data {
+        guard let base = URL(string: server + "/") else { throw APIError(message: "Некорректный адрес API.") }
+        var request = URLRequest(url: base.appendingPathComponent(path))
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let access { request.setValue("Bearer \(access)", forHTTPHeaderField: "Authorization") }
+        if let body {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let (data, response) = try await transport.data(for: request)
+        guard let response = response as? HTTPURLResponse else { throw APIError(message: "Сервер не ответил.") }
+        guard (200..<300).contains(response.statusCode) else {
+            struct ErrorBody: Decodable { let message: String }
+            let message = (try? decoder.decode(ErrorBody.self, from: data))?.message
+            throw HTTPFailure(status: response.statusCode, message: message ?? "Ошибка сервера (\(response.statusCode)).")
+        }
+        return data
+    }
+}
+
+private struct HTTPFailure: LocalizedError {
+    let status: Int
+    let message: String
+    var errorDescription: String? { message }
+}
