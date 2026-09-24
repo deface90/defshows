@@ -4,7 +4,7 @@
 
 declare global {
   interface Window {
-    __ENV?: { API_BASE_URL?: string }
+    __ENV?: { API_BASE_URL?: string; APP_STORE_URL?: string }
   }
 }
 
@@ -18,6 +18,19 @@ export function getApiBaseUrl(): string {
   }
   const fromVite = import.meta.env.VITE_API_BASE_URL as string | undefined
   return fromVite ?? DEFAULT_API_BASE_URL
+}
+
+/**
+ * getAppStoreUrl resolves the App Store link, or undefined while the iOS app
+ * isn't published yet / the var isn't configured — callers should hide the
+ * link in that case rather than show a dead one.
+ */
+export function getAppStoreUrl(): string | undefined {
+  const runtime = typeof window !== 'undefined' ? window.__ENV?.APP_STORE_URL : undefined
+  if (runtime && !runtime.startsWith('${')) {
+    return runtime
+  }
+  return import.meta.env.VITE_APP_STORE_URL as string | undefined
 }
 
 export {}

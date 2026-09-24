@@ -4,10 +4,11 @@
 set -e
 
 : "${API_BASE_URL:=http://localhost:8080}"
-export API_BASE_URL
+: "${APP_STORE_URL:=}"
+export API_BASE_URL APP_STORE_URL
 
-envsubst '${API_BASE_URL}' \
+envsubst '${API_BASE_URL} ${APP_STORE_URL}' \
   < /usr/share/nginx/html/env.template.js \
   > /usr/share/nginx/html/env.js
 
-echo "defshows: rendered env.js with API_BASE_URL=${API_BASE_URL}"
+echo "defshows: rendered env.js with API_BASE_URL=${API_BASE_URL} APP_STORE_URL=${APP_STORE_URL}"

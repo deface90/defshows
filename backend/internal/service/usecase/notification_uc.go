@@ -30,10 +30,13 @@ type TelegramLinker interface {
 	TelegramChatID(ctx context.Context, userID int64) (*int64, error)
 }
 
-// DeviceTokenLinker reads and sets a user's APNs device token.
+// DeviceTokenLinker reads and sets a user's push device tokens, one column
+// per platform (APNs for iOS, FCM for Android).
 type DeviceTokenLinker interface {
 	SetAPNsToken(ctx context.Context, userID int64, token string) error
 	ClearAPNsToken(ctx context.Context, userID int64) error
+	SetFCMToken(ctx context.Context, userID int64, token string) error
+	ClearFCMToken(ctx context.Context, userID int64) error
 }
 
 // NotificationUsers is the user-storage dependency of NotificationUsecase.
@@ -130,16 +133,32 @@ func (uc *NotificationUsecase) GenerateTelegramLink(ctx context.Context, userID 
 	return fmt.Sprintf("https://t.me/%s?start=%s", uc.botUsername, token), nil
 }
 
-// RegisterDeviceToken links an APNs device token to the user, so they start
-// receiving push notifications on that device.
-func (uc *NotificationUsecase) RegisterDeviceToken(ctx context.Context, userID int64, token string) error {
-	return uc.users.SetAPNsToken(ctx, userID, token)
+// ErrUnknownPlatform is returned for a device-token platform other than
+// "ios" or "android".
+var ErrUnknownPlatform = errors.New("usecase: unknown device platform")
+
+// RegisterDeviceToken links a push device token to the user, routed by
+// platform ("ios" -> APNs, "android" -> FCM), so they start receiving push
+// notifications on that device.
+func (uc *NotificationUsecase) RegisterDeviceToken(ctx context.Context, userID int64, platform, token string) error {
+	switch platform {
+	case "ios":
+		return uc.users.SetAPNsToken(ctx, userID, token)
+	case "android":
+		return uc.users.SetFCMToken(ctx, userID, token)
+	default:
+		return ErrUnknownPlatform
+	}
 }
 
-// UnregisterDeviceToken unlinks the user's APNs device token (called on
-// logout so a signed-out device stops receiving pushes for that account).
+// UnregisterDeviceToken unlinks the user's push device tokens on every
+// platform (called on logout; the caller doesn't send its platform back, and
+// clearing both is harmless — at most one is ever set for a given device).
 func (uc *NotificationUsecase) UnregisterDeviceToken(ctx context.Context, userID int64) error {
-	return uc.users.ClearAPNsToken(ctx, userID)
+	if err := uc.users.ClearAPNsToken(ctx, userID); err != nil {
+		return err
+	}
+	return uc.users.ClearFCMToken(ctx, userID)
 }
 
 // LinkTelegram consumes a link token and connects the chat to the user.

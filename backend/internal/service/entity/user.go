@@ -23,6 +23,7 @@ type User struct {
 	IsPublic        bool
 	TelegramChatID  *int64
 	APNsDeviceToken *string `gorm:"column:apns_device_token"`
+	FCMDeviceToken  *string `gorm:"column:fcm_device_token"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

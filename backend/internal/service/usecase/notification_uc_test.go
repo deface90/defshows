@@ -68,8 +68,9 @@ func (f *fakeNotifRepo) ConsumeLinkToken(_ context.Context, token string) (int64
 }
 
 type fakeLinker struct {
-	linked  map[int64]int64 // userID -> chatID
-	devices map[int64]string
+	linked     map[int64]int64 // userID -> chatID
+	devices    map[int64]string
+	fcmDevices map[int64]string
 }
 
 func (f *fakeLinker) SetTelegramChatID(_ context.Context, userID, chatID int64) error {
@@ -100,6 +101,19 @@ func (f *fakeLinker) ClearAPNsToken(_ context.Context, userID int64) error {
 	return nil
 }
 
+func (f *fakeLinker) SetFCMToken(_ context.Context, userID int64, token string) error {
+	if f.fcmDevices == nil {
+		f.fcmDevices = map[int64]string{}
+	}
+	f.fcmDevices[userID] = token
+	return nil
+}
+
+func (f *fakeLinker) ClearFCMToken(_ context.Context, userID int64) error {
+	delete(f.fcmDevices, userID)
+	return nil
+}
+
 func TestNotificationUsecase_TelegramLinkFlow(t *testing.T) {
 	repo := newFakeNotifRepo()
 	linker := &fakeLinker{}
@@ -126,6 +140,40 @@ func TestNotificationUsecase_TelegramLinkFlow(t *testing.T) {
 	// Token is one-time → reuse fails.
 	if err := uc.LinkTelegram(ctx, token, 999); !errors.Is(err, usecase.ErrInvalidLinkToken) {
 		t.Fatalf("want ErrInvalidLinkToken on reuse, got %v", err)
+	}
+}
+
+func TestNotificationUsecase_RegisterDeviceToken(t *testing.T) {
+	repo := newFakeNotifRepo()
+	linker := &fakeLinker{}
+	uc := usecase.NewNotificationUsecase(repo, linker, "bot", 0)
+	ctx := context.Background()
+
+	if err := uc.RegisterDeviceToken(ctx, 1, "ios", "apns-tok"); err != nil {
+		t.Fatalf("register ios: %v", err)
+	}
+	if linker.devices[1] != "apns-tok" {
+		t.Fatalf("want apns token stored, got %v", linker.devices)
+	}
+	if err := uc.RegisterDeviceToken(ctx, 1, "android", "fcm-tok"); err != nil {
+		t.Fatalf("register android: %v", err)
+	}
+	if linker.fcmDevices[1] != "fcm-tok" {
+		t.Fatalf("want fcm token stored, got %v", linker.fcmDevices)
+	}
+	if err := uc.RegisterDeviceToken(ctx, 1, "web", "x"); !errors.Is(err, usecase.ErrUnknownPlatform) {
+		t.Fatalf("want ErrUnknownPlatform, got %v", err)
+	}
+
+	// Unregister clears both platforms regardless of which one is set.
+	if err := uc.UnregisterDeviceToken(ctx, 1); err != nil {
+		t.Fatalf("unregister: %v", err)
+	}
+	if _, ok := linker.devices[1]; ok {
+		t.Fatalf("want apns token cleared")
+	}
+	if _, ok := linker.fcmDevices[1]; ok {
+		t.Fatalf("want fcm token cleared")
 	}
 }
 

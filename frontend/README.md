@@ -34,12 +34,18 @@ tracking, notifications, notes, admin). **Сгенерённый код не р�
 ## Runtime-конфигурация
 Базовый URL API берётся в рантайме из `window.__ENV.API_BASE_URL`
 (`src/shared/lib/env.ts`), с фолбэком на `VITE_API_BASE_URL` и `http://localhost:8080`.
+Ссылка на iOS-приложение в App Store — так же, из `window.__ENV.APP_STORE_URL`
+(`getAppStoreUrl()`), с фолбэком на `VITE_APP_STORE_URL`; пока переменная не задана,
+`getAppStoreUrl()` возвращает `undefined` и футер (`LegalFooter`) ссылку не показывает.
 `index.html` подключает `/env.js`:
-- **dev** — `public/env.js` с плейсхолдером `${API_BASE_URL}` (игнорируется, идёт фолбэк);
+- **dev** — `public/env.js` с плейсхолдерами `${API_BASE_URL}` / `${APP_STORE_URL}`
+  (игнорируются, идёт фолбэк);
 - **prod** — `docker-entrypoint.sh` рендерит `env.js` из `public/env.template.js` через
   `envsubst` при старте контейнера.
 
 ## Docker
 `Dockerfile` — multi-stage (node build → nginx). `env.js` подставляется entrypoint-хуком
-из переменной `API_BASE_URL`. Сервис `frontend` заведён в
-`../backend/deploy/docker-compose.yml` (profile `app`, порт `FRONTEND_PORT`, по умолчанию 3000).
+из переменных `API_BASE_URL` и `APP_STORE_URL`. Сервис `frontend` заведён в
+`../backend/deploy/docker-compose.yml` (profile `app`, порт `FRONTEND_PORT`, по умолчанию 3000;
+`APP_STORE_URL` берётся из `FRONTEND_APP_STORE_URL` в `.env`, например
+`https://apps.apple.com/app/id6814790859`).

@@ -24,6 +24,7 @@ type Config struct {
 	Worker   Worker
 	Telegram Telegram
 	APNs     APNs
+	FCM      FCM
 	Notifier Notifier
 	OAuth    OAuth
 	Seed     Seed
@@ -111,6 +112,19 @@ type APNs struct {
 // Enabled reports whether APNs is configured enough to send push notifications.
 func (a APNs) Enabled() bool {
 	return a.TeamID != "" && a.KeyID != "" && a.KeyPEM != ""
+}
+
+// FCM holds Firebase Cloud Messaging settings for the Android app.
+// ServiceAccountJSON is the full contents of a Firebase service account key
+// (Project Settings -> Service Accounts -> Generate new private key).
+type FCM struct {
+	ProjectID          string
+	ServiceAccountJSON string
+}
+
+// Enabled reports whether FCM is configured enough to send push notifications.
+func (f FCM) Enabled() bool {
+	return f.ProjectID != "" && f.ServiceAccountJSON != ""
 }
 
 // Notifier holds notification worker settings.
@@ -216,6 +230,10 @@ func Load() (Config, error) {
 			KeyPEM:     getEnv("APNS_KEY", ""),
 			Topic:      getEnv("APNS_TOPIC", "com.defshows.ios"),
 			Production: getEnvBool("APNS_PRODUCTION", true),
+		},
+		FCM: FCM{
+			ProjectID:          getEnv("FCM_PROJECT_ID", ""),
+			ServiceAccountJSON: getEnv("FCM_SERVICE_ACCOUNT", ""),
 		},
 		Proxy: getEnv("PROXY_URL", ""),
 		S3: S3{

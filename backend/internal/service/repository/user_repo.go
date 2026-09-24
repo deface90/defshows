@@ -84,6 +84,12 @@ func (r *UserRepository) ListUsers(ctx context.Context, query string, limit, off
 	return users, total, err
 }
 
+// DeleteUser removes the user row; every user-owned table references users
+// with ON DELETE CASCADE, so tracking, notes, tokens and prefs go with it.
+func (r *UserRepository) DeleteUser(ctx context.Context, userID int64) error {
+	return r.db.WithContext(ctx).Delete(&entity.User{}, userID).Error
+}
+
 // SetPublic toggles a user's profile visibility.
 func (r *UserRepository) SetPublic(ctx context.Context, userID int64, public bool) error {
 	return r.db.WithContext(ctx).Model(&entity.User{}).
@@ -214,6 +220,50 @@ func (r *UserRepository) APNsToken(ctx context.Context, userID int64) (*string, 
 		return nil, err
 	}
 	return u.APNsDeviceToken, nil
+}
+
+// SetFCMToken links an FCM device token to a user, stealing it from any other
+// user it was previously registered to (mirrors SetAPNsToken).
+func (r *UserRepository) SetFCMToken(ctx context.Context, userID int64, token string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&entity.User{}).
+			Where("fcm_device_token = ? AND id != ?", token, userID).
+			Updates(map[string]any{"fcm_device_token": nil, "updated_at": time.Now()}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&entity.User{}).
+			Where("id = ?", userID).
+			Updates(map[string]any{"fcm_device_token": token, "updated_at": time.Now()}).Error
+	})
+}
+
+// ClearFCMToken unlinks a user's FCM device token.
+func (r *UserRepository) ClearFCMToken(ctx context.Context, userID int64) error {
+	return r.db.WithContext(ctx).Model(&entity.User{}).
+		Where("id = ?", userID).
+		Updates(map[string]any{"fcm_device_token": nil, "updated_at": time.Now()}).Error
+}
+
+// ClearFCMTokenByToken unlinks whichever user currently holds this device
+// token (used when FCM reports it as unregistered).
+func (r *UserRepository) ClearFCMTokenByToken(ctx context.Context, token string) error {
+	return r.db.WithContext(ctx).Model(&entity.User{}).
+		Where("fcm_device_token = ?", token).
+		Updates(map[string]any{"fcm_device_token": nil, "updated_at": time.Now()}).Error
+}
+
+// FCMToken returns the user's linked FCM device token, or nil if unlinked.
+func (r *UserRepository) FCMToken(ctx context.Context, userID int64) (*string, error) {
+	var u entity.User
+	err := r.db.WithContext(ctx).Select("fcm_device_token").
+		Where("id = ?", userID).First(&u).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return u.FCMDeviceToken, nil
 }
 
 // FindIdentity returns a linked identity or ErrNotFound.

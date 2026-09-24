@@ -167,6 +167,14 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/User' }
         '401': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteMe
+      summary: Permanently delete the current user's account and all their data
+      security:
+        - bearerAuth: []
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     bearerAuth:

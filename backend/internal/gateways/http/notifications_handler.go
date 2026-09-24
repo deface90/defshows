@@ -135,7 +135,10 @@ func (h *NotificationsHandler) RegisterDeviceToken(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
-	if err := h.uc.RegisterDeviceToken(c.Request().Context(), uid, req.Token); err != nil {
+	if err := h.uc.RegisterDeviceToken(c.Request().Context(), uid, req.Platform, req.Token); err != nil {
+		if errors.Is(err, usecase.ErrUnknownPlatform) {
+			return echo.NewHTTPError(http.StatusBadRequest, "unknown platform")
+		}
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)

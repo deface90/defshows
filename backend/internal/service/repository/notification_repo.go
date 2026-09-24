@@ -124,10 +124,20 @@ var pendingQueries = map[string]string{
 		  AND u.apns_device_token IS NOT NULL
 		ORDER BY n.scheduled_for
 		LIMIT ?`,
+	"fcm": `
+		SELECT n.id AS id, u.fcm_device_token AS target, 'defShows' AS title, n.payload AS body, n.show_id AS show_id
+		FROM notifications n
+		JOIN users u ON u.id = n.user_id
+		WHERE n.status = 'pending'
+		  AND n.channel = 'fcm'
+		  AND n.scheduled_for <= now()
+		  AND u.fcm_device_token IS NOT NULL
+		ORDER BY n.scheduled_for
+		LIMIT ?`,
 }
 
-// Pending returns pending notifications for a channel ("telegram" or "apns")
-// ready to send.
+// Pending returns pending notifications for a channel ("telegram", "apns" or
+// "fcm") ready to send.
 func (r *NotificationRepository) Pending(ctx context.Context, channel string, limit int) ([]PendingNotification, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
@@ -165,6 +175,7 @@ type EventCandidate struct {
 	EpisodeNumber  int
 	TelegramChatID *int64
 	APNsToken      *string
+	FCMToken       *string
 }
 
 // ReleasedEpisodeCandidates finds aired-but-unwatched episodes for watching
@@ -180,7 +191,8 @@ func (r *NotificationRepository) ReleasedEpisodeCandidates(ctx context.Context, 
 		       e.season_number      AS season_number,
 		       e.episode_number     AS episode_number,
 		       u.telegram_chat_id   AS telegram_chat_id,
-		       u.apns_device_token  AS apns_token
+		       u.apns_device_token  AS apns_token,
+		       u.fcm_device_token   AS fcm_token
 		FROM episodes e
 		JOIN shows s       ON s.id = e.show_id
 		JOIN user_shows us ON us.show_id = e.show_id AND us.status = 'watching'
@@ -191,7 +203,7 @@ func (r *NotificationRepository) ReleasedEpisodeCandidates(ctx context.Context, 
 		  AND e.air_date <= now()::date
 		  AND e.air_date >= ?
 		  AND COALESCE(p.episode_release, true) = true
-		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL)
+		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL OR u.fcm_device_token IS NOT NULL)
 		  AND ue.id IS NULL`, since).Scan(&out).Error
 	return out, err
 }
@@ -208,7 +220,8 @@ func (r *NotificationRepository) EpisodeUpcomingCandidates(ctx context.Context, 
 		       e.season_number      AS season_number,
 		       e.episode_number     AS episode_number,
 		       u.telegram_chat_id   AS telegram_chat_id,
-		       u.apns_device_token  AS apns_token
+		       u.apns_device_token  AS apns_token,
+		       u.fcm_device_token   AS fcm_token
 		FROM episodes e
 		JOIN shows s       ON s.id = e.show_id
 		JOIN user_shows us ON us.show_id = e.show_id AND us.status = 'watching'
@@ -218,7 +231,7 @@ func (r *NotificationRepository) EpisodeUpcomingCandidates(ctx context.Context, 
 		  AND e.air_date::timestamptz > ?::timestamptz
 		  AND e.air_date::timestamptz <= (?::timestamptz + (COALESCE(p.lead_time_hours, 24) || ' hours')::interval)
 		  AND COALESCE(p.episode_release, true) = true
-		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL)`, now, now).Scan(&out).Error
+		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL OR u.fcm_device_token IS NOT NULL)`, now, now).Scan(&out).Error
 	return out, err
 }
 
@@ -235,7 +248,8 @@ func (r *NotificationRepository) SeasonUpcomingCandidates(ctx context.Context, n
 		       e.season_number      AS season_number,
 		       e.episode_number     AS episode_number,
 		       u.telegram_chat_id   AS telegram_chat_id,
-		       u.apns_device_token  AS apns_token
+		       u.apns_device_token  AS apns_token,
+		       u.fcm_device_token   AS fcm_token
 		FROM episodes e
 		JOIN shows s       ON s.id = e.show_id
 		JOIN user_shows us ON us.show_id = e.show_id AND us.status = 'watching'
@@ -246,7 +260,7 @@ func (r *NotificationRepository) SeasonUpcomingCandidates(ctx context.Context, n
 		  AND e.air_date::timestamptz > ?::timestamptz
 		  AND e.air_date::timestamptz <= (?::timestamptz + (COALESCE(p.lead_time_hours, 24) || ' hours')::interval)
 		  AND COALESCE(p.season_start, true) = true
-		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL)`, now, now).Scan(&out).Error
+		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL OR u.fcm_device_token IS NOT NULL)`, now, now).Scan(&out).Error
 	return out, err
 }
 
