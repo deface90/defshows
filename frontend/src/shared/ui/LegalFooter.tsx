@@ -1,10 +1,12 @@
 import { Anchor, Box, Container, Group } from '@mantine/core'
 import { Link } from 'react-router-dom'
-import { getAppStoreUrl } from '@/shared/lib/env'
+import { useAnalyticsConsent } from '@/shared/lib/analyticsConsent'
+import { getAppStoreUrl, getMetrikaId } from '@/shared/lib/env'
 import { legalOperator } from '@/shared/legal/operator'
 
 export function LegalFooter() {
   const appStoreUrl = getAppStoreUrl()
+  const resetConsent = useAnalyticsConsent((s) => s.reset)
 
   if (!legalOperator && !appStoreUrl) return null
 
@@ -16,6 +18,9 @@ export function LegalFooter() {
             <Group gap="md">
               <Anchor component={Link} to="/legal" size="xs">Реквизиты</Anchor>
               <Anchor component={Link} to="/privacy" size="xs">Политика обработки персональных данных</Anchor>
+              {getMetrikaId() && (
+                <Anchor component="button" type="button" size="xs" onClick={resetConsent}>Настройки cookie</Anchor>
+              )}
             </Group>
           ) : (
             <span />

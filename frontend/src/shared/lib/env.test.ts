@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { getApiBaseUrl, getAppStoreUrl } from './env'
+import { getApiBaseUrl, getAppStoreUrl, getMetrikaId } from './env'
 
 describe('getApiBaseUrl', () => {
   afterEach(() => {
@@ -38,5 +38,23 @@ describe('getAppStoreUrl', () => {
 
   it('is undefined when unset, so callers can hide the link', () => {
     expect(getAppStoreUrl()).toBeUndefined()
+  })
+})
+
+describe('getMetrikaId', () => {
+  afterEach(() => {
+    delete window.__ENV
+  })
+
+  it('parses a configured counter id', () => {
+    window.__ENV = { METRIKA_ID: '112993969' }
+    expect(getMetrikaId()).toBe(112993969)
+  })
+
+  it('is undefined for a placeholder, empty or malformed value', () => {
+    for (const METRIKA_ID of ['${METRIKA_ID}', '', 'abc', '-1']) {
+      window.__ENV = { METRIKA_ID }
+      expect(getMetrikaId()).toBeUndefined()
+    }
   })
 })

@@ -110,6 +110,7 @@ services:
     environment:
       API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8080}
       APP_STORE_URL: ${FRONTEND_APP_STORE_URL:-}
+      METRIKA_ID: ${FRONTEND_METRIKA_ID:-}
     depends_on:
       - web
     ports:

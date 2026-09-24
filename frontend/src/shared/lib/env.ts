@@ -4,7 +4,7 @@
 
 declare global {
   interface Window {
-    __ENV?: { API_BASE_URL?: string; APP_STORE_URL?: string }
+    __ENV?: { API_BASE_URL?: string; APP_STORE_URL?: string; METRIKA_ID?: string }
   }
 }
 
@@ -31,6 +31,17 @@ export function getAppStoreUrl(): string | undefined {
     return runtime
   }
   return import.meta.env.VITE_APP_STORE_URL as string | undefined
+}
+
+/**
+ * getMetrikaId resolves the Yandex Metrika counter id, or undefined when
+ * analytics is not configured (dev, tests, staging) — then nothing is loaded.
+ */
+export function getMetrikaId(): number | undefined {
+  const runtime = typeof window !== 'undefined' ? window.__ENV?.METRIKA_ID : undefined
+  const raw = runtime && !runtime.startsWith('${') ? runtime : (import.meta.env.VITE_METRIKA_ID as string | undefined)
+  const id = Number(raw)
+  return raw && Number.isInteger(id) && id > 0 ? id : undefined
 }
 
 export {}
