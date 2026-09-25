@@ -57,6 +57,7 @@ type UserRepo interface {
 	UpdateTimezone(ctx context.Context, userID int64, tz string) error
 	SetPublic(ctx context.Context, userID int64, public bool) error
 	UpdatePasswordHash(ctx context.Context, userID int64, hash string) error
+	DeleteUser(ctx context.Context, userID int64) error
 	SaveRefreshToken(ctx context.Context, rt *entity.RefreshToken) error
 	FindRefreshByHash(ctx context.Context, hash string) (*entity.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, id int64) error
@@ -297,6 +298,11 @@ func (uc *AuthUsecase) ExchangeOAuthHandoff(ctx context.Context, code, userAgent
 // Me returns the user by id (for the /auth/me endpoint).
 func (uc *AuthUsecase) Me(ctx context.Context, userID int64) (*entity.User, error) {
 	return uc.repo.FindUserByID(ctx, userID)
+}
+
+// DeleteAccount permanently removes the user and all their data.
+func (uc *AuthUsecase) DeleteAccount(ctx context.Context, userID int64) error {
+	return uc.repo.DeleteUser(ctx, userID)
 }
 
 // UpdateTimezone updates the user's timezone and returns the fresh user.

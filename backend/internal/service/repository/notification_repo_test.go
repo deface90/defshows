@@ -183,6 +183,36 @@ func TestNotificationRepository_APNsChannel(t *testing.T) {
 	}
 }
 
+func TestNotificationRepository_FCMChannel(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "users", "shows")
+	repo := repository.NewNotificationRepository(gdb)
+	userRepo := repository.NewUserRepository(gdb)
+	ctx := context.Background()
+
+	user := &entity.User{Email: strptr("fcm@example.com"), Role: entity.RoleUser, Timezone: "UTC"}
+	if err := gdb.Create(user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	// Pending fcm requires a linked device token.
+	if pend, _ := repo.Pending(ctx, "fcm", 10); len(pend) != 0 {
+		t.Fatalf("want 0 pending without token, got %d", len(pend))
+	}
+	if err := userRepo.SetFCMToken(ctx, user.ID, "fcm-device-token-1"); err != nil {
+		t.Fatalf("set fcm token: %v", err)
+	}
+
+	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, Channel: "fcm", Status: entity.NotifyPending, ScheduledFor: time.Now(), DedupeKey: "fcm-k1", Payload: "hi"}
+	if _, err := repo.CreateNotificationIfAbsent(ctx, n); err != nil {
+		t.Fatalf("create notification: %v", err)
+	}
+	pend, _ := repo.Pending(ctx, "fcm", 10)
+	if len(pend) != 1 || pend[0].Target != "fcm-device-token-1" || pend[0].Body != "hi" {
+		t.Fatalf("pending: %+v", pend)
+	}
+}
+
 func TestNotificationRepository_UpcomingCandidates(t *testing.T) {
 	gdb := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, gdb, "users", "shows")
@@ -201,7 +231,11 @@ func TestNotificationRepository_UpcomingCandidates(t *testing.T) {
 	}
 	season := &entity.Season{ShowID: show.ID, SeasonNumber: 2, EpisodeCount: 1}
 	gdb.Create(season)
-	soon := time.Now().Add(12 * time.Hour)
+	// air_date is a DATE compared as midnight, so pin "now" 12h before the next
+	// UTC midnight instead of using the wall clock (flaky before noon).
+	y, m, d := time.Now().UTC().Date()
+	soon := time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC)
+	now := soon.Add(-12 * time.Hour)
 	premiere := &entity.Episode{SeasonID: season.ID, ShowID: show.ID, SeasonNumber: 2, EpisodeNumber: 1, Name: "Premiere", AirDate: &soon}
 	if err := gdb.Create(premiere).Error; err != nil {
 		t.Fatalf("seed episode: %v", err)
@@ -211,7 +245,6 @@ func TestNotificationRepository_UpcomingCandidates(t *testing.T) {
 		t.Fatalf("add user show: %v", err)
 	}
 
-	now := time.Now()
 	epCands, err := repo.EpisodeUpcomingCandidates(ctx, now)
 	if err != nil {
 		t.Fatalf("episode upcoming: %v", err)
@@ -229,7 +262,7 @@ func TestNotificationRepository_UpcomingCandidates(t *testing.T) {
 	}
 
 	// Outside the default 24h lead time: no candidates.
-	far := time.Now().Add(72 * time.Hour)
+	far := soon.Add(72 * time.Hour)
 	premiere.AirDate = &far
 	if err := gdb.Save(premiere).Error; err != nil {
 		t.Fatalf("push air date: %v", err)

@@ -34,12 +34,24 @@ tracking, notifications, notes, admin). **Сгенерённый код не р�
 ## Runtime-конфигурация
 Базовый URL API берётся в рантайме из `window.__ENV.API_BASE_URL`
 (`src/shared/lib/env.ts`), с фолбэком на `VITE_API_BASE_URL` и `http://localhost:8080`.
+Ссылка на iOS-приложение в App Store — так же, из `window.__ENV.APP_STORE_URL`
+(`getAppStoreUrl()`), с фолбэком на `VITE_APP_STORE_URL`; пока переменная не задана,
+`getAppStoreUrl()` возвращает `undefined` и футер (`LegalFooter`) ссылку не показывает.
+Яндекс Метрика — номер счётчика из `window.__ENV.METRIKA_ID` (`getMetrikaId()`), с фолбэком
+на `VITE_METRIKA_ID`; пока не задан, скрипт не грузится (dev, тесты, стейджинг).
+`MetrikaTracker` (в `RootShell`) инициализирует счётчик с `defer: true` и шлёт `hit` на каждую
+смену роута. Вебвизор выключен. Метрика грузится только после согласия в `CookieBanner`
+(выбор хранится в localStorage, `src/shared/lib/analyticsConsent.ts`); ссылка «Настройки cookie»
+в футере сбрасывает выбор, отказ удаляет cookie `_ym*` и перезагружает страницу.
 `index.html` подключает `/env.js`:
-- **dev** — `public/env.js` с плейсхолдером `${API_BASE_URL}` (игнорируется, идёт фолбэк);
+- **dev** — `public/env.js` с плейсхолдерами `${API_BASE_URL}` / `${APP_STORE_URL}` / `${METRIKA_ID}`
+  (игнорируются, идёт фолбэк);
 - **prod** — `docker-entrypoint.sh` рендерит `env.js` из `public/env.template.js` через
   `envsubst` при старте контейнера.
 
 ## Docker
 `Dockerfile` — multi-stage (node build → nginx). `env.js` подставляется entrypoint-хуком
-из переменной `API_BASE_URL`. Сервис `frontend` заведён в
-`../backend/deploy/docker-compose.yml` (profile `app`, порт `FRONTEND_PORT`, по умолчанию 3000).
+из переменных `API_BASE_URL`, `APP_STORE_URL` и `METRIKA_ID`. Сервис `frontend` заведён в
+`../backend/deploy/docker-compose.yml` (profile `app`, порт `FRONTEND_PORT`, по умолчанию 3000;
+`APP_STORE_URL` берётся из `FRONTEND_APP_STORE_URL` в `.env`, например
+`https://apps.apple.com/app/id6814790859`; `METRIKA_ID` — из `FRONTEND_METRIKA_ID`).

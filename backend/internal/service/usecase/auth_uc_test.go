@@ -158,6 +158,14 @@ func (f *fakeRepo) UpdatePasswordHash(_ context.Context, id int64, hash string) 
 	return nil
 }
 
+func (f *fakeRepo) DeleteUser(_ context.Context, id int64) error {
+	if u, ok := f.users[id]; ok && u.Email != nil {
+		delete(f.emailIndex, *u.Email)
+	}
+	delete(f.users, id)
+	return nil
+}
+
 func (f *fakeRepo) RevokeUserTokens(_ context.Context, userID int64) error {
 	for _, rt := range f.refresh {
 		if rt.UserID == userID && rt.RevokedAt == nil {

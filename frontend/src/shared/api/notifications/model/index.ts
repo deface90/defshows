@@ -10,6 +10,7 @@ export * from './errorResponse';
 export * from './notificationFeed';
 export * from './notificationItem';
 export * from './prefs';
+export * from './registerDeviceTokenRequest';
 export * from './telegramLink';
 export * from './telegramStatus';
 export * from './updatePrefsRequest';

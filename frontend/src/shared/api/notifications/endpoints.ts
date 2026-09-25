@@ -23,6 +23,7 @@ import type {
   ErrorResponse,
   NotificationFeed,
   Prefs,
+  RegisterDeviceTokenRequest,
   TelegramLink,
   TelegramStatus,
   UpdatePrefsRequest
@@ -503,6 +504,194 @@ export function useUpdatePrefs<TData = Awaited<ReturnType<typeof updatePrefs>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getUpdatePrefsQueryOptions(updatePrefsRequest,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Register this device's push token
+ */
+export const registerDeviceToken = (
+    registerDeviceTokenRequest: RegisterDeviceTokenRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me/device-token`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: registerDeviceTokenRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getRegisterDeviceTokenQueryKey = (registerDeviceTokenRequest?: RegisterDeviceTokenRequest,) => {
+    return [
+    'POST', `/me/device-token`, registerDeviceTokenRequest
+    ] as const;
+    }
+
+
+export const getRegisterDeviceTokenQueryOptions = <TData = Awaited<ReturnType<typeof registerDeviceToken>>, TError = ErrorResponse>(registerDeviceTokenRequest: RegisterDeviceTokenRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerDeviceToken>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getRegisterDeviceTokenQueryKey(registerDeviceTokenRequest);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof registerDeviceToken>>> = ({ signal }) => registerDeviceToken(registerDeviceTokenRequest, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof registerDeviceToken>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type RegisterDeviceTokenQueryResult = NonNullable<Awaited<ReturnType<typeof registerDeviceToken>>>
+export type RegisterDeviceTokenQueryError = ErrorResponse
+
+
+export function useRegisterDeviceToken<TData = Awaited<ReturnType<typeof registerDeviceToken>>, TError = ErrorResponse>(
+ registerDeviceTokenRequest: RegisterDeviceTokenRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerDeviceToken>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof registerDeviceToken>>,
+          TError,
+          Awaited<ReturnType<typeof registerDeviceToken>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useRegisterDeviceToken<TData = Awaited<ReturnType<typeof registerDeviceToken>>, TError = ErrorResponse>(
+ registerDeviceTokenRequest: RegisterDeviceTokenRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerDeviceToken>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof registerDeviceToken>>,
+          TError,
+          Awaited<ReturnType<typeof registerDeviceToken>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useRegisterDeviceToken<TData = Awaited<ReturnType<typeof registerDeviceToken>>, TError = ErrorResponse>(
+ registerDeviceTokenRequest: RegisterDeviceTokenRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerDeviceToken>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Register this device's push token
+ */
+
+export function useRegisterDeviceToken<TData = Awaited<ReturnType<typeof registerDeviceToken>>, TError = ErrorResponse>(
+ registerDeviceTokenRequest: RegisterDeviceTokenRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerDeviceToken>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getRegisterDeviceTokenQueryOptions(registerDeviceTokenRequest,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Unregister this device's push token
+ */
+export const unregisterDeviceToken = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me/device-token`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getUnregisterDeviceTokenQueryKey = () => {
+    return [
+    'DELETE', `/me/device-token`
+    ] as const;
+    }
+
+
+export const getUnregisterDeviceTokenQueryOptions = <TData = Awaited<ReturnType<typeof unregisterDeviceToken>>, TError = ErrorResponse>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unregisterDeviceToken>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getUnregisterDeviceTokenQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof unregisterDeviceToken>>> = ({ signal }) => unregisterDeviceToken(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof unregisterDeviceToken>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type UnregisterDeviceTokenQueryResult = NonNullable<Awaited<ReturnType<typeof unregisterDeviceToken>>>
+export type UnregisterDeviceTokenQueryError = ErrorResponse
+
+
+export function useUnregisterDeviceToken<TData = Awaited<ReturnType<typeof unregisterDeviceToken>>, TError = ErrorResponse>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof unregisterDeviceToken>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof unregisterDeviceToken>>,
+          TError,
+          Awaited<ReturnType<typeof unregisterDeviceToken>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useUnregisterDeviceToken<TData = Awaited<ReturnType<typeof unregisterDeviceToken>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unregisterDeviceToken>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof unregisterDeviceToken>>,
+          TError,
+          Awaited<ReturnType<typeof unregisterDeviceToken>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useUnregisterDeviceToken<TData = Awaited<ReturnType<typeof unregisterDeviceToken>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unregisterDeviceToken>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Unregister this device's push token
+ */
+
+export function useUnregisterDeviceToken<TData = Awaited<ReturnType<typeof unregisterDeviceToken>>, TError = ErrorResponse>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unregisterDeviceToken>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getUnregisterDeviceTokenQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

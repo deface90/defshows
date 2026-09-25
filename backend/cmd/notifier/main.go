@@ -82,6 +82,17 @@ func main() {
 		go apnsSender.Run(ctx, cfg.Notifier.SendInterval)
 	}
 
+	if !cfg.FCM.Enabled() {
+		logger.Warn("FCM_PROJECT_ID/FCM_SERVICE_ACCOUNT not set — push sender disabled")
+	} else {
+		fcmChannel, err := notify.NewFCMChannel(cfg.FCM.ServiceAccountJSON, cfg.FCM.ProjectID)
+		if err != nil {
+			log.Fatalf("notifier: fcm: %v", err)
+		}
+		fcmSender := workers.NewNotifySender(notificationRepo, "fcm", fcmChannel, logger, 100)
+		go fcmSender.Run(ctx, cfg.Notifier.SendInterval)
+	}
+
 	logger.Info("notifier started")
 	<-ctx.Done()
 	logger.Info("notifier stopped")

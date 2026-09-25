@@ -250,3 +250,52 @@ func TestAuthHandler_PasswordReset(t *testing.T) {
 		t.Fatalf("login after reset: want 200, got %d", rec.Code)
 	}
 }
+
+func TestAuthHandler_DeleteMe(t *testing.T) {
+	e := newTestServer(t)
+
+	rec := doJSON(t, e, http.MethodDelete, "/auth/me", "", nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("delete no token: want 401, got %d", rec.Code)
+	}
+
+	rec = doJSON(t, e, http.MethodPost, "/auth/register", "", map[string]string{
+		"email": "gone@example.com", "password": "pw12345",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register: want 201, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var reg authapi.AuthResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &reg); err != nil {
+		t.Fatalf("decode register: %v", err)
+	}
+
+	rec = doJSON(t, e, http.MethodDelete, "/auth/me", reg.Tokens.AccessToken, nil)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: want 204, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	// The account is gone: login fails, refresh fails, and the email is free again.
+	rec = doJSON(t, e, http.MethodPost, "/auth/login", "", map[string]string{
+		"email": "gone@example.com", "password": "pw12345",
+	})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("login after delete: want 401, got %d", rec.Code)
+	}
+	rec = doJSON(t, e, http.MethodPost, "/auth/refresh", "", map[string]string{
+		"refresh_token": reg.Tokens.RefreshToken,
+	})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("refresh after delete: want 401, got %d", rec.Code)
+	}
+	rec = doJSON(t, e, http.MethodGet, "/auth/me", reg.Tokens.AccessToken, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("me after delete: want 401, got %d", rec.Code)
+	}
+	rec = doJSON(t, e, http.MethodPost, "/auth/register", "", map[string]string{
+		"email": "gone@example.com", "password": "pw12345",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("re-register: want 201, got %d", rec.Code)
+	}
+}

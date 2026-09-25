@@ -58,14 +58,15 @@ func TestNotifyScanner_DedupesAcrossRuns(t *testing.T) {
 
 func TestNotifyScanner_FansOutAcrossChannels(t *testing.T) {
 	chat := int64(1)
-	token := "device-token"
+	apnsToken := "apns-device-token"
+	fcmToken := "fcm-device-token"
 	repo := &fakeScannerRepo{released: []repository.EventCandidate{
-		{UserID: 1, ShowID: 10, EpisodeID: 100, ShowTitle: "S", SeasonNumber: 1, EpisodeNumber: 1, TelegramChatID: &chat, APNsToken: &token},
+		{UserID: 1, ShowID: 10, EpisodeID: 100, ShowTitle: "S", SeasonNumber: 1, EpisodeNumber: 1, TelegramChatID: &chat, APNsToken: &apnsToken, FCMToken: &fcmToken},
 	}}
 	s := workers.NewNotifyScanner(repo, quietLogger(), 7*24*time.Hour)
 
 	created, err := s.RunOnce(context.Background())
-	if err != nil || created != 2 {
-		t.Fatalf("want 2 (telegram+apns), got created=%d err=%v", created, err)
+	if err != nil || created != 3 {
+		t.Fatalf("want 3 (telegram+apns+fcm), got created=%d err=%v", created, err)
 	}
 }

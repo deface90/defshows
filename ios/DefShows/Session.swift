@@ -77,6 +77,12 @@ final class Session: ObservableObject {
         try clear()
     }
 
+    /// Permanently deletes the account and every piece of data tied to it on the server.
+    func deleteAccount() async throws {
+        _ = try await authorized("auth/me", method: "DELETE")
+        try clear()
+    }
+
     func registerDeviceToken(_ token: String) async throws {
         try await mutate("me/device-token", body: ["token": token, "platform": "ios"])
     }

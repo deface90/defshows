@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var busy = false
     @State private var error: String?
     @State private var message: String?
+    @State private var confirmingDeletion = false
 
     var body: some View {
         Form {
@@ -45,9 +46,21 @@ struct SettingsView: View {
                     Stepper("За \(leadTimeHours) ч. до выхода", value: $leadTimeHours, in: 0...168)
                     Button("Сохранить уведомления") { Task { await savePreferences() } }
                 } header: { Text("Уведомления сервиса") }
-                  footer: { Text("Эти настройки действуют для твоего аккаунта. Push-уведомления iPhone пока не подключены.") }
+                  footer: { Text("Эти настройки действуют для твоего аккаунта: push-уведомлений на iPhone и Telegram. Разрешение на push можно отключить в настройках iOS.") }
                   .disabled(busy)
             }
+            Section {
+                Button("Удалить аккаунт", role: .destructive) { confirmingDeletion = true }
+                    .disabled(busy)
+            } footer: {
+                Text("Аккаунт и все данные — коллекция, отметки просмотра, заметки, уведомления — будут удалены без возможности восстановления.")
+            }
+        }
+        .confirmationDialog("Удалить аккаунт?", isPresented: $confirmingDeletion, titleVisibility: .visible) {
+            Button("Удалить навсегда", role: .destructive) { Task { await deleteAccount() } }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Это действие нельзя отменить.")
         }
         .navigationTitle("Настройки")
         .navigationBarTitleDisplayMode(.inline)
@@ -71,6 +84,17 @@ struct SettingsView: View {
             leadTimeHours = prefs.leadTimeHours
             error = nil
         } catch { self.error = error.localizedDescription }
+    }
+
+    private func deleteAccount() async {
+        guard !busy else { return }
+        busy = true
+        error = nil
+        message = nil
+        defer { busy = false }
+        // Best-effort: the server row and its token go away with the account anyway.
+        try? await session.unregisterDeviceToken()
+        do { try await session.deleteAccount() } catch { self.error = error.localizedDescription }
     }
 
     private func saveProfile() async {

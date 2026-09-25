@@ -99,7 +99,7 @@ func (s *NotifyScanner) RunOnce(ctx context.Context) (created int, err error) {
 }
 
 // enqueue creates one notification per channel available for the candidate
-// (telegram and/or apns), returning how many rows were newly created.
+// (telegram and/or apns and/or fcm), returning how many rows were newly created.
 func (s *NotifyScanner) enqueue(ctx context.Context, kind eventKind, c repository.EventCandidate) int {
 	created := 0
 	targets := []string{}
@@ -108,6 +108,9 @@ func (s *NotifyScanner) enqueue(ctx context.Context, kind eventKind, c repositor
 	}
 	if c.APNsToken != nil {
 		targets = append(targets, "apns")
+	}
+	if c.FCMToken != nil {
+		targets = append(targets, "fcm")
 	}
 	showID, episodeID := c.ShowID, c.EpisodeID
 	for _, channel := range targets {

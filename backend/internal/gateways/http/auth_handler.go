@@ -261,3 +261,15 @@ func (h *AuthHandler) GetMe(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, toAPIUser(u))
 }
+
+// DeleteMe handles DELETE /auth/me.
+func (h *AuthHandler) DeleteMe(c echo.Context) error {
+	claims, ok := auth.ClaimsFromContext(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	if err := h.uc.DeleteAccount(c.Request().Context(), claims.UserID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
