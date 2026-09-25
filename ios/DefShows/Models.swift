@@ -92,6 +92,18 @@ struct APIError: LocalizedError {
 // Keep the same order in tracked and catalog detail screens.
 extension Array where Element == Season {
     var newestFirst: [Season] { sorted { $0.seasonNumber > $1.seasonNumber } }
+
+    /// seasonToExpand is the season to open by default: the one holding the earliest
+    /// unwatched episode (the same episode the "Продолжить просмотр" card offers).
+    /// Falls back to the newest season when nothing is left to watch or the show is
+    /// not tracked.
+    func seasonToExpand(nextUnwatchedEpisodeID: Int?) -> Season? {
+        if let id = nextUnwatchedEpisodeID,
+           let season = first(where: { season in season.episodes.contains { $0.id == id } }) {
+            return season
+        }
+        return newestFirst.first
+    }
 }
 
 struct ShowRating: Decodable {

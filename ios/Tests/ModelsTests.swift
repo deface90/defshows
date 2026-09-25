@@ -35,6 +35,16 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(seasons[0].episodes.map(\.episodeNumber), [1, 2])
     }
 
+    func testSeasonToExpandFollowsTheEarliestUnwatchedEpisode() throws {
+        let show = try decode(ShowDetail.self, #"{"id":1,"title":"Тест","seasons":[{"id":1,"season_number":1,"name":"Первый","episodes":[{"id":11,"season_number":1,"episode_number":1,"name":"Начало"}]},{"id":2,"season_number":2,"name":"Второй","episodes":[{"id":21,"season_number":2,"episode_number":1,"name":"Второе"}]},{"id":3,"season_number":3,"name":"Третий","episodes":[{"id":31,"season_number":3,"episode_number":1,"name":"Третье"}]}]}"#)
+        let seasons = try XCTUnwrap(show.seasons)
+        XCTAssertEqual(seasons.seasonToExpand(nextUnwatchedEpisodeID: 21)?.seasonNumber, 2)
+        // Nothing left to watch, an unknown episode, or an untracked show: newest season.
+        XCTAssertEqual(seasons.seasonToExpand(nextUnwatchedEpisodeID: nil)?.seasonNumber, 3)
+        XCTAssertEqual(seasons.seasonToExpand(nextUnwatchedEpisodeID: 999)?.seasonNumber, 3)
+        XCTAssertNil([Season]().seasonToExpand(nextUnwatchedEpisodeID: 21))
+    }
+
     func testNotificationPayloadRemainsPlainText() throws {
         let feed = try decode(NotificationFeed.self, #"{"notifications":[{"id":1,"type":"episode_released","status":"sent","read":false,"payload":"Вышла новая серия","created_at":"2026-09-22T10:00:00.123Z"}]}"#)
         let item = try XCTUnwrap(feed.notifications.first)

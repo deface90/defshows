@@ -209,12 +209,17 @@ export function ShowDetailContent({ show, preview = false, backTo = '/search' }:
         </Group>
         {seasons.length === 0 ? (
           <EmptyState title="Нет эпизодов" />
+        ) : !preview && trackedQuery.isPending ? (
+          // The accordion picks which season to expand on mount, so wait for
+          // progress instead of opening the wrong one and jumping afterwards.
+          <LoadingState />
         ) : (
           <SeasonAccordion
             seasons={seasons}
             showId={show.id}
             tracked={tracked}
             watchedIds={watchedIds}
+            openSeason={nextEp?.season_number}
           />
         )}
       </Card>

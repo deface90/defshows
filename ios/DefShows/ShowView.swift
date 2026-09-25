@@ -131,12 +131,22 @@ struct ShowView: View {
         defer { loading = false }
         do {
             let show: ShowDetail = try await session.get("shows/\(showID)")
-            if detail == nil, let latest = (show.seasons ?? []).newestFirst.first { expanded.insert(latest.id) }
+            let firstLoad = detail == nil
             detail = show
+            // Which season to open depends on progress, so decide after tracking is
+            // loaded — the defer keeps the fallback when that request fails.
+            defer { if firstLoad { expandSeasonToResume() } }
             try await reloadTracking()
             error = nil
         } catch is CancellationError { }
         catch { self.error = error.localizedDescription }
+    }
+
+    /// expandSeasonToResume opens the season the viewer left off in, once on first load.
+    private func expandSeasonToResume() {
+        let target = (detail?.seasons ?? [])
+            .seasonToExpand(nextUnwatchedEpisodeID: tracked?.progress.nextUnwatchedEpisodeId)
+        if let target { expanded.insert(target.id) }
     }
 
     private func reloadTracking() async throws {

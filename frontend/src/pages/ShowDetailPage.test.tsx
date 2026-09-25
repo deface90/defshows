@@ -103,7 +103,8 @@ it('keeps a later season checked independently of the first and updates episode 
   )
   renderDetail()
   const seasons = await screen.findAllByRole('checkbox', { name: 'Отметить сезон просмотренным' })
-  await user.click(screen.getByRole('button', { name: /Сезон 1/ }))
+  // Season 1 holds the earliest unwatched episode and is open already; open season 2 too.
+  await user.click(screen.getByRole('button', { name: /Сезон 2/ }))
   await user.click(seasons[0])
   await waitFor(() => expect(seasons[0]).toBeChecked())
   expect(seasons[1]).not.toBeChecked()
@@ -209,6 +210,60 @@ it('shows completed aired progress even with upcoming and undated episodes in th
   expect(screen.getByText('Upcoming episode')).toBeInTheDocument()
   expect(screen.getByText('Undated episode')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Весь сериал просмотрен ✓' })).toBeDisabled()
+})
+
+describe('default expanded season', () => {
+  const threeSeasons = {
+    ...show,
+    seasons: [
+      show.seasons[0],
+      {
+        id: 2, season_number: 2, name: 'Сезон 2',
+        episodes: [
+          { id: 200, season_number: 2, episode_number: 1, name: 'S2E1', air_date: '2012-04-01' },
+          { id: 201, season_number: 2, episode_number: 2, name: 'S2E2', air_date: '2012-04-08' },
+        ],
+      },
+      {
+        id: 3, season_number: 3, name: 'Сезон 3',
+        episodes: [{ id: 300, season_number: 3, episode_number: 1, name: 'S3E1', air_date: '2013-03-31' }],
+      },
+    ],
+  }
+
+  function trackedWith(progress: Record<string, unknown>) {
+    server.use(
+      http.get(`${base}/shows/10`, () => HttpResponse.json(threeSeasons)),
+      http.get(`${base}/me/shows/10`, () => HttpResponse.json({
+        user_show: { id: 5, show_id: 10, status: 'watching', favorite: false },
+        show: threeSeasons,
+        progress,
+      })),
+    )
+  }
+
+  const expanded = (name: RegExp) => screen.getByRole('button', { name }).getAttribute('aria-expanded')
+
+  it('opens only the season with the earliest unwatched episode', async () => {
+    trackedWith({ watched: 3, total: 5, watched_episode_ids: [100, 101, 200], next_unwatched_episode_id: 201 })
+    renderDetail()
+    await screen.findByRole('button', { name: /Сезон 2/ })
+    expect(expanded(/Сезон 1/)).toBe('false')
+    expect(expanded(/Сезон 2/)).toBe('true')
+    expect(expanded(/Сезон 3/)).toBe('false')
+  })
+
+  it('falls back to the newest season when everything aired is watched', async () => {
+    trackedWith({
+      watched: 5, total: 5, watched_episode_ids: [100, 101, 200, 201, 300],
+      next_unwatched_episode_id: null,
+    })
+    renderDetail()
+    await screen.findByRole('button', { name: /Сезон 3/ })
+    expect(expanded(/Сезон 3/)).toBe('true')
+    expect(expanded(/Сезон 1/)).toBe('false')
+    expect(expanded(/Сезон 2/)).toBe('false')
+  })
 })
 
 it('shows TMDB season and episode ratings, omitting unrated episodes', async () => {

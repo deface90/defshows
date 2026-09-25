@@ -10,18 +10,26 @@ export function SeasonAccordion({
   showId,
   tracked,
   watchedIds,
+  openSeason,
 }: {
   seasons: Season[]
   showId: number
   tracked: boolean
   watchedIds: Set<number>
+  /** Season number to expand initially (the one with the earliest unwatched episode). */
+  openSeason?: number
 }) {
   if (seasons.length === 0) {
     return <Text c="dimmed">Нет информации о сезонах</Text>
   }
   const sortedSeasons = [...seasons].sort((a, b) => b.season_number - a.season_number)
+  // Expand the season the viewer is actually in; fall back to the newest one
+  // when there is nothing left to watch (or the show is not tracked).
+  const initialSeason =
+    seasons.find((s) => s.season_number === openSeason)?.season_number ??
+    sortedSeasons[0].season_number
   return (
-    <Accordion multiple defaultValue={[String(sortedSeasons[0].season_number)]}>
+    <Accordion multiple defaultValue={[String(initialSeason)]}>
       {sortedSeasons.map((season) => {
         const airedEpisodes = season.episodes.filter((ep) => isAired(ep.air_date))
         const watchedCount = airedEpisodes.reduce(
