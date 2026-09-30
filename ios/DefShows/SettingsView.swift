@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var isPublic = false
     @State private var episodeRelease = false
     @State private var seasonStart = false
+    @State private var seasonFinale = false
     @State private var weeklyDigest = false
     @State private var leadTimeHours = 0
     @State private var busy = false
@@ -42,11 +43,12 @@ struct SettingsView: View {
                 Section {
                     Toggle("Выход новых серий", isOn: $episodeRelease)
                     Toggle("Начало сезона", isOn: $seasonStart)
+                    Toggle("Финал сезона", isOn: $seasonFinale)
                     Toggle("Еженедельная сводка", isOn: $weeklyDigest)
                     Stepper("За \(leadTimeHours) ч. до выхода", value: $leadTimeHours, in: 0...168)
                     Button("Сохранить уведомления") { Task { await savePreferences() } }
                 } header: { Text("Уведомления сервиса") }
-                  footer: { Text("Эти настройки действуют для твоего аккаунта: push-уведомлений на iPhone и Telegram. Разрешение на push можно отключить в настройках iOS.") }
+                  footer: { Text("Эти настройки действуют для твоего аккаунта: push-уведомлений на iPhone и Telegram. Разрешение на push можно отключить в настройках iOS. «Финал сезона» приходит по факту выхода последней серии сезона — настройка «за сколько часов» на него не влияет.") }
                   .disabled(busy)
             }
             Section {
@@ -80,6 +82,7 @@ struct SettingsView: View {
             preferences = prefs
             episodeRelease = prefs.episodeRelease
             seasonStart = prefs.seasonStart
+            seasonFinale = prefs.seasonFinale
             weeklyDigest = prefs.weeklyDigest
             leadTimeHours = prefs.leadTimeHours
             error = nil
@@ -118,7 +121,8 @@ struct SettingsView: View {
         do {
             try await session.mutate("me/notifications/prefs", method: "PATCH", body: [
                 "episode_release": episodeRelease, "season_start": seasonStart,
-                "weekly_digest": weeklyDigest, "lead_time_hours": leadTimeHours
+                "season_finale": seasonFinale, "weekly_digest": weeklyDigest,
+                "lead_time_hours": leadTimeHours
             ])
             message = "Настройки уведомлений сохранены."
         } catch { self.error = error.localizedDescription }

@@ -15,4 +15,9 @@ export interface Progress {
   unwatched: number;
   /** @nullable */
   next_unwatched_episode_id?: number | null;
+  /**
+     * Season number of a fully-aired, completely-unwatched season that dropped while the user was caught up on everything earlier; null when there is no such season.
+     * @nullable
+     */
+  new_full_season?: number | null;
 }

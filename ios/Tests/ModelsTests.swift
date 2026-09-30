@@ -53,6 +53,42 @@ final class ModelsTests: XCTestCase {
         XCTAssertFalse(item.read)
         XCTAssertNotEqual(item.dateText, item.createdAt)
     }
+
+    func testSeasonFinaleNotificationTitle() throws {
+        let feed = try decode(NotificationFeed.self, #"{"notifications":[{"id":2,"type":"season_finale","status":"sent","read":true,"payload":"Сезон завершён","created_at":"2026-09-22T10:00:00.123Z"}]}"#)
+        XCTAssertEqual(feed.notifications.first?.title, "Финал сезона")
+    }
+
+    func testStatsDecodeAndWatchTimeFormatting() throws {
+        let stats = try decode(Stats.self, #"{"shows_tracked":12,"shows_completed":4,"seasons_watched":9,"episodes_watched":120,"minutes_watched":3600}"#)
+        XCTAssertEqual(stats.showsTracked, 12)
+        XCTAssertEqual(stats.episodesWatched, 120)
+        // 3600 minutes = 2 days 12 hours.
+        XCTAssertEqual(stats.watchTimeText, "2 д 12 ч")
+        XCTAssertEqual(Stats(showsTracked: 0, showsCompleted: 0, seasonsWatched: 0, episodesWatched: 0, minutesWatched: 90).watchTimeText, "1 ч 30 мин")
+        XCTAssertEqual(Stats(showsTracked: 0, showsCompleted: 0, seasonsWatched: 0, episodesWatched: 0, minutesWatched: 0).watchTimeText, "0 мин")
+    }
+
+    func testWatchProgressDecodesNewSeasonAndUnwatchedWhenPresent() throws {
+        let progress = try decode(WatchProgress.self, #"{"watched":8,"total":16,"watched_episode_ids":[1],"next_unwatched_episode_id":9,"unwatched":8,"new_full_season":2}"#)
+        XCTAssertEqual(progress.unwatched, 8)
+        XCTAssertEqual(progress.newFullSeason, 2)
+        // Absent fields stay nil (older payloads / caught-up shows).
+        let plain = try decode(WatchProgress.self, #"{"watched":1,"total":3,"watched_episode_ids":[10],"next_unwatched_episode_id":12}"#)
+        XCTAssertNil(plain.unwatched)
+        XCTAssertNil(plain.newFullSeason)
+    }
+
+    func testShowReferenceExposesDistinctOriginalTitleAndAiring() throws {
+        let both = try decode(TrackedList.self, #"{"tracked":[{"show":{"id":1,"tmdb_id":42,"title":"Тест","original_title":"Test","airing_status":"airing"},"user_show":{"status":"watching","favorite":false},"progress":{"watched":1,"total":2,"watched_episode_ids":[1],"next_unwatched_episode_id":2}}]}"#)
+        let show = try XCTUnwrap(both.tracked.first?.show)
+        XCTAssertEqual(show.distinctOriginalTitle, "Test")
+        XCTAssertEqual(show.airingStatusTitle, "Идёт")
+        // Original identical to the localized title is hidden.
+        let same = try decode(ShowReference.self, #"{"id":1,"tmdb_id":42,"title":"Тест","original_title":"Тест"}"#)
+        XCTAssertNil(same.distinctOriginalTitle)
+        XCTAssertNil(same.airingStatusTitle)
+    }
     func testDetailMetadataAndExternalRatings() throws {
         let show = try decode(ShowDetail.self, #"{"id":7,"title":"Тест","original_title":"Test","poster_url":"/images/poster.jpg","first_air_date":"2020-01-01","next_episode_air_date":"2026-10-01","airing_status":"airing","vote_average":8.2,"vote_count":120,"genres":[{"id":1,"name":"Драма"}],"ratings":[{"source":"IMDb","value":"8.5","votes":300}],"imdb_url":"https://www.imdb.com/title/tt123/","wikipedia_url":"https://ru.wikipedia.org/wiki/Test"}"#)
         XCTAssertEqual(show.originalTitle, "Test")

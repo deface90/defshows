@@ -67,7 +67,7 @@ func (uc *NotificationUsecase) GetPrefs(ctx context.Context, userID int64) (*ent
 }
 
 // UpdatePrefs updates a user's notification preferences.
-func (uc *NotificationUsecase) UpdatePrefs(ctx context.Context, userID int64, episodeRelease, seasonStart, weeklyDigest *bool, leadTimeHours *int) (*entity.NotificationPref, error) {
+func (uc *NotificationUsecase) UpdatePrefs(ctx context.Context, userID int64, episodeRelease, seasonStart, seasonFinale, weeklyDigest *bool, leadTimeHours *int) (*entity.NotificationPref, error) {
 	p, err := uc.repo.GetPrefs(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -78,6 +78,9 @@ func (uc *NotificationUsecase) UpdatePrefs(ctx context.Context, userID int64, ep
 	}
 	if seasonStart != nil {
 		p.SeasonStart = *seasonStart
+	}
+	if seasonFinale != nil {
+		p.SeasonFinale = *seasonFinale
 	}
 	if weeklyDigest != nil {
 		p.WeeklyDigest = *weeklyDigest

@@ -8,6 +8,8 @@
 export interface Prefs {
   episode_release: boolean;
   season_start: boolean;
+  /** Notify when a season's finale airs. Not affected by lead_time_hours. */
+  season_finale: boolean;
   weekly_digest: boolean;
   channel: string;
   lead_time_hours: number;

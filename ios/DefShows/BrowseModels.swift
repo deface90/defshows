@@ -39,6 +39,7 @@ struct FeedItem: Decodable, Identifiable {
         case "episode_released": return "Новая серия"
         case "episode_upcoming": return "Скоро серия"
         case "season_upcoming": return "Скоро сезон"
+        case "season_finale": return "Финал сезона"
         default: return "Уведомление"
         }
     }
@@ -77,6 +78,7 @@ struct AccountSettings: Decodable {
 struct NotificationPreferences: Decodable {
     var episodeRelease: Bool
     var seasonStart: Bool
+    var seasonFinale: Bool
     var weeklyDigest: Bool
     var leadTimeHours: Int
 }

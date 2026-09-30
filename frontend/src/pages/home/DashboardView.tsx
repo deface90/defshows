@@ -14,9 +14,17 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 // How many rows each dashboard section previews before linking to the full page.
 const PREVIEW = 5
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({ label, value, to }: { label: string; value: number; to: string }) {
   return (
-    <Card withBorder padding="md" radius="md">
+    <Card
+      component={Link}
+      to={to}
+      withBorder
+      padding="md"
+      radius="md"
+      className="stat-card"
+      style={{ color: 'inherit', textDecoration: 'none' }}
+    >
       <Text fz={28} fw={700} lh={1}>
         {value}
       </Text>
@@ -107,10 +115,10 @@ export function DashboardView() {
       {query.isSuccess && all.length > 0 && (
         <>
           <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
-            <StatCard label="Всего сериалов" value={stats.total} />
-            <StatCard label="Смотрю" value={stats.watching} />
-            <StatCard label="Эпизодов к просмотру" value={stats.backlog} />
-            <StatCard label="Завершено" value={stats.completed} />
+            <StatCard label="Всего сериалов" value={stats.total} to="/my?status=all" />
+            <StatCard label="Смотрю" value={stats.watching} to="/my?status=watching" />
+            <StatCard label="Эпизодов к просмотру" value={stats.backlog} to="/unwatched" />
+            <StatCard label="Завершено" value={stats.completed} to="/my?status=completed" />
           </SimpleGrid>
 
           <DashboardSection

@@ -16,7 +16,26 @@ struct ShowReference: Decodable {
     let tmdbId: Int
     let id: Int
     let title: String
+    let originalTitle: String?
     let posterUrl: String?
+    let airingStatus: String?
+    let seasonCount: Int?
+    let nextEpisodeAirDate: String?
+
+    /// Original title shown as a subtitle only when it differs from the localized title.
+    var distinctOriginalTitle: String? {
+        guard let originalTitle, !originalTitle.isEmpty, originalTitle != title else { return nil }
+        return originalTitle
+    }
+    var airingStatusTitle: String? {
+        switch airingStatus {
+        case "airing": return "Идёт"
+        case "between_seasons": return "Между сезонами"
+        case "not_started": return "Не начат"
+        case "ended": return "Завершён"
+        default: return nil
+        }
+    }
 }
 struct UserShow: Decodable {
     let status: String
@@ -37,6 +56,32 @@ struct WatchProgress: Decodable {
     let total: Int
     let watchedEpisodeIds: [Int]
     let nextUnwatchedEpisodeId: Int?
+    // Aired-but-unwatched episodes the user can watch right now.
+    let unwatched: Int?
+    // Season number of a whole new season that dropped while the user was caught
+    // up on everything earlier; nil when there is no such season.
+    let newFullSeason: Int?
+}
+
+struct Stats: Decodable {
+    let showsTracked: Int
+    let showsCompleted: Int
+    let seasonsWatched: Int
+    let episodesWatched: Int
+    let minutesWatched: Int
+
+    /// Compact "Xд Yч" / "Yч Zмин" watch-time string.
+    var watchTimeText: String {
+        if minutesWatched <= 0 { return "0 мин" }
+        let days = minutesWatched / (60 * 24)
+        let hours = (minutesWatched % (60 * 24)) / 60
+        let mins = minutesWatched % 60
+        var parts: [String] = []
+        if days > 0 { parts.append("\(days) д") }
+        if hours > 0 { parts.append("\(hours) ч") }
+        if mins > 0 && days == 0 { parts.append("\(mins) мин") }
+        return parts.isEmpty ? "0 мин" : parts.joined(separator: " ")
+    }
 }
 struct ShowDetail: Decodable {
     let id: Int

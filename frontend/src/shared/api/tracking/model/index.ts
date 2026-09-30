@@ -19,6 +19,7 @@ export * from './progress';
 export * from './settings';
 export * from './showRef';
 export * from './showRefAiringStatus';
+export * from './stats';
 export * from './taste';
 export * from './tasteGenre';
 export * from './tasteLanguage';

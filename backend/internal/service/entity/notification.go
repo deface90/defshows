@@ -7,6 +7,7 @@ const (
 	NotifyEpisodeReleased = "episode_released"
 	NotifyEpisodeUpcoming = "episode_upcoming"
 	NotifySeasonUpcoming  = "season_upcoming"
+	NotifySeasonFinale    = "season_finale"
 )
 
 // Notification statuses.
@@ -22,6 +23,7 @@ type NotificationPref struct {
 	UserID         int64
 	EpisodeRelease bool
 	SeasonStart    bool
+	SeasonFinale   bool
 	WeeklyDigest   bool
 	Channel        string
 	LeadTimeHours  int
@@ -36,6 +38,7 @@ func DefaultNotificationPref(userID int64) NotificationPref {
 		UserID:         userID,
 		EpisodeRelease: true,
 		SeasonStart:    true,
+		SeasonFinale:   true,
 		WeeklyDigest:   false,
 		Channel:        "telegram",
 		LeadTimeHours:  24,

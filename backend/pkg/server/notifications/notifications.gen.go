@@ -43,8 +43,11 @@ type Prefs struct {
 	Channel        string `json:"channel"`
 	EpisodeRelease bool   `json:"episode_release"`
 	LeadTimeHours  int    `json:"lead_time_hours"`
-	SeasonStart    bool   `json:"season_start"`
-	WeeklyDigest   bool   `json:"weekly_digest"`
+
+	// SeasonFinale Notify when a season's finale airs. Not affected by lead_time_hours.
+	SeasonFinale bool `json:"season_finale"`
+	SeasonStart  bool `json:"season_start"`
+	WeeklyDigest bool `json:"weekly_digest"`
 }
 
 // RegisterDeviceTokenRequest defines model for RegisterDeviceTokenRequest.
@@ -67,6 +70,7 @@ type TelegramStatus struct {
 type UpdatePrefsRequest struct {
 	EpisodeRelease *bool `json:"episode_release,omitempty"`
 	LeadTimeHours  *int  `json:"lead_time_hours,omitempty"`
+	SeasonFinale   *bool `json:"season_finale,omitempty"`
 	SeasonStart    *bool `json:"season_start,omitempty"`
 	WeeklyDigest   *bool `json:"weekly_digest,omitempty"`
 }
@@ -265,22 +269,23 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

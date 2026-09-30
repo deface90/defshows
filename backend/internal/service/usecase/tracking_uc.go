@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sort"
 	"time"
 
 	"github.com/deface90/defshows/backend/internal/service/entity"
@@ -49,6 +50,21 @@ type Progress struct {
 	// watched — i.e. what the user can actually watch right now.
 	Unwatched     int
 	NextUnwatched *entity.Episode
+	// NewFullSeason is the number of a fully-aired, completely-unwatched season
+	// that dropped while the user was caught up on everything earlier; nil when
+	// there is no such season.
+	NewFullSeason *int
+}
+
+// Stats aggregates a user's viewing across all tracked shows.
+type Stats struct {
+	ShowsTracked    int
+	ShowsCompleted  int
+	SeasonsWatched  int
+	EpisodesWatched int
+	// MinutesWatched sums the runtime of watched episodes (episodes with an
+	// unknown runtime contribute zero).
+	MinutesWatched int64
 }
 
 // TrackedShow bundles a user's tracking with the show and its progress.
@@ -230,21 +246,118 @@ func (uc *TrackingUsecase) progress(ctx context.Context, us *entity.UserShow) (P
 
 	prog := Progress{WatchedEpisodeIDs: append([]int64{}, watchedIDs...)}
 	now := time.Now()
+	seasons := map[int]*seasonTally{}
 	for i := range episodes {
-		if !aired(episodes[i].AirDate, now) {
+		e := &episodes[i]
+		if e.SeasonNumber > 0 {
+			st := seasons[e.SeasonNumber]
+			if st == nil {
+				st = &seasonTally{}
+				seasons[e.SeasonNumber] = st
+			}
+			st.total++
+			if aired(e.AirDate, now) {
+				st.aired++
+				if watched[e.ID] {
+					st.watched++
+				}
+			}
+		}
+		if !aired(e.AirDate, now) {
 			continue
 		}
 		prog.Total++
-		if watched[episodes[i].ID] {
+		if watched[e.ID] {
 			prog.Watched++
 			continue
 		}
 		prog.Unwatched++
 		if prog.NextUnwatched == nil {
-			prog.NextUnwatched = &episodes[i]
+			prog.NextUnwatched = e
 		}
 	}
+	prog.NewFullSeason = newFullSeason(seasons)
 	return prog, nil
+}
+
+// seasonTally counts a single season's episodes: catalogued (total), already
+// aired, and watched-among-aired.
+type seasonTally struct{ total, aired, watched int }
+
+// newFullSeason returns the earliest season that has fully aired with zero
+// watches while every earlier season is fully caught up — i.e. a whole new
+// season dropped for a user who was up to date. Returns nil otherwise.
+func newFullSeason(seasons map[int]*seasonTally) *int {
+	nums := make([]int, 0, len(seasons))
+	for n := range seasons {
+		nums = append(nums, n)
+	}
+	sort.Ints(nums)
+	for _, n := range nums {
+		st := seasons[n]
+		if st.aired > 0 && st.aired == st.total && st.watched == 0 {
+			num := n
+			return &num
+		}
+		// An earlier season with aired-but-unwatched episodes means the user is
+		// mid-run, not waiting on a whole new season.
+		if st.watched < st.aired {
+			return nil
+		}
+	}
+	return nil
+}
+
+// Stats aggregates the user's viewing across all their tracked shows.
+func (uc *TrackingUsecase) Stats(ctx context.Context, userID int64) (Stats, error) {
+	userShows, err := uc.repo.ListUserShows(ctx, userID, "")
+	if err != nil {
+		return Stats{}, err
+	}
+	now := time.Now()
+	st := Stats{ShowsTracked: len(userShows)}
+	for i := range userShows {
+		us := userShows[i]
+		if us.Status == entity.StatusCompleted {
+			st.ShowsCompleted++
+		}
+		episodes, err := uc.catalog.Episodes(ctx, us.ShowID)
+		if err != nil {
+			return Stats{}, err
+		}
+		watchedIDs, err := uc.repo.WatchedEpisodeIDs(ctx, us.ID)
+		if err != nil {
+			return Stats{}, err
+		}
+		watched := make(map[int64]bool, len(watchedIDs))
+		for _, id := range watchedIDs {
+			watched[id] = true
+		}
+		airedBySeason := map[int]int{}
+		watchedBySeason := map[int]int{}
+		for j := range episodes {
+			e := &episodes[j]
+			if e.SeasonNumber <= 0 {
+				continue
+			}
+			if aired(e.AirDate, now) {
+				airedBySeason[e.SeasonNumber]++
+			}
+			if watched[e.ID] {
+				st.EpisodesWatched++
+				watchedBySeason[e.SeasonNumber]++
+				if e.Runtime != nil {
+					st.MinutesWatched += int64(*e.Runtime)
+				}
+			}
+		}
+		for sn, airedCnt := range airedBySeason {
+			if airedCnt > 0 && watchedBySeason[sn] >= airedCnt {
+				st.SeasonsWatched++
+			}
+		}
+	}
+	return st, nil
 }
 
 // aired reports whether an episode with the given air date has already been

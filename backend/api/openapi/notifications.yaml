@@ -130,10 +130,11 @@ components:
           items: { $ref: '#/components/schemas/NotificationItem' }
     Prefs:
       type: object
-      required: [episode_release, season_start, weekly_digest, channel, lead_time_hours]
+      required: [episode_release, season_start, season_finale, weekly_digest, channel, lead_time_hours]
       properties:
         episode_release: { type: boolean }
         season_start: { type: boolean }
+        season_finale: { type: boolean, description: Notify when a season's finale airs. Not affected by lead_time_hours. }
         weekly_digest: { type: boolean }
         channel: { type: string }
         lead_time_hours: { type: integer }
@@ -142,6 +143,7 @@ components:
       properties:
         episode_release: { type: boolean }
         season_start: { type: boolean }
+        season_finale: { type: boolean }
         weekly_digest: { type: boolean }
         lead_time_hours: { type: integer }
     RegisterDeviceTokenRequest:

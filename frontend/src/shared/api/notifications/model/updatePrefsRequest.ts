@@ -8,6 +8,7 @@
 export interface UpdatePrefsRequest {
   episode_release?: boolean;
   season_start?: boolean;
+  season_finale?: boolean;
   weekly_digest?: boolean;
   lead_time_hours?: number;
 }

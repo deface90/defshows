@@ -13,6 +13,7 @@ import (
 // ScannerRepo is the storage dependency of NotifyScanner.
 type ScannerRepo interface {
 	ReleasedEpisodeCandidates(ctx context.Context, since time.Time) ([]repository.EventCandidate, error)
+	SeasonFinaleCandidates(ctx context.Context, since time.Time) ([]repository.EventCandidate, error)
 	EpisodeUpcomingCandidates(ctx context.Context, now time.Time) ([]repository.EventCandidate, error)
 	SeasonUpcomingCandidates(ctx context.Context, now time.Time) ([]repository.EventCandidate, error)
 	CreateNotificationIfAbsent(ctx context.Context, n *entity.Notification) (bool, error)
@@ -65,6 +66,13 @@ var eventKinds = []eventKind{
 			return fmt.Sprintf("Скоро новый сезон: %s, сезон %d", c.ShowTitle, c.SeasonNumber)
 		},
 	},
+	{
+		notifyType: entity.NotifySeasonFinale,
+		dedupeTag:  "finale",
+		payload: func(c repository.EventCandidate) string {
+			return fmt.Sprintf("Сезон завершён: %s, сезон %d", c.ShowTitle, c.SeasonNumber)
+		},
+	},
 }
 
 // RunOnce scans for release/upcoming candidates and enqueues notifications
@@ -75,6 +83,10 @@ func (s *NotifyScanner) RunOnce(ctx context.Context) (created int, err error) {
 
 	candidatesByKind := map[string][]repository.EventCandidate{}
 	candidatesByKind[entity.NotifyEpisodeReleased], err = s.repo.ReleasedEpisodeCandidates(ctx, since)
+	if err != nil {
+		return 0, err
+	}
+	candidatesByKind[entity.NotifySeasonFinale], err = s.repo.SeasonFinaleCandidates(ctx, since)
 	if err != nil {
 		return 0, err
 	}

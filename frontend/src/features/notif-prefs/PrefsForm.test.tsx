@@ -11,6 +11,7 @@ const base = 'http://localhost:8080'
 const prefs = {
   episode_release: true,
   season_start: false,
+  season_finale: true,
   weekly_digest: false,
   channel: 'telegram',
   lead_time_hours: 24,

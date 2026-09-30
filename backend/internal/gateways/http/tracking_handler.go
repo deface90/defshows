@@ -221,6 +221,25 @@ func (h *TrackingHandler) DeleteLink(c echo.Context, showID trackingapi.ShowId, 
 	return c.NoContent(http.StatusNoContent)
 }
 
+// GetStats handles GET /me/stats.
+func (h *TrackingHandler) GetStats(c echo.Context) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	st, err := h.uc.Stats(c.Request().Context(), uid)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, trackingapi.Stats{
+		ShowsTracked:    st.ShowsTracked,
+		ShowsCompleted:  st.ShowsCompleted,
+		SeasonsWatched:  st.SeasonsWatched,
+		EpisodesWatched: st.EpisodesWatched,
+		MinutesWatched:  st.MinutesWatched,
+	})
+}
+
 // GetSettings handles GET /me/settings.
 func (h *TrackingHandler) GetSettings(c echo.Context) error {
 	uid, ok := userID(c)
@@ -297,6 +316,7 @@ func toAPIProgress(p usecase.Progress) trackingapi.Progress {
 		id := p.NextUnwatched.ID
 		prog.NextUnwatchedEpisodeId = &id
 	}
+	prog.NewFullSeason = p.NewFullSeason
 	return prog
 }
 

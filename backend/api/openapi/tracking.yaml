@@ -169,6 +169,18 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HomeRecommendations' }
         '401': { $ref: '#/components/responses/Error' }
+  /me/stats:
+    get:
+      operationId: getStats
+      summary: Aggregate viewing statistics for the current user
+      description: Counts of watched shows/seasons/episodes, total watch time, and how many shows are tracked in total.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Stats' }
+        '401': { $ref: '#/components/responses/Error' }
   /me/settings:
     get:
       operationId: getSettings
@@ -258,6 +270,12 @@ components:
         total: { type: integer, description: Episodes with a known air date of today or earlier }
         unwatched: { type: integer, description: Aired but not-yet-watched episodes }
         next_unwatched_episode_id: { type: integer, format: int64, nullable: true }
+        new_full_season:
+          type: integer
+          nullable: true
+          description: >-
+            Season number of a fully-aired, completely-unwatched season that dropped while
+            the user was caught up on everything earlier; null when there is no such season.
     TrackedShow:
       type: object
       required: [user_show, show, progress]
@@ -336,6 +354,15 @@ components:
         recommendations:
           type: array
           items: { $ref: '#/components/schemas/ShowRef' }
+    Stats:
+      type: object
+      required: [shows_tracked, shows_completed, seasons_watched, episodes_watched, minutes_watched]
+      properties:
+        shows_tracked: { type: integer, description: Total shows the user tracks }
+        shows_completed: { type: integer, description: Shows with status completed }
+        seasons_watched: { type: integer, description: Seasons whose aired episodes are all watched }
+        episodes_watched: { type: integer, description: Episodes marked watched }
+        minutes_watched: { type: integer, format: int64, description: "Summed runtime of watched episodes, in minutes" }
     Settings:
       type: object
       required: [timezone, is_public]

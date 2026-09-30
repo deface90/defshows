@@ -25,7 +25,7 @@ export interface MyShowRowData {
     season_count?: number
   }
   user_show: { status: string }
-  progress: { watched: number; total: number; unwatched?: number }
+  progress: { watched: number; total: number; unwatched?: number; new_full_season?: number | null }
 }
 
 function seasonLabel(count: number): string {
@@ -52,6 +52,7 @@ export function MyShowRow({
   const pct = progress.total > 0 ? Math.round((progress.watched / progress.total) * 100) : 0
   const hasOriginal = show.original_title && show.original_title !== show.title
   const unwatched = progress.unwatched ?? 0
+  const newSeason = progress.new_full_season ?? null
 
   return (
     <div className="my-show-row">
@@ -82,6 +83,11 @@ export function MyShowRow({
 
             <Group gap="xs" wrap="nowrap" align="center" style={{ minWidth: 0 }}>
               {show.airing_status && <AiringStatusBadge status={show.airing_status} />}
+              {newSeason != null && (
+                <Badge variant="filled" color="teal" style={{ flexShrink: 0 }}>
+                  🆕 Новый сезон {newSeason}
+                </Badge>
+              )}
               {showUnwatched && unwatched > 0 && (
                 <Badge variant="filled" color="brand" style={{ flexShrink: 0 }}>
                   🔴 {unwatched} к просмотру

@@ -105,7 +105,7 @@ func (h *NotificationsHandler) UpdatePrefs(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
-	p, err := h.uc.UpdatePrefs(c.Request().Context(), uid, req.EpisodeRelease, req.SeasonStart, req.WeeklyDigest, req.LeadTimeHours)
+	p, err := h.uc.UpdatePrefs(c.Request().Context(), uid, req.EpisodeRelease, req.SeasonStart, req.SeasonFinale, req.WeeklyDigest, req.LeadTimeHours)
 	if err != nil {
 		return err
 	}
@@ -160,6 +160,7 @@ func toAPIPrefs(p *entity.NotificationPref) notificationsapi.Prefs {
 	return notificationsapi.Prefs{
 		EpisodeRelease: p.EpisodeRelease,
 		SeasonStart:    p.SeasonStart,
+		SeasonFinale:   p.SeasonFinale,
 		WeeklyDigest:   p.WeeklyDigest,
 		Channel:        p.Channel,
 		LeadTimeHours:  p.LeadTimeHours,

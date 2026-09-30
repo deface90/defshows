@@ -5,6 +5,7 @@ const typeLabels: Record<string, string> = {
   episode_released: 'Новый эпизод',
   episode_upcoming: 'Скоро эпизод',
   season_upcoming: 'Скоро сезон',
+  season_finale: 'Финал сезона',
 }
 
 interface NotificationItemProps {

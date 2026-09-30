@@ -40,7 +40,7 @@ func (r *NotificationRepository) GetPrefs(ctx context.Context, userID int64) (*e
 func (r *NotificationRepository) UpsertPrefs(ctx context.Context, p *entity.NotificationPref) error {
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"episode_release", "season_start", "weekly_digest", "channel", "lead_time_hours"}),
+		DoUpdates: clause.AssignmentColumns([]string{"episode_release", "season_start", "season_finale", "weekly_digest", "channel", "lead_time_hours"}),
 	}).Create(p).Error
 }
 
@@ -261,6 +261,45 @@ func (r *NotificationRepository) SeasonUpcomingCandidates(ctx context.Context, n
 		  AND e.air_date::timestamptz <= (?::timestamptz + (COALESCE(p.lead_time_hours, 24) || ' hours')::interval)
 		  AND COALESCE(p.season_start, true) = true
 		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL OR u.fcm_device_token IS NOT NULL)`, now, now).Scan(&out).Error
+	return out, err
+}
+
+// SeasonFinaleCandidates finds recently-aired season finales of watched shows
+// for users who have season_finale enabled and at least one delivery channel.
+// A finale is the highest-numbered episode of a season whose every episode has
+// already aired (the whole season is out). Not gated by lead time — it fires
+// on release, like episode_release.
+func (r *NotificationRepository) SeasonFinaleCandidates(ctx context.Context, since time.Time) ([]EventCandidate, error) {
+	var out []EventCandidate
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT us.user_id           AS user_id,
+		       e.show_id            AS show_id,
+		       e.id                 AS episode_id,
+		       s.title              AS show_title,
+		       e.season_number      AS season_number,
+		       e.episode_number     AS episode_number,
+		       u.telegram_chat_id   AS telegram_chat_id,
+		       u.apns_device_token  AS apns_token,
+		       u.fcm_device_token   AS fcm_token
+		FROM episodes e
+		JOIN shows s       ON s.id = e.show_id
+		JOIN user_shows us ON us.show_id = e.show_id AND us.status = 'watching'
+		JOIN users u       ON u.id = us.user_id
+		LEFT JOIN notification_prefs p ON p.user_id = us.user_id
+		WHERE e.air_date IS NOT NULL
+		  AND e.air_date <= now()::date
+		  AND e.air_date >= ?
+		  AND e.season_number > 0
+		  AND COALESCE(p.season_finale, true) = true
+		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL OR u.fcm_device_token IS NOT NULL)
+		  AND NOT EXISTS (
+		        SELECT 1 FROM episodes e2
+		        WHERE e2.show_id = e.show_id AND e2.season_number = e.season_number
+		          AND e2.episode_number > e.episode_number)
+		  AND NOT EXISTS (
+		        SELECT 1 FROM episodes e3
+		        WHERE e3.show_id = e.show_id AND e3.season_number = e.season_number
+		          AND (e3.air_date IS NULL OR e3.air_date > now()::date))`, since).Scan(&out).Error
 	return out, err
 }
 

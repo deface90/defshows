@@ -137,6 +137,64 @@ func TestNotificationRepository_ReleaseCandidatesAndLinkTokens(t *testing.T) {
 	}
 }
 
+func TestNotificationRepository_SeasonFinaleCandidates(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "users", "shows")
+	repo := repository.NewNotificationRepository(gdb)
+	trackingRepo := repository.NewTrackingRepository(gdb)
+	ctx := context.Background()
+
+	chat := int64(42)
+	user := &entity.User{Email: strptr("finale@example.com"), Role: entity.RoleUser, Timezone: "UTC", TelegramChatID: &chat}
+	if err := gdb.Create(user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	show := &entity.Show{TMDBID: 901, Title: "Finale Show", AiringStatus: entity.AiringNow}
+	if err := gdb.Create(show).Error; err != nil {
+		t.Fatalf("seed show: %v", err)
+	}
+	yesterday := time.Now().AddDate(0, 0, -1)
+	tomorrow := time.Now().AddDate(0, 0, 1)
+	// S1 fully aired (finale = e2); S2 still airing (finale not aired yet).
+	s1 := &entity.Season{ShowID: show.ID, SeasonNumber: 1, EpisodeCount: 2}
+	s2 := &entity.Season{ShowID: show.ID, SeasonNumber: 2, EpisodeCount: 2}
+	gdb.Create(s1)
+	gdb.Create(s2)
+	eps := []*entity.Episode{
+		{SeasonID: s1.ID, ShowID: show.ID, SeasonNumber: 1, EpisodeNumber: 1, Name: "S1E1", AirDate: &yesterday},
+		{SeasonID: s1.ID, ShowID: show.ID, SeasonNumber: 1, EpisodeNumber: 2, Name: "S1E2", AirDate: &yesterday},
+		{SeasonID: s2.ID, ShowID: show.ID, SeasonNumber: 2, EpisodeNumber: 1, Name: "S2E1", AirDate: &yesterday},
+		{SeasonID: s2.ID, ShowID: show.ID, SeasonNumber: 2, EpisodeNumber: 2, Name: "S2E2", AirDate: &tomorrow},
+	}
+	for _, e := range eps {
+		if err := gdb.Create(e).Error; err != nil {
+			t.Fatalf("seed ep: %v", err)
+		}
+	}
+	us := &entity.UserShow{UserID: user.ID, ShowID: show.ID, Status: entity.StatusWatching}
+	if err := trackingRepo.AddUserShow(ctx, us); err != nil {
+		t.Fatalf("add user show: %v", err)
+	}
+
+	since := time.Now().AddDate(0, 0, -7)
+	cands, err := repo.SeasonFinaleCandidates(ctx, since)
+	if err != nil {
+		t.Fatalf("candidates: %v", err)
+	}
+	// Only S1's finale (e2), not S2 (season not fully aired) nor S1E1 (not the finale).
+	if len(cands) != 1 || cands[0].EpisodeID != eps[1].ID || cands[0].SeasonNumber != 1 {
+		t.Fatalf("want 1 finale candidate for S1E2, got %+v", cands)
+	}
+
+	// Disabling season_finale suppresses the candidate.
+	if err := repo.UpsertPrefs(ctx, &entity.NotificationPref{UserID: user.ID, EpisodeRelease: true, SeasonStart: true, SeasonFinale: false, Channel: "telegram", LeadTimeHours: 24}); err != nil {
+		t.Fatalf("set prefs: %v", err)
+	}
+	if cands, _ := repo.SeasonFinaleCandidates(ctx, since); len(cands) != 0 {
+		t.Fatalf("want 0 candidates when season_finale off, got %d", len(cands))
+	}
+}
+
 func TestNotificationRepository_APNsChannel(t *testing.T) {
 	gdb := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, gdb, "users", "shows")

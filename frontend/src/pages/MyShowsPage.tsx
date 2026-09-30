@@ -1,9 +1,10 @@
 import { ActionIcon, Button, Card, Center, Divider, Group, Select, Stack, Tabs, Text, TextInput, Title, Tooltip } from '@mantine/core'
 import { useIntersection } from '@mantine/hooks'
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { MyShowRow } from '@/entities/show/MyShowRow'
 import { STATUS_OPTIONS } from '@/entities/show/status'
+import { StatsButton } from '@/features/stats/StatsButton'
 import { useListTracked } from '@/shared/api/tracking/endpoints'
 import type { TrackedShow } from '@/shared/api/tracking/model'
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
@@ -35,7 +36,20 @@ function pct(t: TrackedShow): number {
 const PAGE = 20
 
 export function MyShowsPage() {
-  const [status, setStatus] = useState('watching')
+  const [searchParams, setSearchParams] = useSearchParams()
+  // The tabs use '' to mean "all"; the URL uses the explicit "all" token.
+  const initialStatus = searchParams.get('status')
+  const [status, setStatusState] = useState(
+    initialStatus === 'all' ? '' : (initialStatus ?? 'watching'),
+  )
+  const setStatus = (next: string) => {
+    setStatusState(next)
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.set('status', next === '' ? 'all' : next)
+      return p
+    })
+  }
   const [airing, setAiring] = useState('')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('progress')
@@ -102,9 +116,12 @@ export function MyShowsPage() {
             Коллекция и прогресс просмотра
           </Text>
         </div>
-        <Button component={Link} to="/search">
-          + Найти сериал
-        </Button>
+        <Group gap="sm">
+          <StatsButton />
+          <Button component={Link} to="/search">
+            + Найти сериал
+          </Button>
+        </Group>
       </Group>
 
       <Card withBorder padding={0}>
