@@ -47,8 +47,15 @@ func (p *Provider) Discover(ctx context.Context, opts provider.DiscoverOptions) 
 
 // Trending returns TV shows trending on TMDB this week — a lighter-weight,
 // unfiltered pick for surfacing "what's popular right now" without a discovery
-// query (the picker's/home page's default view).
+// query (the picker's/home page's default view). The home page hits this on
+// every (guest) visit, so the result is cached for an hour; a failed response
+// never replaces the cache.
 func (p *Provider) Trending(ctx context.Context) (provider.DiscoveryPage, error) {
+	p.trendingMu.Lock()
+	defer p.trendingMu.Unlock()
+	if time.Now().Before(p.trendingExpiry) {
+		return p.trending, nil
+	}
 	resp, err := p.client.TrendingTvWithResponse(ctx, tmdbclient.Week, p.editor)
 	if err != nil {
 		return provider.DiscoveryPage{}, fmt.Errorf("tmdb: trending: %w", safeRequestError(err))
@@ -57,7 +64,9 @@ func (p *Provider) Trending(ctx context.Context) (provider.DiscoveryPage, error)
 		return provider.DiscoveryPage{}, fmt.Errorf("tmdb: trending: unexpected status %d", resp.StatusCode())
 	}
 	page := resp.JSON200
-	return provider.DiscoveryPage{Results: summaries(page.Results), Page: val(page.Page), TotalPages: min(val(page.TotalPages), 500), TotalResults: val(page.TotalResults)}, nil
+	result := provider.DiscoveryPage{Results: summaries(page.Results), Page: val(page.Page), TotalPages: min(val(page.TotalPages), 500), TotalResults: val(page.TotalResults)}
+	p.trending, p.trendingExpiry = result, time.Now().Add(time.Hour)
+	return result, nil
 }
 
 func summaries(results *[]tmdbclient.TvSearchResult) []provider.ShowSummary {

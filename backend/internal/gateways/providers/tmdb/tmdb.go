@@ -22,13 +22,16 @@ const (
 
 // Provider is the TMDB-backed ShowProvider.
 type Provider struct {
-	filtersMu     sync.Mutex
-	filters       provider.DiscoveryFilters
-	filtersExpiry time.Time
-	client        *tmdbclient.ClientWithResponses
-	apiKey        string
-	language      string
-	httpClient    *http.Client
+	filtersMu      sync.Mutex
+	filters        provider.DiscoveryFilters
+	filtersExpiry  time.Time
+	trendingMu     sync.Mutex
+	trending       provider.DiscoveryPage
+	trendingExpiry time.Time
+	client         *tmdbclient.ClientWithResponses
+	apiKey         string
+	language       string
+	httpClient     *http.Client
 }
 
 var _ provider.ShowProvider = (*Provider)(nil)

@@ -41,7 +41,9 @@ func TestDiscoverFiltersAndPagination(t *testing.T) {
 }
 
 func TestTrending(t *testing.T) {
+	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
 		if r.URL.Path != "/3/trending/tv/week" {
 			t.Errorf("path: %s", r.URL.Path)
 		}
@@ -62,6 +64,14 @@ func TestTrending(t *testing.T) {
 	}
 	if page.TotalResults != 1 || len(page.Results) != 1 || page.Results[0].TMDBID != 123 {
 		t.Fatalf("page: %+v", page)
+	}
+	// The home page calls Trending on every guest visit; the result is cached
+	// for an hour, so a second call must not hit TMDB again.
+	if _, err := p.Trending(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("trending not cached: %d upstream calls", calls)
 	}
 }
 
