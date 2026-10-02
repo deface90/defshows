@@ -267,18 +267,18 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: `backend/internal/service/repository/social_repo.go`
 - Modify: `backend/internal/service/repository/social_repo_test.go`
 
-- [ ] add `CreateBlock(ctx, *entity.Block) error` (unique-violation → `ErrConflict`)
-- [ ] add `DeleteBlock(ctx, blockerID, blockedID int64) error` (`RowsAffected==0` → `ErrNotFound`)
-- [ ] add `ListBlocked(ctx, blockerID, limit, offset int) ([]entity.User, int64, error)`
+- [x] add `CreateBlock(ctx, *entity.Block) error` (unique-violation → `ErrConflict`)
+- [x] add `DeleteBlock(ctx, blockerID, blockedID int64) error` (`RowsAffected==0` → `ErrNotFound`)
+- [x] add `ListBlocked(ctx, blockerID, limit, offset int) ([]entity.User, int64, error)`
       (users I blocked, join `blocks`, newest first — mirror `listEdgeUsers`)
-- [ ] add `IsBlockedEither(ctx, a, b int64) (bool, error)` and
+- [x] add `IsBlockedEither(ctx, a, b int64) (bool, error)` and
       `BlockedIDsEither(ctx, userID int64) ([]int64, error)`
-- [ ] add `DeleteFollowEither(ctx, a, b int64) error` (delete both directed follow rows in one
+- [x] add `DeleteFollowEither(ctx, a, b int64) error` (delete both directed follow rows in one
       query; no error if none)
-- [ ] write testcontainers tests: unique(blocker,blocked), self-block CHECK rejected,
+- [x] write testcontainers tests: unique(blocker,blocked), self-block CHECK rejected,
       `IsBlockedEither` both directions, `BlockedIDsEither`, `ListBlocked` pagination,
       `DeleteFollowEither` removes both edges
-- [ ] run `go test ./internal/service/repository/...` — green before next task
+- [x] run `go test ./internal/service/repository/...` — green before next task
 
 #### Task 4: Block usecase + block-aware CanViewProfile/Follow
 

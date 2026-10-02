@@ -148,3 +148,89 @@ func (r *SocialRepository) countEdges(ctx context.Context, where string, id int6
 		Where(where, id, entity.FollowAccepted).Count(&n).Error
 	return n, err
 }
+
+// CreateBlock inserts a block edge. Returns ErrConflict if one already exists.
+func (r *SocialRepository) CreateBlock(ctx context.Context, b *entity.Block) error {
+	if err := r.db.WithContext(ctx).Create(b).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrConflict
+		}
+		return err
+	}
+	return nil
+}
+
+// DeleteBlock removes the directed block edge. Returns ErrNotFound if there was none.
+func (r *SocialRepository) DeleteBlock(ctx context.Context, blockerID, blockedID int64) error {
+	res := r.db.WithContext(ctx).
+		Where("blocker_id = ? AND blocked_id = ?", blockerID, blockedID).
+		Delete(&entity.Block{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListBlocked returns the users the given user has blocked (paginated), newest first.
+func (r *SocialRepository) ListBlocked(ctx context.Context, blockerID int64, limit, offset int) ([]entity.User, int64, error) {
+	base := r.db.WithContext(ctx).Model(&entity.User{}).
+		Joins("JOIN blocks ON blocks.blocked_id = users.id").
+		Where("blocks.blocker_id = ?", blockerID)
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	q := base.Order("blocks.created_at DESC, users.id DESC")
+	if limit > 0 {
+		q = q.Limit(limit).Offset(offset)
+	}
+	var users []entity.User
+	if err := q.Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+// IsBlockedEither reports whether a block exists between the two users in either
+// direction (a blocked b or b blocked a).
+func (r *SocialRepository) IsBlockedEither(ctx context.Context, a, b int64) (bool, error) {
+	var n int64
+	err := r.db.WithContext(ctx).Model(&entity.Block{}).
+		Where("(blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)", a, b, b, a).
+		Count(&n).Error
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// BlockedIDsEither returns the ids of every user involved in a block with the given
+// user in either direction (users they blocked plus users who blocked them).
+func (r *SocialRepository) BlockedIDsEither(ctx context.Context, userID int64) ([]int64, error) {
+	var ids []int64
+	err := r.db.WithContext(ctx).Model(&entity.Block{}).
+		Where("blocker_id = ?", userID).
+		Pluck("blocked_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	var incoming []int64
+	err = r.db.WithContext(ctx).Model(&entity.Block{}).
+		Where("blocked_id = ?", userID).
+		Pluck("blocker_id", &incoming).Error
+	if err != nil {
+		return nil, err
+	}
+	return append(ids, incoming...), nil
+}
+
+// DeleteFollowEither removes both directed follow rows between the two users in one
+// query. Not an error if none existed (used when a block tears down edges).
+func (r *SocialRepository) DeleteFollowEither(ctx context.Context, a, b int64) error {
+	return r.db.WithContext(ctx).
+		Where("(follower_id = ? AND followee_id = ?) OR (follower_id = ? AND followee_id = ?)", a, b, b, a).
+		Delete(&entity.Follow{}).Error
+}
