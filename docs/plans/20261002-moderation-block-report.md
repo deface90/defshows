@@ -491,12 +491,15 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: admin nav/router (wherever the dubbing-studios admin section is registered)
 - Regenerate: `frontend/src/shared/api/admin/*` (via `npm run api:gen`)
 
-- [ ] `npm run api:gen` for admin reports
-- [ ] build a reports table (status filter; reporter/target links; reason/note) with
+- [x] `npm run api:gen` for admin reports (already generated from `admin.yaml`; re-run is a no-op)
+- [x] build a reports table (status filter; reporter/target links; reason/note) with
       Resolve/Dismiss actions → `POST /admin/reports/{id}/resolve`, invalidating the list
-- [ ] register the section under the existing admin area (role-guarded)
-- [ ] write tests: list renders + status filter; resolve/dismiss mutation + refetch
-- [ ] run gate — `npx tsc -b` + `npx vitest run` + `npm run build` — green before next task
+      (`pages/admin/ReportsPage.tsx`; `SegmentedControl` status filter open/resolved/dismissed/all)
+- [x] register the section under the existing admin area (role-guarded) — new `/admin/reports`
+      route under the existing `RequireRole('admin')` guard + shared `AdminNav` sub-nav
+- [x] write tests: list renders + status filter; resolve/dismiss mutation + refetch
+      (`pages/admin/ReportsPage.test.tsx`, 4 tests)
+- [x] run gate — `npx tsc -b` + `npx vitest run` + `npm run build` — green before next task
 
 ### Slice 7 — iOS (write + review here; build/test on Mac/CI)
 
