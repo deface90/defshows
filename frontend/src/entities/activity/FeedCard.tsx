@@ -1,4 +1,5 @@
 import { Badge, Card, Group, Image, Stack, Text } from '@mantine/core'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { FeedCard } from '@/shared/api/social/model'
 
@@ -39,8 +40,18 @@ export function feedCardLabel(card: FeedCard): string {
   }
 }
 
-/** FeedCardView renders a single activity event; actor is shown only on the home feed. */
-export function FeedCardView({ card }: { card: FeedCard }) {
+/**
+ * FeedCardView renders a single activity event; actor is shown only on the home feed.
+ * `renderActorMenu` is an optional page-supplied slot (FSD: entities can't import
+ * features) that mounts moderation controls next to the actor, e.g. Block/Report.
+ */
+export function FeedCardView({
+  card,
+  renderActorMenu,
+}: {
+  card: FeedCard
+  renderActorMenu?: (actorId: number) => ReactNode
+}) {
   const date = new Date(card.created_at).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
@@ -53,9 +64,12 @@ export function FeedCardView({ card }: { card: FeedCard }) {
         )}
         <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
           {card.actor && (
-            <Text size="xs" c="dimmed" truncate>
-              {card.actor.display_name}
-            </Text>
+            <Group gap={4} wrap="nowrap" justify="space-between">
+              <Text size="xs" c="dimmed" truncate>
+                {card.actor.display_name}
+              </Text>
+              {renderActorMenu?.(card.actor.id)}
+            </Group>
           )}
           <Text component={Link} to={`/catalog/${card.show.tmdb_id}`} fw={600} truncate style={{ color: 'inherit' }}>
             {card.show.title}

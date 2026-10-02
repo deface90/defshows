@@ -8,4 +8,6 @@
 export interface UpdateSettingsRequest {
   timezone: string;
   is_public?: boolean;
+  /** New display name; blank resets to the derived default; 1..50 characters otherwise */
+  display_name?: string;
 }

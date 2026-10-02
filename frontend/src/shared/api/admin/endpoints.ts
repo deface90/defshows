@@ -23,7 +23,10 @@ import type {
   DubbingStudio,
   DubbingStudioList,
   DubbingStudioRequest,
-  ErrorResponse
+  ErrorResponse,
+  ListReportsParams,
+  ReportList,
+  ResolveReportRequest
 } from './model';
 
 import { customInstance } from '../http';
@@ -417,6 +420,202 @@ export function useDeleteDubbingStudio<TData = Awaited<ReturnType<typeof deleteD
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getDeleteDubbingStudioQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary List moderation reports (optionally filtered by status)
+ */
+export const listReports = (
+    params?: ListReportsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ReportList>(
+      {url: `/admin/reports`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListReportsQueryKey = (params?: ListReportsParams,) => {
+    return [
+    `/admin/reports`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListReportsQueryOptions = <TData = Awaited<ReturnType<typeof listReports>>, TError = ErrorResponse>(params?: ListReportsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listReports>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListReportsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listReports>>> = ({ signal }) => listReports(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listReports>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListReportsQueryResult = NonNullable<Awaited<ReturnType<typeof listReports>>>
+export type ListReportsQueryError = ErrorResponse
+
+
+export function useListReports<TData = Awaited<ReturnType<typeof listReports>>, TError = ErrorResponse>(
+ params: undefined |  ListReportsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listReports>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listReports>>,
+          TError,
+          Awaited<ReturnType<typeof listReports>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListReports<TData = Awaited<ReturnType<typeof listReports>>, TError = ErrorResponse>(
+ params?: ListReportsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listReports>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listReports>>,
+          TError,
+          Awaited<ReturnType<typeof listReports>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListReports<TData = Awaited<ReturnType<typeof listReports>>, TError = ErrorResponse>(
+ params?: ListReportsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listReports>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List moderation reports (optionally filtered by status)
+ */
+
+export function useListReports<TData = Awaited<ReturnType<typeof listReports>>, TError = ErrorResponse>(
+ params?: ListReportsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listReports>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListReportsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Resolve or dismiss a moderation report
+ */
+export const resolveReport = (
+    id: number,
+    resolveReportRequest: ResolveReportRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/admin/reports/${id}/resolve`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: resolveReportRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getResolveReportQueryKey = (id: number,
+    resolveReportRequest?: ResolveReportRequest,) => {
+    return [
+    'POST', `/admin/reports/${id}/resolve`, resolveReportRequest
+    ] as const;
+    }
+
+
+export const getResolveReportQueryOptions = <TData = Awaited<ReturnType<typeof resolveReport>>, TError = ErrorResponse>(id: number,
+    resolveReportRequest: ResolveReportRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveReport>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getResolveReportQueryKey(id,resolveReportRequest);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof resolveReport>>> = ({ signal }) => resolveReport(id,resolveReportRequest, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof resolveReport>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ResolveReportQueryResult = NonNullable<Awaited<ReturnType<typeof resolveReport>>>
+export type ResolveReportQueryError = ErrorResponse
+
+
+export function useResolveReport<TData = Awaited<ReturnType<typeof resolveReport>>, TError = ErrorResponse>(
+ id: number,
+    resolveReportRequest: ResolveReportRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveReport>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof resolveReport>>,
+          TError,
+          Awaited<ReturnType<typeof resolveReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useResolveReport<TData = Awaited<ReturnType<typeof resolveReport>>, TError = ErrorResponse>(
+ id: number,
+    resolveReportRequest: ResolveReportRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveReport>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof resolveReport>>,
+          TError,
+          Awaited<ReturnType<typeof resolveReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useResolveReport<TData = Awaited<ReturnType<typeof resolveReport>>, TError = ErrorResponse>(
+ id: number,
+    resolveReportRequest: ResolveReportRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveReport>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Resolve or dismiss a moderation report
+ */
+
+export function useResolveReport<TData = Awaited<ReturnType<typeof resolveReport>>, TError = ErrorResponse>(
+ id: number,
+    resolveReportRequest: ResolveReportRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveReport>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getResolveReportQueryOptions(id,resolveReportRequest,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

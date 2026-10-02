@@ -5,6 +5,7 @@ import { ActivityFeed } from '@/entities/activity/ActivityFeed'
 import { MyShowRow } from '@/entities/show/MyShowRow'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
 import { FollowButton } from '@/features/follow/FollowButton'
+import { ModerationMenu } from '@/features/report-user/ModerationMenu'
 import { getProfileFeed } from '@/shared/api/social/endpoints'
 import { useListTracked } from '@/shared/api/tracking/endpoints'
 import { useGetUserProfile, useListUserShows } from '@/shared/api/users/endpoints'
@@ -67,7 +68,12 @@ export function UserProfilePage() {
                 </Text>
               </Group>
             </div>
-            {!isSelf && <FollowButton userId={userId} state={profile.is_following} />}
+            {!isSelf && (
+              <Group gap="xs" wrap="nowrap">
+                <FollowButton userId={userId} state={profile.is_following} />
+                <ModerationMenu userId={userId} />
+              </Group>
+            )}
           </Group>
 
           {!canView ? (

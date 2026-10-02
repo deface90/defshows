@@ -8,4 +8,6 @@
 export interface Settings {
   timezone: string;
   is_public: boolean;
+  /** Effective display name (falls back to a derived default when unset) */
+  display_name: string;
 }

@@ -26,8 +26,11 @@ import type {
   FollowUserList,
   GetHomeFeedParams,
   GetProfileFeedParams,
+  ListBlocksParams,
   ListFollowersParams,
-  ListFollowingParams
+  ListFollowingParams,
+  Report,
+  ReportRequest
 } from './model';
 
 import { customInstance } from '../http';
@@ -224,6 +227,474 @@ export function useUnfollowUser<TData = Awaited<ReturnType<typeof unfollowUser>>
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getUnfollowUserQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Block a user (mutual cut-off). Idempotent.
+ */
+export const blockUser = (
+    userId: number,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me/blocks/${userId}`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getBlockUserQueryKey = (userId: number,) => {
+    return [
+    'POST', `/me/blocks/${userId}`
+    ] as const;
+    }
+
+
+export const getBlockUserQueryOptions = <TData = Awaited<ReturnType<typeof blockUser>>, TError = ErrorResponse>(userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof blockUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBlockUserQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof blockUser>>> = ({ signal }) => blockUser(userId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof blockUser>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type BlockUserQueryResult = NonNullable<Awaited<ReturnType<typeof blockUser>>>
+export type BlockUserQueryError = ErrorResponse
+
+
+export function useBlockUser<TData = Awaited<ReturnType<typeof blockUser>>, TError = ErrorResponse>(
+ userId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof blockUser>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof blockUser>>,
+          TError,
+          Awaited<ReturnType<typeof blockUser>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBlockUser<TData = Awaited<ReturnType<typeof blockUser>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof blockUser>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof blockUser>>,
+          TError,
+          Awaited<ReturnType<typeof blockUser>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBlockUser<TData = Awaited<ReturnType<typeof blockUser>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof blockUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Block a user (mutual cut-off). Idempotent.
+ */
+
+export function useBlockUser<TData = Awaited<ReturnType<typeof blockUser>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof blockUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getBlockUserQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Unblock a user. Idempotent.
+ */
+export const unblockUser = (
+    userId: number,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me/blocks/${userId}`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getUnblockUserQueryKey = (userId: number,) => {
+    return [
+    'DELETE', `/me/blocks/${userId}`
+    ] as const;
+    }
+
+
+export const getUnblockUserQueryOptions = <TData = Awaited<ReturnType<typeof unblockUser>>, TError = ErrorResponse>(userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unblockUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getUnblockUserQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof unblockUser>>> = ({ signal }) => unblockUser(userId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof unblockUser>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type UnblockUserQueryResult = NonNullable<Awaited<ReturnType<typeof unblockUser>>>
+export type UnblockUserQueryError = ErrorResponse
+
+
+export function useUnblockUser<TData = Awaited<ReturnType<typeof unblockUser>>, TError = ErrorResponse>(
+ userId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof unblockUser>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof unblockUser>>,
+          TError,
+          Awaited<ReturnType<typeof unblockUser>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useUnblockUser<TData = Awaited<ReturnType<typeof unblockUser>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unblockUser>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof unblockUser>>,
+          TError,
+          Awaited<ReturnType<typeof unblockUser>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useUnblockUser<TData = Awaited<ReturnType<typeof unblockUser>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unblockUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Unblock a user. Idempotent.
+ */
+
+export function useUnblockUser<TData = Awaited<ReturnType<typeof unblockUser>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unblockUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getUnblockUserQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Users the current user has blocked (paginated)
+ */
+export const listBlocks = (
+    params?: ListBlocksParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<FollowUserList>(
+      {url: `/me/blocks`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListBlocksQueryKey = (params?: ListBlocksParams,) => {
+    return [
+    `/me/blocks`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListBlocksQueryOptions = <TData = Awaited<ReturnType<typeof listBlocks>>, TError = ErrorResponse>(params?: ListBlocksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBlocks>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBlocksQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBlocks>>> = ({ signal }) => listBlocks(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBlocks>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListBlocksQueryResult = NonNullable<Awaited<ReturnType<typeof listBlocks>>>
+export type ListBlocksQueryError = ErrorResponse
+
+
+export function useListBlocks<TData = Awaited<ReturnType<typeof listBlocks>>, TError = ErrorResponse>(
+ params: undefined |  ListBlocksParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBlocks>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listBlocks>>,
+          TError,
+          Awaited<ReturnType<typeof listBlocks>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListBlocks<TData = Awaited<ReturnType<typeof listBlocks>>, TError = ErrorResponse>(
+ params?: ListBlocksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBlocks>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listBlocks>>,
+          TError,
+          Awaited<ReturnType<typeof listBlocks>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListBlocks<TData = Awaited<ReturnType<typeof listBlocks>>, TError = ErrorResponse>(
+ params?: ListBlocksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBlocks>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Users the current user has blocked (paginated)
+ */
+
+export function useListBlocks<TData = Awaited<ReturnType<typeof listBlocks>>, TError = ErrorResponse>(
+ params?: ListBlocksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBlocks>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListBlocksQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary Remove (eject) an existing follower or pending requester. Idempotent.
+ */
+export const removeFollower = (
+    userId: number,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me/followers/${userId}`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getRemoveFollowerQueryKey = (userId: number,) => {
+    return [
+    'DELETE', `/me/followers/${userId}`
+    ] as const;
+    }
+
+
+export const getRemoveFollowerQueryOptions = <TData = Awaited<ReturnType<typeof removeFollower>>, TError = ErrorResponse>(userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof removeFollower>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getRemoveFollowerQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof removeFollower>>> = ({ signal }) => removeFollower(userId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof removeFollower>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type RemoveFollowerQueryResult = NonNullable<Awaited<ReturnType<typeof removeFollower>>>
+export type RemoveFollowerQueryError = ErrorResponse
+
+
+export function useRemoveFollower<TData = Awaited<ReturnType<typeof removeFollower>>, TError = ErrorResponse>(
+ userId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof removeFollower>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof removeFollower>>,
+          TError,
+          Awaited<ReturnType<typeof removeFollower>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useRemoveFollower<TData = Awaited<ReturnType<typeof removeFollower>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof removeFollower>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof removeFollower>>,
+          TError,
+          Awaited<ReturnType<typeof removeFollower>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useRemoveFollower<TData = Awaited<ReturnType<typeof removeFollower>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof removeFollower>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Remove (eject) an existing follower or pending requester. Idempotent.
+ */
+
+export function useRemoveFollower<TData = Awaited<ReturnType<typeof removeFollower>>, TError = ErrorResponse>(
+ userId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof removeFollower>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getRemoveFollowerQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * @summary File a moderation report against another user
+ */
+export const createReport = (
+    reportRequest: ReportRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<Report>(
+      {url: `/me/reports`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: reportRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreateReportQueryKey = (reportRequest?: ReportRequest,) => {
+    return [
+    'POST', `/me/reports`, reportRequest
+    ] as const;
+    }
+
+
+export const getCreateReportQueryOptions = <TData = Awaited<ReturnType<typeof createReport>>, TError = ErrorResponse>(reportRequest: ReportRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof createReport>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCreateReportQueryKey(reportRequest);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof createReport>>> = ({ signal }) => createReport(reportRequest, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof createReport>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CreateReportQueryResult = NonNullable<Awaited<ReturnType<typeof createReport>>>
+export type CreateReportQueryError = ErrorResponse
+
+
+export function useCreateReport<TData = Awaited<ReturnType<typeof createReport>>, TError = ErrorResponse>(
+ reportRequest: ReportRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof createReport>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof createReport>>,
+          TError,
+          Awaited<ReturnType<typeof createReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCreateReport<TData = Awaited<ReturnType<typeof createReport>>, TError = ErrorResponse>(
+ reportRequest: ReportRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof createReport>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof createReport>>,
+          TError,
+          Awaited<ReturnType<typeof createReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCreateReport<TData = Awaited<ReturnType<typeof createReport>>, TError = ErrorResponse>(
+ reportRequest: ReportRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof createReport>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary File a moderation report against another user
+ */
+
+export function useCreateReport<TData = Awaited<ReturnType<typeof createReport>>, TError = ErrorResponse>(
+ reportRequest: ReportRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof createReport>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCreateReportQueryOptions(reportRequest,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
