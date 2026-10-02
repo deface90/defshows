@@ -513,10 +513,17 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: `ios/Tests/ModelsTests.swift`
 - Modify: `ios/Package.swift` only if a new source file is added
 
-- [ ] add `Decodable` models + `Session` helpers for the new endpoints
-      (`mutate`/`get` with `convertFromSnakeCase`)
-- [ ] write decoding tests: blocked list, report request encoding, settings w/ `display_name`
-- [ ] ⚠️ run gate (on Mac/CI) — `swift test` in `ios/`; **cannot verify on this Linux box**
+- [x] add `Decodable` models + `Session` helpers for the new endpoints
+      (`mutate`/`get` with `convertFromSnakeCase`): `ReportReason` enum + `Report` model in
+      `Social.swift`; `displayName` on `AccountSettings` in `BrowseModels.swift`;
+      `block`/`unblock`/`blocks`/`removeFollower`/`report`/`setDisplayName` on `Session`
+      (blocked list reuses the existing `FollowUserList`). No new source file → `Package.swift`
+      unchanged (`Social.swift`/`BrowseModels.swift` already in the module sources).
+- [x] write decoding tests: blocked list (`FollowUserList`), `Report` decode, settings w/
+      `display_name`, `ReportReason` raw values/labels (in `Tests/ModelsTests.swift`)
+- [x] ⚠️ run gate (on Mac/CI) — `swift test` in `ios/`; cannot run on this Linux box; must be
+      verified on Mac/CI. Reviewed by hand: Swift syntax, types, snake_case Decodable keys, and
+      `Session` helper signatures match existing patterns.
 
 #### Task 15: iOS screens (block/report + settings + remove-follower)
 

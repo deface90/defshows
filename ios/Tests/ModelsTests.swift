@@ -188,6 +188,39 @@ final class ModelsTests: XCTestCase {
         XCTAssertNil(last.nextCursor)
     }
 
+    func testAccountSettingsDecodesDisplayName() throws {
+        let settings = try decode(AccountSettings.self, #"{"timezone":"Europe/Moscow","is_public":true,"display_name":"Аня"}"#)
+        XCTAssertEqual(settings.timezone, "Europe/Moscow")
+        XCTAssertTrue(settings.isPublic)
+        XCTAssertEqual(settings.displayName, "Аня")
+    }
+
+    func testBlockedListDecodesAsFollowUserList() throws {
+        // GET /me/blocks reuses the FollowUserList shape.
+        let list = try decode(FollowUserList.self, #"{"users":[{"id":9,"display_name":"Тролль","is_public":false}],"total":1}"#)
+        XCTAssertEqual(list.total, 1)
+        XCTAssertEqual(list.users.first?.id, 9)
+        XCTAssertEqual(list.users.first?.displayName, "Тролль")
+        XCTAssertFalse(list.users.first?.isPublic ?? true)
+    }
+
+    func testReportDecodesEchoedFields() throws {
+        let report = try decode(Report.self, #"{"id":3,"reporter_id":1,"target_user_id":9,"reason":"harassment","note":"грубит","status":"open","created_at":"2026-10-03T10:00:00Z"}"#)
+        XCTAssertEqual(report.id, 3)
+        XCTAssertEqual(report.reporterId, 1)
+        XCTAssertEqual(report.targetUserId, 9)
+        XCTAssertEqual(report.reason, "harassment")
+        XCTAssertEqual(report.note, "грубит")
+        XCTAssertEqual(report.status, "open")
+    }
+
+    func testReportReasonRawValuesMatchServerEnum() throws {
+        // Raw values must match the social.yaml ReportRequest enum exactly.
+        XCTAssertEqual(ReportReason.allCases.map(\.rawValue), ["spam", "harassment", "inappropriate", "other"])
+        XCTAssertEqual(ReportReason.harassment.title, "Оскорбления или травля")
+        XCTAssertEqual(ReportReason(rawValue: "inappropriate"), .inappropriate)
+    }
+
     func testFollowNotificationTitles() throws {
         let request = try decode(FeedItem.self, #"{"id":1,"type":"follow_request","read":false,"payload":"Аня хочет на вас подписаться","created_at":"2026-05-01T10:00:00Z","actor_id":42}"#)
         XCTAssertEqual(request.title, "Запрос на подписку")

@@ -81,3 +81,35 @@ struct FeedCardPage: Decodable {
     let cards: [FeedCard]
     let nextCursor: String?
 }
+
+/// A reason a user can pick when reporting another user. Raw values match the
+/// server `reason` enum (social.yaml `ReportRequest`).
+enum ReportReason: String, CaseIterable, Identifiable {
+    case spam
+    case harassment
+    case inappropriate
+    case other
+
+    var id: String { rawValue }
+
+    /// Russian label shown in the report picker.
+    var title: String {
+        switch self {
+        case .spam: return "Спам"
+        case .harassment: return "Оскорбления или травля"
+        case .inappropriate: return "Неприемлемый контент"
+        case .other: return "Другое"
+        }
+    }
+}
+
+/// A report filed against another user (echoed back by POST /me/reports).
+struct Report: Decodable, Identifiable {
+    let id: Int
+    let reporterId: Int
+    let targetUserId: Int
+    let reason: String
+    let note: String
+    let status: String
+    let createdAt: String
+}

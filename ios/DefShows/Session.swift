@@ -100,6 +100,34 @@ final class Session: ObservableObject {
     func followers(userID: Int) async throws -> FollowUserList { try await get("users/\(userID)/followers") }
     func following(userID: Int) async throws -> FollowUserList { try await get("users/\(userID)/following") }
 
+    // MARK: Moderation (block / report / remove-follower)
+
+    /// Block a user (mutual cut-off). Idempotent on the server.
+    func block(userID: Int) async throws { _ = try await authorized("me/blocks/\(userID)", method: "POST") }
+    /// Unblock a user. Idempotent on the server.
+    func unblock(userID: Int) async throws { _ = try await authorized("me/blocks/\(userID)", method: "DELETE") }
+    /// Users the current user has blocked (paginated, reuses FollowUserList).
+    func blocks() async throws -> FollowUserList { try await get("me/blocks") }
+    /// Eject an existing follower or pending requester. Idempotent on the server.
+    func removeFollower(userID: Int) async throws { _ = try await authorized("me/followers/\(userID)", method: "DELETE") }
+
+    /// File a moderation report against another user. `note` is optional.
+    @discardableResult
+    func report(userID: Int, reason: ReportReason, note: String = "") async throws -> Report {
+        var body: [String: Any] = ["target_user_id": userID, "reason": reason.rawValue]
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { body["note"] = trimmed }
+        let data = try await authorized("me/reports", method: "POST", body: body)
+        return try decoder.decode(Report.self, from: data)
+    }
+
+    // MARK: Settings
+
+    /// Updates the editable display name. Blank resets to the server-derived default.
+    func setDisplayName(_ name: String) async throws {
+        try await mutate("me/settings", method: "PATCH", body: ["display_name": name])
+    }
+
     // MARK: Feeds
 
     func homeFeed(cursor: String? = nil) async throws -> FeedCardPage {

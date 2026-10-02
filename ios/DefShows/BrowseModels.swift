@@ -82,6 +82,8 @@ struct PublicProgress: Decodable { let watched: Int; let total: Int }
 struct AccountSettings: Decodable {
     var timezone: String
     var isPublic: Bool
+    // Effective display name (server falls back to a derived default when unset).
+    var displayName: String
 }
 struct NotificationPreferences: Decodable {
     var episodeRelease: Bool
