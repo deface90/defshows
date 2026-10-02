@@ -286,23 +286,23 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: `backend/internal/service/usecase/social_uc.go`
 - Modify: `backend/internal/service/usecase/social_uc_test.go`
 
-- [ ] extend the `SocialRepo` interface with the Task 3 methods
-- [ ] add `ErrSelfBlock`, `ErrBlocked` domain errors
-- [ ] implement `Block(ctx, blockerID, blockedID)`: self → `ErrSelfBlock`; target exists;
+- [x] extend the `SocialRepo` interface with the Task 3 methods
+- [x] add `ErrSelfBlock`, `ErrBlocked` domain errors
+- [x] implement `Block(ctx, blockerID, blockedID)`: self → `ErrSelfBlock`; target exists;
       `CreateBlock` (idempotent on `ErrConflict`); `DeleteFollowEither`;
       `clearFollowNotifications` both directions
-- [ ] implement `Unblock(ctx, blockerID, blockedID)` (idempotent) and
+- [x] implement `Unblock(ctx, blockerID, blockedID)` (idempotent) and
       `Blocked(ctx, userID, limit, offset)`
-- [ ] make `CanViewProfile` return `false` when `IsBlockedEither` (short-circuit first)
-- [ ] make `Follow` return `ErrBlocked` when `IsBlockedEither`
-- [ ] make `Approve` block-safe: if `IsBlockedEither`, return a no-op (do **not** blanket-
+- [x] make `CanViewProfile` return `false` when `IsBlockedEither` (short-circuit first)
+- [x] make `Follow` return `ErrBlocked` when `IsBlockedEither`
+- [x] make `Approve` block-safe: if `IsBlockedEither`, return a no-op (do **not** blanket-
       swallow `ErrNotFound` — the handler's existing 404 "no pending request" for a genuinely
       absent edge must be preserved)
-- [ ] write usecase tests (fakes): block idempotency, self-block error, edges torn down +
+- [x] write usecase tests (fakes): block idempotency, self-block error, edges torn down +
       notifications cleared, re-follow after block → `ErrBlocked`, `CanViewProfile` blocked
       matrix (either direction), unblock restores viewability for a public target,
       `Approve` after the counterpart blocked = no-op (no error)
-- [ ] run `go test ./internal/service/usecase/...` — green before next task
+- [x] run `go test ./internal/service/usecase/...` — green before next task
 
 #### Task 5: Block contract + handler + directory-search exclusion
 

@@ -12,11 +12,58 @@ import (
 
 // fakeSocialRepo is an in-memory SocialRepo keyed by (follower, followee).
 type fakeSocialRepo struct {
-	edges map[[2]int64]*entity.Follow
+	edges  map[[2]int64]*entity.Follow
+	blocks map[[2]int64]bool // (blocker, blocked)
 }
 
 func newFakeSocialRepo() *fakeSocialRepo {
-	return &fakeSocialRepo{edges: map[[2]int64]*entity.Follow{}}
+	return &fakeSocialRepo{edges: map[[2]int64]*entity.Follow{}, blocks: map[[2]int64]bool{}}
+}
+
+func (r *fakeSocialRepo) CreateBlock(_ context.Context, b *entity.Block) error {
+	k := [2]int64{b.BlockerID, b.BlockedID}
+	if r.blocks[k] {
+		return repository.ErrConflict
+	}
+	r.blocks[k] = true
+	return nil
+}
+func (r *fakeSocialRepo) DeleteBlock(_ context.Context, blocker, blocked int64) error {
+	k := [2]int64{blocker, blocked}
+	if !r.blocks[k] {
+		return repository.ErrNotFound
+	}
+	delete(r.blocks, k)
+	return nil
+}
+func (r *fakeSocialRepo) ListBlocked(_ context.Context, blocker int64, _, _ int) ([]entity.User, int64, error) {
+	var out []entity.User
+	for k := range r.blocks {
+		if k[0] == blocker {
+			out = append(out, entity.User{ID: k[1]})
+		}
+	}
+	return out, int64(len(out)), nil
+}
+func (r *fakeSocialRepo) IsBlockedEither(_ context.Context, a, b int64) (bool, error) {
+	return r.blocks[[2]int64{a, b}] || r.blocks[[2]int64{b, a}], nil
+}
+func (r *fakeSocialRepo) BlockedIDsEither(_ context.Context, userID int64) ([]int64, error) {
+	var out []int64
+	for k := range r.blocks {
+		switch userID {
+		case k[0]:
+			out = append(out, k[1])
+		case k[1]:
+			out = append(out, k[0])
+		}
+	}
+	return out, nil
+}
+func (r *fakeSocialRepo) DeleteFollowEither(_ context.Context, a, b int64) error {
+	delete(r.edges, [2]int64{a, b})
+	delete(r.edges, [2]int64{b, a})
+	return nil
 }
 
 func (r *fakeSocialRepo) CreateFollow(_ context.Context, f *entity.Follow) error {
@@ -324,6 +371,123 @@ func TestSocialUsecase_AutoAcceptOnPublic(t *testing.T) {
 	}
 	if followers, _, _ := uc.Followers(ctx, priv, 10, 0); len(followers) != 2 {
 		t.Fatalf("accepted followers after going public: %d", len(followers))
+	}
+}
+
+func TestSocialUsecase_Block(t *testing.T) {
+	ctx := context.Background()
+	const pub, priv = int64(2), int64(3)
+
+	// Self-block rejected.
+	uc, _ := newSocialUC(pub, priv)
+	if err := uc.Block(ctx, pub, pub); !errors.Is(err, usecase.ErrSelfBlock) {
+		t.Fatalf("self-block: want ErrSelfBlock, got %v", err)
+	}
+	// Unknown target rejected.
+	if err := uc.Block(ctx, pub, 999); !errors.Is(err, usecase.ErrUserNotFound) {
+		t.Fatalf("unknown target: want ErrUserNotFound, got %v", err)
+	}
+
+	// Block tears down both follow edges and clears both pairs' notifications.
+	uc, notifier := newSocialUC(pub, priv)
+	if _, err := uc.Follow(ctx, pub, priv); err != nil { // pub -> priv (pending, notifies priv)
+		t.Fatalf("follow pub->priv: %v", err)
+	}
+	if _, err := uc.Follow(ctx, priv, pub); err != nil { // priv -> pub (accepted)
+		t.Fatalf("follow priv->pub: %v", err)
+	}
+	if len(notifier.created) == 0 {
+		t.Fatal("expected a follow_request notification before block")
+	}
+	if err := uc.Block(ctx, pub, priv); err != nil {
+		t.Fatalf("block: %v", err)
+	}
+	if state, _ := uc.FollowState(ctx, pub, priv); state != "none" {
+		t.Fatalf("pub->priv edge should be gone after block, got %s", state)
+	}
+	if state, _ := uc.FollowState(ctx, priv, pub); state != "none" {
+		t.Fatalf("priv->pub edge should be gone after block, got %s", state)
+	}
+	if len(notifier.created) != 0 {
+		t.Fatalf("block should clear follow notifications, got %+v", notifier.created)
+	}
+
+	// Re-block is idempotent.
+	if err := uc.Block(ctx, pub, priv); err != nil {
+		t.Fatalf("re-block should be idempotent: %v", err)
+	}
+
+	// Re-follow after block is rejected in both directions.
+	if _, err := uc.Follow(ctx, pub, priv); !errors.Is(err, usecase.ErrBlocked) {
+		t.Fatalf("follow by blocker: want ErrBlocked, got %v", err)
+	}
+	if _, err := uc.Follow(ctx, priv, pub); !errors.Is(err, usecase.ErrBlocked) {
+		t.Fatalf("follow by blocked: want ErrBlocked, got %v", err)
+	}
+
+	// Blocked list contains the blocked user.
+	blocked, total, err := uc.Blocked(ctx, pub, 10, 0)
+	if err != nil || total != 1 || len(blocked) != 1 || blocked[0].ID != priv {
+		t.Fatalf("blocked list: %v total=%d %+v", err, total, blocked)
+	}
+
+	// Unblock restores viewability for a public target and re-follow works again.
+	if err := uc.Unblock(ctx, pub, priv); err != nil {
+		t.Fatalf("unblock: %v", err)
+	}
+	if err := uc.Unblock(ctx, pub, priv); err != nil {
+		t.Fatalf("second unblock should be no-op: %v", err)
+	}
+	if ok, _ := uc.CanViewProfile(ctx, priv, pub); !ok {
+		t.Fatal("after unblock, blocked user should view the public profile again")
+	}
+	if _, err := uc.Follow(ctx, priv, pub); err != nil {
+		t.Fatalf("re-follow after unblock: %v", err)
+	}
+}
+
+func TestSocialUsecase_CanViewProfile_Blocked(t *testing.T) {
+	ctx := context.Background()
+	const pub, other = int64(2), int64(3)
+
+	// A blocks the public user B → neither can view the other (either direction).
+	uc, _ := newSocialUC(pub, other)
+	if err := uc.Block(ctx, other, pub); err != nil {
+		t.Fatalf("block: %v", err)
+	}
+	if ok, _ := uc.CanViewProfile(ctx, other, pub); ok {
+		t.Fatal("blocker should NOT view the blocked user's profile")
+	}
+	if ok, _ := uc.CanViewProfile(ctx, pub, other); ok {
+		t.Fatal("blocked user should NOT view the blocker's profile")
+	}
+	// A guest (viewer 0) is unaffected by the block and sees the public profile.
+	if ok, _ := uc.CanViewProfile(ctx, 0, pub); !ok {
+		t.Fatal("guest should still view the public profile")
+	}
+}
+
+func TestSocialUsecase_Approve_BlockedIsNoop(t *testing.T) {
+	ctx := context.Background()
+	const pub, priv = int64(2), int64(3)
+	uc, _ := newSocialUC(pub, priv)
+
+	// pub requests to follow priv (pending), then priv blocks pub which tears the edge.
+	if _, err := uc.Follow(ctx, pub, priv); err != nil {
+		t.Fatalf("follow: %v", err)
+	}
+	if err := uc.Block(ctx, priv, pub); err != nil {
+		t.Fatalf("block: %v", err)
+	}
+	// Approving the (now gone) request is a no-op, not a 404-producing ErrNotFound.
+	if err := uc.Approve(ctx, priv, pub); err != nil {
+		t.Fatalf("approve after block should be a no-op, got %v", err)
+	}
+
+	// A genuinely absent request (no block) still surfaces ErrNotFound.
+	uc2, _ := newSocialUC(pub, priv)
+	if err := uc2.Approve(ctx, priv, pub); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("approve with no pending request: want ErrNotFound, got %v", err)
 	}
 }
 

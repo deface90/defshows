@@ -13,6 +13,8 @@ import (
 var (
 	ErrSelfFollow   = errors.New("usecase: cannot follow yourself")
 	ErrUserNotFound = errors.New("usecase: user not found")
+	ErrSelfBlock    = errors.New("usecase: cannot block yourself")
+	ErrBlocked      = errors.New("usecase: blocked")
 )
 
 // SocialRepo is the follow-storage dependency of SocialUsecase.
@@ -27,6 +29,13 @@ type SocialRepo interface {
 	ListIncoming(ctx context.Context, userID int64) ([]entity.User, error)
 	CountFollowers(ctx context.Context, userID int64) (int64, error)
 	CountFollowing(ctx context.Context, userID int64) (int64, error)
+
+	CreateBlock(ctx context.Context, b *entity.Block) error
+	DeleteBlock(ctx context.Context, blockerID, blockedID int64) error
+	ListBlocked(ctx context.Context, blockerID int64, limit, offset int) ([]entity.User, int64, error)
+	IsBlockedEither(ctx context.Context, a, b int64) (bool, error)
+	BlockedIDsEither(ctx context.Context, userID int64) ([]int64, error)
+	DeleteFollowEither(ctx context.Context, a, b int64) error
 }
 
 // SocialUserRepo looks up users for visibility and existence checks.
@@ -127,6 +136,13 @@ func (uc *SocialUsecase) Follow(ctx context.Context, followerID, followeeID int6
 	if followerID == followeeID {
 		return nil, ErrSelfFollow
 	}
+	blocked, err := uc.repo.IsBlockedEither(ctx, followerID, followeeID)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, ErrBlocked
+	}
 	target, err := uc.users.FindUserByID(ctx, followeeID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -171,8 +187,16 @@ func (uc *SocialUsecase) Unfollow(ctx context.Context, followerID, followeeID in
 }
 
 // Approve accepts a pending request from followerID to ownerID and notifies the
-// follower.
+// follower. If a block exists in either direction the request's edge has already been
+// torn down, so Approve is a no-op (rather than surfacing a confusing 404) — but a
+// genuinely absent edge still returns the repo's ErrNotFound so the handler's existing
+// "no pending request" 404 is preserved.
 func (uc *SocialUsecase) Approve(ctx context.Context, ownerID, followerID int64) error {
+	if blocked, err := uc.repo.IsBlockedEither(ctx, ownerID, followerID); err != nil {
+		return err
+	} else if blocked {
+		return nil
+	}
 	if err := uc.repo.SetFollowStatus(ctx, followerID, ownerID, entity.FollowAccepted); err != nil {
 		return err
 	}
@@ -237,6 +261,15 @@ func (uc *SocialUsecase) CanViewProfile(ctx context.Context, viewerID, targetID 
 	if viewerID != 0 && viewerID == targetID {
 		return true, nil
 	}
+	if viewerID != 0 {
+		blocked, err := uc.repo.IsBlockedEither(ctx, viewerID, targetID)
+		if err != nil {
+			return false, err
+		}
+		if blocked {
+			return false, nil
+		}
+	}
 	target, err := uc.users.FindUserByID(ctx, targetID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -264,4 +297,57 @@ func (uc *SocialUsecase) CanViewProfile(ctx context.Context, viewerID, targetID 
 // public. Call this after persisting the visibility change.
 func (uc *SocialUsecase) OnProfileMadePublic(ctx context.Context, userID int64) error {
 	return uc.repo.AcceptAllPending(ctx, userID)
+}
+
+// Block establishes a block from blockerID to blockedID: a mutual visibility cut-off.
+// It tears down follow edges in both directions and clears their follow notifications so
+// no stale request/accepted lingers. Idempotent: re-blocking an already-blocked user is a
+// no-op. Blocking is intentionally not reported to the blocked user.
+func (uc *SocialUsecase) Block(ctx context.Context, blockerID, blockedID int64) error {
+	if blockerID == blockedID {
+		return ErrSelfBlock
+	}
+	if _, err := uc.users.FindUserByID(ctx, blockedID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+	b := &entity.Block{BlockerID: blockerID, BlockedID: blockedID}
+	if err := uc.repo.CreateBlock(ctx, b); err != nil && !errors.Is(err, repository.ErrConflict) {
+		return err
+	}
+	if err := uc.repo.DeleteFollowEither(ctx, blockerID, blockedID); err != nil {
+		return err
+	}
+	uc.clearFollowNotifications(ctx, blockerID, blockedID)
+	uc.clearFollowNotifications(ctx, blockedID, blockerID)
+	return nil
+}
+
+// Unblock removes the directed block from blockerID to blockedID. Idempotent: no error
+// when there was no block.
+func (uc *SocialUsecase) Unblock(ctx context.Context, blockerID, blockedID int64) error {
+	err := uc.repo.DeleteBlock(ctx, blockerID, blockedID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil
+	}
+	return err
+}
+
+// Blocked returns the users the given user has blocked (paginated).
+func (uc *SocialUsecase) Blocked(ctx context.Context, userID int64, limit, offset int) ([]entity.User, int64, error) {
+	return uc.repo.ListBlocked(ctx, userID, limit, offset)
+}
+
+// BlockedIDs returns the ids of every user involved in a block with the given user in
+// either direction — the exclusion set for directory search.
+func (uc *SocialUsecase) BlockedIDs(ctx context.Context, userID int64) ([]int64, error) {
+	return uc.repo.BlockedIDsEither(ctx, userID)
+}
+
+// IsBlockedEither reports whether a block exists between the two users in either
+// direction.
+func (uc *SocialUsecase) IsBlockedEither(ctx context.Context, a, b int64) (bool, error) {
+	return uc.repo.IsBlockedEither(ctx, a, b)
 }
