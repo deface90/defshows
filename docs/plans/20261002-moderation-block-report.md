@@ -558,14 +558,15 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 
 ### Task 16: Verify acceptance criteria
 
-- [ ] all Overview requirements implemented (block mutual cut-off, report + admin review,
+- [x] all Overview requirements implemented (block mutual cut-off, report + admin review,
       remove-follower, editable display_name)
-- [ ] edge cases: self-block/self-report, double-block idempotency, re-follow after block
+- [x] edge cases: self-block/self-report, double-block idempotency, re-follow after block
       blocked, blocked users absent from search/feed/lists, name validation
-- [ ] full backend suite: `go test ./...` (with Docker) + `go vet` clean
-- [ ] web gate: `npx tsc -b` && `npx vitest run` && `npm run build` — green
-- [ ] ⚠️ iOS on Mac/CI: `swift test` + Xcode build (cannot run on this Linux box)
-- [ ] confirm no generated files were hand-edited (re-running codegen is a no-op)
+- [x] full backend suite: `go test ./...` (with Docker) + `go vet` clean
+- [x] web gate: `npx tsc -b` && `npx vitest run` && `npm run build` — green
+- [x] ⚠️ iOS on Mac/CI: `swift test` + Xcode build — cannot run on Linux; verify on Mac/CI
+- [x] confirm no generated files were hand-edited (re-running codegen is a no-op:
+      `make generate` + `npm run api:gen` produced NO git diff)
 
 ### Task 17: Documentation
 
