@@ -379,15 +379,15 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Create: `backend/internal/service/usecase/report_uc.go`
 - Create: `backend/internal/service/usecase/report_uc_test.go`
 
-- [ ] define `ReportRepo` interface + a user-lookup dep (mirror the existing `SocialUserRepo`
+- [x] define `ReportRepo` interface + a user-lookup dep (mirror the existing `SocialUserRepo`
       `FindUserByID` pattern — do not invent a new lookup shape); `ErrSelfReport`, `ErrInvalidReason`
-- [ ] `Report(ctx, reporterID, targetID, reason, note)`: validate reason ∈ set, `note` ≤ 1000
+- [x] `Report(ctx, reporterID, targetID, reason, note)`: validate reason ∈ set, `note` ≤ 1000
       runes, self-report → `ErrSelfReport`, target exists (else `ErrUserNotFound`); insert `open`
-- [ ] `ListReports(ctx, status, limit, offset)` and
+- [x] `ListReports(ctx, status, limit, offset)` and
       `ResolveReport(ctx, id, adminID, status)` (status ∈ {resolved, dismissed}, else error)
-- [ ] write usecase tests (fakes): valid report; invalid reason; self-report; unknown target;
+- [x] write usecase tests (fakes): valid report; invalid reason; self-report; unknown target;
       list filter; resolve valid + invalid status
-- [ ] run `go test ./internal/service/usecase/...` — green before next task
+- [x] run `go test ./internal/service/usecase/...` — green before next task
 
 #### Task 9: Report contract + user handler + admin handler
 
