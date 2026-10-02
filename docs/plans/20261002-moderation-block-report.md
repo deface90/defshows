@@ -252,12 +252,12 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Create: `backend/internal/service/entity/report.go`
 - Modify/Create: `backend/internal/service/entity/social_test.go` (+ report entity test)
 
-- [ ] add `Block` struct (+ `TableName "blocks"`)
-- [ ] add `Report` struct (+ `TableName "reports"`), `ReportReason` consts
+- [x] add `Block` struct (+ `TableName "blocks"`)
+- [x] add `Report` struct (+ `TableName "reports"`), `ReportReason` consts
       (`spam`/`harassment`/`inappropriate`/`other`), `ReportStatus` consts
       (`open`/`resolved`/`dismissed`)
-- [ ] write entity tests asserting `TableName()` values (blocks, reports)
-- [ ] run `go build ./...` + `go test ./internal/service/entity/...` — green before next task
+- [x] write entity tests asserting `TableName()` values (blocks, reports)
+- [x] run `go build ./...` + `go test ./internal/service/entity/...` — green before next task
 
 ### Slice 2 — Block (backend)
 

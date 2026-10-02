@@ -54,3 +54,16 @@ type ActivityEvent struct {
 
 // TableName maps ActivityEvent to the activity_events table.
 func (ActivityEvent) TableName() string { return "activity_events" }
+
+// Block is a directed block edge: BlockerID has blocked BlockedID. Treated as
+// symmetric for visibility (either direction hides the pair from each other)
+// while the directed row records who blocked whom (only the blocker can unblock).
+type Block struct {
+	ID        int64 `gorm:"primaryKey"`
+	BlockerID int64
+	BlockedID int64
+	CreatedAt time.Time
+}
+
+// TableName maps Block to the blocks table.
+func (Block) TableName() string { return "blocks" }
