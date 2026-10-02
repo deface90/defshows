@@ -69,6 +69,7 @@ func main() {
 	homeRepo := repository.NewHomeRepository(gdb)
 	socialRepo := repository.NewSocialRepository(gdb)
 	activityRepo := repository.NewActivityRepository(gdb)
+	reportRepo := repository.NewReportRepository(gdb)
 
 	notificationRepo := repository.NewNotificationRepository(gdb)
 	notesRepo := repository.NewNotesRepository(gdb)
@@ -91,6 +92,7 @@ func main() {
 	homeUC := usecase.NewHomeUsecase(homeRepo)
 	socialUC := usecase.NewSocialUsecase(socialRepo, userRepo, notificationRepo)
 	feedUC := usecase.NewFeedUsecase(activityRepo, socialRepo, cfg.Social.FeedGroupWindow)
+	reportUC := usecase.NewReportUsecase(reportRepo, userRepo)
 	notificationUC := usecase.NewNotificationUsecase(notificationRepo, userRepo, cfg.Telegram.Username, cfg.Notifier.LinkTTL)
 	notesUC := usecase.NewNotesUsecase(notesRepo)
 
@@ -100,9 +102,9 @@ func main() {
 	trackingH := httpapi.NewTrackingHandler(trackingUC, homeUC, authUC, socialUC)
 	notificationsH := httpapi.NewNotificationsHandler(notificationUC)
 	notesH := httpapi.NewNotesHandler(notesUC)
-	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb))
+	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb), reportUC, userRepo)
 	usersH := httpapi.NewUsersHandler(authUC, trackingUC, socialUC)
-	socialH := httpapi.NewSocialHandler(socialUC, feedUC, catalogUC, userRepo)
+	socialH := httpapi.NewSocialHandler(socialUC, feedUC, reportUC, catalogUC, userRepo)
 
 	e := httpapi.NewWebRouter(authH, showsH, trackingH, notificationsH, notesH, adminH, usersH, socialH, jwtMgr, imageStore, proxyClient, cfg.Server.CORSAllowedOrigins...)
 	logger.Info("web service starting", "addr", cfg.Server.Addr)

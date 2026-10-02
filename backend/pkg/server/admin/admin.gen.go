@@ -12,11 +12,96 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/labstack/echo/v4"
 	"github.com/oapi-codegen/runtime"
 )
+
+// Defines values for ReportReason.
+const (
+	Harassment    ReportReason = "harassment"
+	Inappropriate ReportReason = "inappropriate"
+	Other         ReportReason = "other"
+	Spam          ReportReason = "spam"
+)
+
+// Valid indicates whether the value is a known member of the ReportReason enum.
+func (e ReportReason) Valid() bool {
+	switch e {
+	case Harassment:
+		return true
+	case Inappropriate:
+		return true
+	case Other:
+		return true
+	case Spam:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReportStatus.
+const (
+	ReportStatusDismissed ReportStatus = "dismissed"
+	ReportStatusOpen      ReportStatus = "open"
+	ReportStatusResolved  ReportStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the ReportStatus enum.
+func (e ReportStatus) Valid() bool {
+	switch e {
+	case ReportStatusDismissed:
+		return true
+	case ReportStatusOpen:
+		return true
+	case ReportStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolveReportRequestStatus.
+const (
+	ResolveReportRequestStatusDismissed ResolveReportRequestStatus = "dismissed"
+	ResolveReportRequestStatusResolved  ResolveReportRequestStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the ResolveReportRequestStatus enum.
+func (e ResolveReportRequestStatus) Valid() bool {
+	switch e {
+	case ResolveReportRequestStatusDismissed:
+		return true
+	case ResolveReportRequestStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListReportsParamsStatus.
+const (
+	ListReportsParamsStatusDismissed ListReportsParamsStatus = "dismissed"
+	ListReportsParamsStatusOpen      ListReportsParamsStatus = "open"
+	ListReportsParamsStatusResolved  ListReportsParamsStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the ListReportsParamsStatus enum.
+func (e ListReportsParamsStatus) Valid() bool {
+	switch e {
+	case ListReportsParamsStatusDismissed:
+		return true
+	case ListReportsParamsStatusOpen:
+		return true
+	case ListReportsParamsStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
 
 // DubbingStudio defines model for DubbingStudio.
 type DubbingStudio struct {
@@ -43,11 +128,62 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Report defines model for Report.
+type Report struct {
+	CreatedAt  time.Time         `json:"created_at"`
+	Id         int64             `json:"id"`
+	Note       string            `json:"note"`
+	Reason     ReportReason      `json:"reason"`
+	Reporter   ReportUserSummary `json:"reporter"`
+	ResolvedAt *time.Time        `json:"resolved_at,omitempty"`
+	Status     ReportStatus      `json:"status"`
+	Target     ReportUserSummary `json:"target"`
+}
+
+// ReportReason defines model for Report.Reason.
+type ReportReason string
+
+// ReportStatus defines model for Report.Status.
+type ReportStatus string
+
+// ReportList defines model for ReportList.
+type ReportList struct {
+	Reports []Report `json:"reports"`
+	Total   int64    `json:"total"`
+}
+
+// ReportUserSummary defines model for ReportUserSummary.
+type ReportUserSummary struct {
+	DisplayName string `json:"display_name"`
+	Id          int64  `json:"id"`
+}
+
+// ResolveReportRequest defines model for ResolveReportRequest.
+type ResolveReportRequest struct {
+	Status ResolveReportRequestStatus `json:"status"`
+}
+
+// ResolveReportRequestStatus defines model for ResolveReportRequest.Status.
+type ResolveReportRequestStatus string
+
+// ListReportsParams defines parameters for ListReports.
+type ListReportsParams struct {
+	Status   *ListReportsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	Page     *int                     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int                     `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListReportsParamsStatus defines parameters for ListReports.
+type ListReportsParamsStatus string
+
 // CreateDubbingStudioJSONRequestBody defines body for CreateDubbingStudio for application/json ContentType.
 type CreateDubbingStudioJSONRequestBody = DubbingStudioRequest
 
 // UpdateDubbingStudioJSONRequestBody defines body for UpdateDubbingStudio for application/json ContentType.
 type UpdateDubbingStudioJSONRequestBody = DubbingStudioRequest
+
+// ResolveReportJSONRequestBody defines body for ResolveReport for application/json ContentType.
+type ResolveReportJSONRequestBody = ResolveReportRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -63,6 +199,12 @@ type ServerInterface interface {
 	// UpdateDubbingStudio Update a dubbing studio
 	// (PUT /admin/dubbing-studios/{id})
 	UpdateDubbingStudio(ctx echo.Context, id int64) error
+	// ListReports List moderation reports (optionally filtered by status)
+	// (GET /admin/reports)
+	ListReports(ctx echo.Context, params ListReportsParams) error
+	// ResolveReport Resolve or dismiss a moderation report
+	// (POST /admin/reports/{id}/resolve)
+	ResolveReport(ctx echo.Context, id int64) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -120,6 +262,54 @@ func (w *ServerInterfaceWrapper) UpdateDubbingStudio(ctx echo.Context) error {
 	return err
 }
 
+// ListReports converts echo context to params.
+func (w *ServerInterfaceWrapper) ListReports(ctx echo.Context) error {
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListReportsParams
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", ctx.QueryParams(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter status: %s", err))
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", ctx.QueryParams(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page: %s", err))
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", ctx.QueryParams(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page_size: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListReports(ctx, params)
+	return err
+}
+
+// ResolveReport converts echo context to params.
+func (w *ServerInterfaceWrapper) ResolveReport(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ResolveReport(ctx, id)
+	return err
+}
+
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -171,6 +361,8 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/admin/dubbing-studios", wrapper.CreateDubbingStudio, options.OperationMiddlewares["createDubbingStudio"]...)
 	router.DELETE(options.BaseURL+"/admin/dubbing-studios/:id", wrapper.DeleteDubbingStudio, options.OperationMiddlewares["deleteDubbingStudio"]...)
 	router.PUT(options.BaseURL+"/admin/dubbing-studios/:id", wrapper.UpdateDubbingStudio, options.OperationMiddlewares["updateDubbingStudio"]...)
+	router.GET(options.BaseURL+"/admin/reports", wrapper.ListReports, options.OperationMiddlewares["listReports"]...)
+	router.POST(options.BaseURL+"/admin/reports/:id/resolve", wrapper.ResolveReport, options.OperationMiddlewares["resolveReport"]...)
 
 }
 
@@ -179,17 +371,23 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"zFXBbts4EP0VY3aPWkvZGHvQLZu0QNqiLZoWPQRGQYtjm4FFMsNRCsPgvxckLUeK1BpIk7Y3mkM/vnnv",
-	"DbWDytTWaNTsoNwBobNGO4w/XhAZCovKaEbNYSms3ahKsDI6v3FGhz1XrbEWYfU34RJK+Cu/R81T1eUJ",
-	"zXufgURXkbIBBEpoC9keKN590SwWSq+uuJHKhA1LxiKxStRExeoOw4q3FqGEhTEbFBp8BkqG/aWhWjCU",
-	"oDT/N4OsPag04wopHNSi7kI4JqVXoeAU45eGNiNFnwHhbaMIJZTX4a49TtZymh+uMosbrDgA9rp5oxwP",
-	"O3KxFpeKsXbH5OwL5A+XCiKxHfBs0Y+S+4C3DY7x+5HiTyBkhBhjdwhhn06NzokVHgduDw6xAz+sGlK8",
-	"vQqiJuAFCkI6a3h9/+tlm6VXnz/CPqZRgli9z9aa2aaEK72MqWXFm1CRuLxam69uciZrpSdn7y8hgzsk",
-	"l0agmJ5Mi9CtsaiFVVDC6bSYnkIGVvA6EstF+Gsuk1v/dPKywuhXkCcO5qWEEkLKes46yPrj/W9RPNlw",
-	"DwM+MujvXocWZ8Xp99AO9PLOm9DUtaDtvqPJvv1J277PwBo30v85oWDsT0lKBjr+38jt8/Tezo/v55Cp",
-	"QT/Q/+R5OIxpn+SQP2VAwpiIBybEU+PpzHdK+nCZxA0yDl26iPsPXbKCRI2M5KC83oEKDYQ5aN/aMr27",
-	"fXmzjlRHH38/H5gxSzy7or01k/O9O1G32eN0S02O6JaBbUai+8lK8ftE+ZMGpPh1A9I+To/0OHk2Nhud",
-	"z0w0rvuBuZ77uf8WAAD//w==",
+	"1FZbb9s2FP4rwtkeNoCNlTbYg96ydgO6DduQrNhDYAS0eWyzkEiGPMqmBfrvA0lJliK6dtNmlzwxpHwu",
+	"3/edywOsdWW0QkUOigew6IxWDsM/31mrrT+stSJU5I/cmFKuOUmtFu+dVv7OrXdYcX/60uIGCvhisbe6",
+	"iK9uEa21bctAoFtbabwRKKB/YJ2h4PtNvVpJtb2mWkjtL4zVBi3JGBpfk7xHf6LGIBSw0rpErqBlIIW/",
+	"32hbcYICpKJvLoD1H0pFuEXrP1S8GptwZKXa+gcnCW9rWyYeWwYW72ppUUBx4311dlgf03JwpVfvcU3e",
+	"4CSbn6SjeUYuvIWjJKzcMTinALWDU24tb2Zx9taPBneFdzWm4vsQ4p8ByGAiFd0gwmk4FTrHt3jccP9h",
+	"yvYVGm0Tua4tckJxy2miJMEJX5AMZM9SPV11mtJgWeRdQaGqq8Ca4RUw2HHLnat8BTKQihsfrZWcfCCa",
+	"dmhH2Y3t+ezQHlNSROGdQ3tdVxW3Tfyx0+X9R2LgiFPtxhlogwr21oCBkK6SzqFIxkzcbpGeEHGqLgcA",
+	"BrsDyB0NQ8hszPlhqaRLN/o5vXQ72c1qlgFp4uVJOnqUbx9Cb+JwCmPUZpkI6UzJm9uDBX2iylNsTGyn",
+	"4wsiiWEe7ENzjZ0orllHDHbmgXgd47q2kpprT1h0u0Ju0V7WtNv/930Pww+//wbd9AqdMbzuYdkRmTj4",
+	"pNqEYUaSSv8icHO903+47FJUUmWXv74FBvdoXZyM+dn5We6h8WXEjYQCXp3lZ6+AgeG0C4EtuP/pQsQm",
+	"/mI0RrpC8uCFef1WQAFewZOG72J57qf+yzz/bDN/PvcS8/+XH32KF/mrQ9aG8BajVaGXcMgo69LP+vRb",
+	"Bka7RP6vQ5lPh2cUBjr6VovmeXLv5dxOZUi2xnaG//nzxJDCPsIhPomAaCPjj0gIX6XVuXiQog39BkuM",
+	"03DK0ptw/5glwy2vkNA6KG4eQPoEfB30K1jRt/0xvGwE1fG+tZyRcRHjHIP2s85ed+wE3C6ehltMMoEb",
+	"A1MnpPvOCP7vgfJfKpD8nyuQvjk9kePI2QdrY7Q9HOzYV8N4T9F9V6Nt9nwPK80egqetYy1LOzB+nx6b",
+	"F7jhdUlQnDOo+J+y8t7O8/DHoJKqu0ktCodd3Dr51wE/L/OpoyNOls+ooNFi+EyzrdKi00PWaSX7SgcH",
+	"vCybbCNLQosiWzVZpP7rhLxCy110xIetKjkeJzvY/7q7JLfJk7rLCR0/P5nOjyP/EzpNl2+mbdbVdMbn",
+	"0okI9Ptt4HS82d4s22X7dwAAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -64,6 +64,75 @@ func (e FollowResultStatus) Valid() bool {
 	}
 }
 
+// Defines values for ReportReason.
+const (
+	ReportReasonHarassment    ReportReason = "harassment"
+	ReportReasonInappropriate ReportReason = "inappropriate"
+	ReportReasonOther         ReportReason = "other"
+	ReportReasonSpam          ReportReason = "spam"
+)
+
+// Valid indicates whether the value is a known member of the ReportReason enum.
+func (e ReportReason) Valid() bool {
+	switch e {
+	case ReportReasonHarassment:
+		return true
+	case ReportReasonInappropriate:
+		return true
+	case ReportReasonOther:
+		return true
+	case ReportReasonSpam:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReportStatus.
+const (
+	Dismissed ReportStatus = "dismissed"
+	Open      ReportStatus = "open"
+	Resolved  ReportStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the ReportStatus enum.
+func (e ReportStatus) Valid() bool {
+	switch e {
+	case Dismissed:
+		return true
+	case Open:
+		return true
+	case Resolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReportRequestReason.
+const (
+	ReportRequestReasonHarassment    ReportRequestReason = "harassment"
+	ReportRequestReasonInappropriate ReportRequestReason = "inappropriate"
+	ReportRequestReasonOther         ReportRequestReason = "other"
+	ReportRequestReasonSpam          ReportRequestReason = "spam"
+)
+
+// Valid indicates whether the value is a known member of the ReportRequestReason enum.
+func (e ReportRequestReason) Valid() bool {
+	switch e {
+	case ReportRequestReasonHarassment:
+		return true
+	case ReportRequestReasonInappropriate:
+		return true
+	case ReportRequestReasonOther:
+		return true
+	case ReportRequestReasonSpam:
+		return true
+	default:
+		return false
+	}
+}
+
 // Error defines model for Error.
 type Error struct {
 	Message string `json:"message"`
@@ -130,6 +199,33 @@ type FollowUserList struct {
 	Users []FollowUser `json:"users"`
 }
 
+// Report defines model for Report.
+type Report struct {
+	CreatedAt    time.Time    `json:"created_at"`
+	Id           int64        `json:"id"`
+	Note         string       `json:"note"`
+	Reason       ReportReason `json:"reason"`
+	ReporterId   int64        `json:"reporter_id"`
+	Status       ReportStatus `json:"status"`
+	TargetUserId int64        `json:"target_user_id"`
+}
+
+// ReportReason defines model for Report.Reason.
+type ReportReason string
+
+// ReportStatus defines model for Report.Status.
+type ReportStatus string
+
+// ReportRequest defines model for ReportRequest.
+type ReportRequest struct {
+	Note         *string             `json:"note,omitempty"`
+	Reason       ReportRequestReason `json:"reason"`
+	TargetUserId int64               `json:"target_user_id"`
+}
+
+// ReportRequestReason defines model for ReportRequest.Reason.
+type ReportRequestReason string
+
 // Cursor defines model for Cursor.
 type Cursor = string
 
@@ -177,6 +273,9 @@ type ListFollowingParams struct {
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
+// CreateReportJSONRequestBody defines body for CreateReport for application/json ContentType.
+type CreateReportJSONRequestBody = ReportRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// ListBlocks Users the current user has blocked (paginated)
@@ -209,6 +308,9 @@ type ServerInterface interface {
 	// FollowUser Follow a user (instant for public, a pending request for private). Idempotent.
 	// (POST /me/follows/{userId})
 	FollowUser(ctx echo.Context, userId UserId) error
+	// CreateReport File a moderation report against another user
+	// (POST /me/reports)
+	CreateReport(ctx echo.Context) error
 	// GetProfileFeed A user's activity feed (visible per profile privacy)
 	// (GET /users/{userId}/feed)
 	GetProfileFeed(ctx echo.Context, userId UserId, params GetProfileFeedParams) error
@@ -396,6 +498,15 @@ func (w *ServerInterfaceWrapper) FollowUser(ctx echo.Context) error {
 	return err
 }
 
+// CreateReport converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateReport(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreateReport(ctx)
+	return err
+}
+
 // GetProfileFeed converts echo context to params.
 func (w *ServerInterfaceWrapper) GetProfileFeed(ctx echo.Context) error {
 	var err error
@@ -545,6 +656,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/me/blocks/:userId", wrapper.BlockUser, options.OperationMiddlewares["blockUser"]...)
 	router.GET(options.BaseURL+"/me/blocks", wrapper.ListBlocks, options.OperationMiddlewares["listBlocks"]...)
 	router.DELETE(options.BaseURL+"/me/followers/:userId", wrapper.RemoveFollower, options.OperationMiddlewares["removeFollower"]...)
+	router.POST(options.BaseURL+"/me/reports", wrapper.CreateReport, options.OperationMiddlewares["createReport"]...)
 	router.GET(options.BaseURL+"/me/follows/incoming", wrapper.ListIncomingRequests, options.OperationMiddlewares["listIncomingRequests"]...)
 	router.POST(options.BaseURL+"/me/follows/incoming/:userId/approve", wrapper.ApproveFollower, options.OperationMiddlewares["approveFollower"]...)
 	router.POST(options.BaseURL+"/me/follows/incoming/:userId/reject", wrapper.RejectFollower, options.OperationMiddlewares["rejectFollower"]...)
@@ -560,31 +672,34 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"AP//",
+	"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",
+	"yPTGy8EOelQelZ1vq8/Jl1fLq+VfAQAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -44,7 +44,8 @@ func newWebServer(t *testing.T) *echo.Echo {
 	feedUC := usecase.NewFeedUsecase(repository.NewActivityRepository(gdb), socialRepo, 12*time.Hour)
 	notificationUC := usecase.NewNotificationUsecase(notificationRepo, userRepo, "defShowsBot", time.Hour)
 	notesUC := usecase.NewNotesUsecase(notesRepo)
-	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb))
+	reportUC := usecase.NewReportUsecase(repository.NewReportRepository(gdb), userRepo)
+	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb), reportUC, userRepo)
 	usersH := httpapi.NewUsersHandler(authUC, trackingUC, socialUC)
 
 	return httpapi.NewWebRouter(
@@ -55,7 +56,7 @@ func newWebServer(t *testing.T) *echo.Echo {
 		httpapi.NewNotesHandler(notesUC),
 		adminH,
 		usersH,
-		httpapi.NewSocialHandler(socialUC, feedUC, catalogUC, userRepo),
+		httpapi.NewSocialHandler(socialUC, feedUC, reportUC, catalogUC, userRepo),
 		jwtMgr,
 		nil,
 		nil,

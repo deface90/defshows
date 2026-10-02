@@ -400,20 +400,20 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
   repo/usecase; pass into social + admin handlers)
 - Regenerate: `backend/pkg/server/social`, `backend/pkg/server/admin` (via `make generate`)
 
-- [ ] `social.yaml`: `POST /me/reports` body `{target_user_id, reason, note?}` → 201/400/404
-- [ ] `admin.yaml`: `GET /admin/reports?status=&page=&page_size=` → list w/ reporter+target
+- [x] `social.yaml`: `POST /me/reports` body `{target_user_id, reason, note?}` → 201/400/404
+- [x] `admin.yaml`: `GET /admin/reports?status=&page=&page_size=` → list w/ reporter+target
       summaries; `POST /admin/reports/{id}/resolve` body `{status}` → 204; `make generate`
-- [ ] implement `CreateReport` on `SocialHandler` (map `ErrSelfReport` 400, `ErrInvalidReason`
+- [x] implement `CreateReport` on `SocialHandler` (map `ErrSelfReport` 400, `ErrInvalidReason`
       400, `ErrUserNotFound` 404)
-- [ ] implement `ListReports`/`ResolveReport` on `AdminHandler` (role already guarded by
+- [x] implement `ListReports`/`ResolveReport` on `AdminHandler` (role already guarded by
       router). Note: `AdminHandler` today takes only `dubbing` — extend `NewAdminHandler` to
       also take the report usecase (+ a user lookup, since the list enriches reporter/target
       summaries) and inject it in `cmd/web/main.go`
-- [ ] wire report repo/usecase in `cmd/web/main.go`; thread into the social + admin handler
+- [x] wire report repo/usecase in `cmd/web/main.go`; thread into the social + admin handler
       constructors
-- [ ] write handler tests: create report 201 + self 400 + bad reason 400; admin list (filter)
+- [x] write handler tests: create report 201 + self 400 + bad reason 400; admin list (filter)
       + resolve 204 + resolve missing 404; non-admin blocked by the existing guard
-- [ ] run `go test ./...` (backend) — green before next task
+- [x] run `go test ./...` (backend) — green before next task
 
 ### Slice 5 — Editable display_name (backend)
 

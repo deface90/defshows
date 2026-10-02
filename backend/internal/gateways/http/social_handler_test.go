@@ -352,3 +352,45 @@ func TestSocial_AutoAcceptOnGoingPublic(t *testing.T) {
 		t.Fatalf("pending after going public: %d", incoming.Total)
 	}
 }
+
+func TestSocial_CreateReport(t *testing.T) {
+	e := newWebServer(t)
+
+	aID, aTok := registerUser(t, e, "reporter@soc.com")
+	bID, _ := registerUser(t, e, "target@soc.com")
+	_ = aID
+
+	// Valid report → 201.
+	rec := doJSON(t, e, http.MethodPost, "/me/reports", aTok, map[string]any{
+		"target_user_id": bID, "reason": "spam", "note": "buying followers",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create report: want 201, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var rep socialapi.Report
+	_ = json.Unmarshal(rec.Body.Bytes(), &rep)
+	if rep.TargetUserId != bID || rep.Reason != "spam" || rep.Status != "open" || rep.Note != "buying followers" {
+		t.Fatalf("unexpected report: %+v", rep)
+	}
+
+	// Self-report → 400.
+	if rec := doJSON(t, e, http.MethodPost, "/me/reports", aTok, map[string]any{
+		"target_user_id": aID, "reason": "spam",
+	}); rec.Code != http.StatusBadRequest {
+		t.Fatalf("self-report: want 400, got %d", rec.Code)
+	}
+
+	// Bad reason → 400 (enum rejected by the generated binder).
+	if rec := doJSON(t, e, http.MethodPost, "/me/reports", aTok, map[string]any{
+		"target_user_id": bID, "reason": "bogus",
+	}); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad reason: want 400, got %d", rec.Code)
+	}
+
+	// Unknown target → 404.
+	if rec := doJSON(t, e, http.MethodPost, "/me/reports", aTok, map[string]any{
+		"target_user_id": 999999, "reason": "other",
+	}); rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown target: want 404, got %d", rec.Code)
+	}
+}

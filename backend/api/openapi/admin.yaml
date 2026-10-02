@@ -63,6 +63,46 @@ paths:
       responses:
         '204': { description: No Content }
         '404': { $ref: '#/components/responses/Error' }
+  /admin/reports:
+    get:
+      operationId: listReports
+      summary: List moderation reports (optionally filtered by status)
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, resolved, dismissed] }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportList' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/reports/{id}/resolve:
+    post:
+      operationId: resolveReport
+      summary: Resolve or dismiss a moderation report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveReportRequest' }
+      responses:
+        '204': { description: No Content }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -100,3 +140,34 @@ components:
         name: { type: string }
         site_url: { type: string }
         active: { type: boolean }
+    ReportUserSummary:
+      type: object
+      required: [id, display_name]
+      properties:
+        id: { type: integer, format: int64 }
+        display_name: { type: string }
+    Report:
+      type: object
+      required: [id, reporter, target, reason, note, status, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        reporter: { $ref: '#/components/schemas/ReportUserSummary' }
+        target: { $ref: '#/components/schemas/ReportUserSummary' }
+        reason: { type: string, enum: [spam, harassment, inappropriate, other] }
+        note: { type: string }
+        status: { type: string, enum: [open, resolved, dismissed] }
+        created_at: { type: string, format: date-time }
+        resolved_at: { type: string, format: date-time }
+    ReportList:
+      type: object
+      required: [reports, total]
+      properties:
+        total: { type: integer, format: int64 }
+        reports:
+          type: array
+          items: { $ref: '#/components/schemas/Report' }
+    ResolveReportRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [resolved, dismissed] }

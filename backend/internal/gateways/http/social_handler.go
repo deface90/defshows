@@ -25,17 +25,19 @@ type FeedUserLookup interface {
 }
 
 // SocialHandler implements the generated social ServerInterface: follows,
-// approval of requests, follower/following listings, and the activity feeds.
+// approval of requests, follower/following listings, moderation reports, and the
+// activity feeds.
 type SocialHandler struct {
 	social  *usecase.SocialUsecase
 	feed    *usecase.FeedUsecase
+	report  *usecase.ReportUsecase
 	catalog FeedCatalog
 	users   FeedUserLookup
 }
 
 // NewSocialHandler creates a SocialHandler.
-func NewSocialHandler(socialUC *usecase.SocialUsecase, feedUC *usecase.FeedUsecase, catalog FeedCatalog, users FeedUserLookup) *SocialHandler {
-	return &SocialHandler{social: socialUC, feed: feedUC, catalog: catalog, users: users}
+func NewSocialHandler(socialUC *usecase.SocialUsecase, feedUC *usecase.FeedUsecase, reportUC *usecase.ReportUsecase, catalog FeedCatalog, users FeedUserLookup) *SocialHandler {
+	return &SocialHandler{social: socialUC, feed: feedUC, report: reportUC, catalog: catalog, users: users}
 }
 
 var _ socialapi.ServerInterface = (*SocialHandler)(nil)
@@ -126,6 +128,45 @@ func (h *SocialHandler) RemoveFollower(c echo.Context, targetID socialapi.UserId
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// CreateReport handles POST /me/reports: a user files a moderation report
+// against another user.
+func (h *SocialHandler) CreateReport(c echo.Context) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	var req socialapi.ReportRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	note := ""
+	if req.Note != nil {
+		note = *req.Note
+	}
+	rep, err := h.report.Report(c.Request().Context(), uid, req.TargetUserId, entity.ReportReason(req.Reason), note)
+	switch {
+	case errors.Is(err, usecase.ErrSelfReport):
+		return echo.NewHTTPError(http.StatusBadRequest, "cannot report yourself")
+	case errors.Is(err, usecase.ErrInvalidReason):
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid reason")
+	case errors.Is(err, usecase.ErrInvalidNote):
+		return echo.NewHTTPError(http.StatusBadRequest, "note too long")
+	case errors.Is(err, usecase.ErrUserNotFound):
+		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+	case err != nil:
+		return err
+	}
+	return c.JSON(http.StatusCreated, socialapi.Report{
+		Id:           rep.ID,
+		ReporterId:   rep.ReporterID,
+		TargetUserId: rep.TargetUserID,
+		Reason:       socialapi.ReportReason(rep.Reason),
+		Note:         rep.Note,
+		Status:       socialapi.ReportStatus(rep.Status),
+		CreatedAt:    rep.CreatedAt,
+	})
 }
 
 // ListIncomingRequests handles GET /me/follows/incoming.
