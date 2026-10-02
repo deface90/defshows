@@ -17,7 +17,7 @@ func TestMigrations_UpDown(t *testing.T) {
 		t.Fatalf("migrate up: %v", err)
 	}
 
-	for _, tbl := range []string{"users", "user_identities", "refresh_tokens", "shows", "seasons", "episodes", "user_shows"} {
+	for _, tbl := range []string{"users", "user_identities", "refresh_tokens", "shows", "seasons", "episodes", "user_shows", "blocks", "reports"} {
 		if !tableExists(t, gdb, tbl) {
 			t.Fatalf("expected table %q to exist after up", tbl)
 		}
