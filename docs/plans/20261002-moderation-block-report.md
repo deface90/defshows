@@ -365,13 +365,13 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Create: `backend/internal/service/repository/report_repo.go`
 - Create: `backend/internal/service/repository/report_repo_test.go`
 
-- [ ] implement `ReportRepository`: `Create(ctx, *entity.Report)`,
+- [x] implement `ReportRepository`: `Create(ctx, *entity.Report)`,
       `List(ctx, status string, limit, offset) ([]entity.Report, int64, error)`
       (status `""` = all), `Get(ctx, id)`, `Resolve(ctx, id, adminID int64, status entity.ReportStatus)`
       (sets `status`/`resolved_at`/`resolved_by`; `RowsAffected==0` → `ErrNotFound`)
-- [ ] write testcontainers tests: insert, list-by-status + pagination, resolve transitions,
+- [x] write testcontainers tests: insert, list-by-status + pagination, resolve transitions,
       resolve missing → `ErrNotFound`
-- [ ] run `go test ./internal/service/repository/...` — green before next task
+- [x] run `go test ./internal/service/repository/...` — green before next task
 
 #### Task 8: Report usecase
 
