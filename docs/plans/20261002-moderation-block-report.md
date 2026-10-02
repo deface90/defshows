@@ -473,13 +473,16 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: `frontend/src/pages/FollowsPage.tsx` (Remove button on the "Мои подписчики" tab)
 - Regenerate: `frontend/src/shared/api/{social,tracking}/*` (via `npm run api:gen`)
 
-- [ ] add a `display_name` text field to Settings (RHF+zod, 1..50; blank allowed = reset),
+- [x] add a `display_name` text field to Settings (RHF+zod, 1..50; blank allowed = reset),
       saved via `updateSettings`, invalidating the `getMe`/settings query
-- [ ] add a "Заблокированные" list in Settings (`GET /me/blocks`) with an Unblock action
-- [ ] add a Remove (убрать из подписчиков) action on the followers tab → `DELETE /me/followers/{id}`
-- [ ] write tests: display_name save + validation; blocked list renders + unblock; remove
+      (`features/profile/DisplayNameForm.tsx`)
+- [x] add a "Заблокированные" list in Settings (`GET /me/blocks`) with an Unblock action
+      (`features/profile/BlockedUsersList.tsx`, reuses the Task 11 `BlockButton`)
+- [x] add a Remove (убрать из подписчиков) action on the followers tab → `DELETE /me/followers/{id}`
+      (`RemoveFollowerButton` in `FollowsPage.tsx`, followers tab only)
+- [x] write tests: display_name save + validation; blocked list renders + unblock; remove
       follower mutation + list refetch
-- [ ] run gate — `npx tsc -b` + `npx vitest run` + `npm run build` — green before next task
+- [x] run gate — `npx tsc -b` + `npx vitest run` + `npm run build` — green before next task
 
 #### Task 13: Admin reports section (web)
 

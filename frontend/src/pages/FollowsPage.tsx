@@ -1,7 +1,11 @@
-import { Badge, Card, Group, Stack, Tabs, Text, Title } from '@mantine/core'
+import { Badge, Button, Card, Group, Stack, Tabs, Text, Title } from '@mantine/core'
+import { notifications } from '@mantine/notifications'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useSearchParams } from 'react-router-dom'
 import {
+  getListFollowersQueryKey,
+  removeFollower,
   useListFollowers,
   useListFollowing,
   useListIncomingRequests,
@@ -84,19 +88,52 @@ function FollowList({
   return (
     <Stack gap="xs">
       {users.map((u: FollowUser) => (
-        <Card key={u.id} withBorder padding="sm" component={Link} to={`/users/${u.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+        <Card key={u.id} withBorder padding="sm">
           <Group justify="space-between" wrap="nowrap">
-            <Text fw={600} truncate>
+            <Text
+              component={Link}
+              to={`/users/${u.id}`}
+              fw={600}
+              truncate
+              style={{ color: 'inherit', textDecoration: 'none', flex: 1, minWidth: 0 }}
+            >
               {u.display_name}
             </Text>
-            {!u.is_public && (
-              <Text c="dimmed" size="sm">
-                Закрытый
-              </Text>
-            )}
+            <Group gap="sm" wrap="nowrap">
+              {!u.is_public && (
+                <Text c="dimmed" size="sm">
+                  Закрытый
+                </Text>
+              )}
+              {kind === 'followers' && <RemoveFollowerButton ownerId={userId} followerId={u.id} />}
+            </Group>
           </Group>
         </Card>
       ))}
     </Stack>
+  )
+}
+
+/** RemoveFollowerButton ejects an accepted follower via DELETE /me/followers/{id}. */
+function RemoveFollowerButton({ ownerId, followerId }: { ownerId: number; followerId: number }) {
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: () => removeFollower(followerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getListFollowersQueryKey(ownerId) })
+      notifications.show({ message: 'Подписчик удалён' })
+    },
+    onError: () => notifications.show({ message: 'Не удалось удалить подписчика', color: 'red' }),
+  })
+  return (
+    <Button
+      size="xs"
+      variant="light"
+      color="red"
+      loading={mutation.isPending}
+      onClick={() => mutation.mutate()}
+    >
+      Убрать
+    </Button>
   )
 }

@@ -38,6 +38,31 @@ describe('FollowsPage', () => {
     expect(await screen.findByText('Боб')).toBeInTheDocument()
   })
 
+  it('removes a follower and refetches the list', async () => {
+    login()
+    let removed = false
+    server.use(
+      http.get(`${base}/me/follows/incoming`, () => HttpResponse.json({ users: [], total: 0 })),
+      http.get(`${base}/users/1/followers`, () =>
+        HttpResponse.json({
+          users: removed ? [] : [{ id: 2, display_name: 'Алиса', is_public: true }],
+          total: removed ? 0 : 1,
+        }),
+      ),
+      http.delete(`${base}/me/followers/2`, () => {
+        removed = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderWithProviders(<FollowsPage />)
+
+    expect(await screen.findByText('Алиса')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Убрать' }))
+
+    await waitFor(() => expect(removed).toBe(true))
+    await waitFor(() => expect(screen.queryByText('Алиса')).not.toBeInTheDocument())
+  })
+
   it('shows a pending badge and approves a request', async () => {
     login()
     let approved = false
