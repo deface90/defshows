@@ -15,6 +15,7 @@ import { DubbingForm } from '@/features/admin/DubbingForm'
 import type { DubbingStudioInput } from '@/features/admin/schemas'
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
+import { AdminNav } from './AdminNav'
 
 /** AdminDubbingPage manages the DubbingStudio reference table (admin only). */
 export function AdminDubbingPage() {
@@ -56,6 +57,7 @@ export function AdminDubbingPage() {
 
   return (
     <Stack>
+      <AdminNav />
       <Group justify="space-between">
         <Title order={3}>Студии озвучки</Title>
         <Button onClick={openCreate}>Добавить</Button>

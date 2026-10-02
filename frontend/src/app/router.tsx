@@ -2,6 +2,7 @@ import { DiscoverPage } from '@/pages/DiscoverPage'
 import { CatalogShowPage } from '@/pages/CatalogShowPage'
 import { createBrowserRouter } from 'react-router-dom'
 import { AdminDubbingPage } from '@/pages/admin/AdminDubbingPage'
+import { ReportsPage } from '@/pages/admin/ReportsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
@@ -62,7 +63,10 @@ export const router = createBrowserRouter([
               { path: 'settings', element: <SettingsPage /> },
               {
                 element: <RequireRole role="admin" />,
-                children: [{ path: 'admin', element: <AdminDubbingPage /> }],
+                children: [
+                  { path: 'admin', element: <AdminDubbingPage /> },
+                  { path: 'admin/reports', element: <ReportsPage /> },
+                ],
               },
             ],
           },
