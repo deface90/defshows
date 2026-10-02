@@ -67,6 +67,8 @@ func main() {
 	catalogRepo := repository.NewCatalogRepository(gdb)
 	trackingRepo := repository.NewTrackingRepository(gdb)
 	homeRepo := repository.NewHomeRepository(gdb)
+	socialRepo := repository.NewSocialRepository(gdb)
+	activityRepo := repository.NewActivityRepository(gdb)
 
 	notificationRepo := repository.NewNotificationRepository(gdb)
 	notesRepo := repository.NewNotesRepository(gdb)
@@ -87,19 +89,22 @@ func main() {
 	}
 	trackingUC := usecase.NewTrackingUsecase(trackingRepo, catalogUC)
 	homeUC := usecase.NewHomeUsecase(homeRepo)
+	socialUC := usecase.NewSocialUsecase(socialRepo, userRepo, notificationRepo)
+	feedUC := usecase.NewFeedUsecase(activityRepo, socialRepo, cfg.Social.FeedGroupWindow)
 	notificationUC := usecase.NewNotificationUsecase(notificationRepo, userRepo, cfg.Telegram.Username, cfg.Notifier.LinkTTL)
 	notesUC := usecase.NewNotesUsecase(notesRepo)
 
 	authH := httpapi.NewAuthHandler(authUC).
 		WithOAuth(httpapi.BuildOAuthRegistry(cfg.OAuth), cfg.OAuth.RedirectBaseURL, cfg.OAuth.FrontendURL)
 	showsH := httpapi.NewShowsHandler(catalogUC)
-	trackingH := httpapi.NewTrackingHandler(trackingUC, homeUC, authUC)
+	trackingH := httpapi.NewTrackingHandler(trackingUC, homeUC, authUC, socialUC)
 	notificationsH := httpapi.NewNotificationsHandler(notificationUC)
 	notesH := httpapi.NewNotesHandler(notesUC)
 	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb))
-	usersH := httpapi.NewUsersHandler(authUC, trackingUC)
+	usersH := httpapi.NewUsersHandler(authUC, trackingUC, socialUC)
+	socialH := httpapi.NewSocialHandler(socialUC, feedUC, catalogUC, userRepo)
 
-	e := httpapi.NewWebRouter(authH, showsH, trackingH, notificationsH, notesH, adminH, usersH, jwtMgr, imageStore, proxyClient, cfg.Server.CORSAllowedOrigins...)
+	e := httpapi.NewWebRouter(authH, showsH, trackingH, notificationsH, notesH, adminH, usersH, socialH, jwtMgr, imageStore, proxyClient, cfg.Server.CORSAllowedOrigins...)
 	logger.Info("web service starting", "addr", cfg.Server.Addr)
 	if err := e.Start(cfg.Server.Addr); err != nil {
 		log.Fatalf("web: server: %v", err)

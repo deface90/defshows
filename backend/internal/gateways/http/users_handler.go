@@ -22,11 +22,12 @@ import (
 type UsersHandler struct {
 	auth     *usecase.AuthUsecase
 	tracking *usecase.TrackingUsecase
+	social   *usecase.SocialUsecase
 }
 
 // NewUsersHandler creates a UsersHandler.
-func NewUsersHandler(authUC *usecase.AuthUsecase, trackingUC *usecase.TrackingUsecase) *UsersHandler {
-	return &UsersHandler{auth: authUC, tracking: trackingUC}
+func NewUsersHandler(authUC *usecase.AuthUsecase, trackingUC *usecase.TrackingUsecase, socialUC *usecase.SocialUsecase) *UsersHandler {
+	return &UsersHandler{auth: authUC, tracking: trackingUC, social: socialUC}
 }
 
 var _ usersapi.ServerInterface = (*UsersHandler)(nil)
@@ -88,11 +89,26 @@ func (h *UsersHandler) GetUserProfile(c echo.Context, userID usersapi.UserId) er
 	if err != nil {
 		return err
 	}
+	viewerID := int64(0)
+	if claims, ok := auth.ClaimsFromContext(c); ok {
+		viewerID = claims.UserID
+	}
+	state, err := h.social.FollowState(ctx, viewerID, userID)
+	if err != nil {
+		return err
+	}
+	followers, following, err := h.social.Counts(ctx, userID)
+	if err != nil {
+		return err
+	}
 	return c.JSON(http.StatusOK, usersapi.UserProfile{
-		Id:          u.ID,
-		DisplayName: displayNameOf(u),
-		IsPublic:    u.IsPublic,
-		ShowsCount:  counts[u.ID],
+		Id:             u.ID,
+		DisplayName:    displayNameOf(u),
+		IsPublic:       u.IsPublic,
+		ShowsCount:     counts[u.ID],
+		IsFollowing:    usersapi.UserProfileIsFollowing(state),
+		FollowersCount: int(followers),
+		FollowingCount: int(following),
 	})
 }
 
@@ -113,10 +129,16 @@ func (h *UsersHandler) ListUserShows(c echo.Context, userID usersapi.UserId) err
 		return err
 	}
 
-	isOwner := claims.UserID == target.ID
 	isAdmin := claims.Role == string(entity.RoleAdmin)
-	if !target.IsPublic && !isOwner && !isAdmin {
-		return echo.NewHTTPError(http.StatusForbidden, "profile is private")
+	if !isAdmin {
+		// Visibility is owner || public || accepted-follower (centralized in the usecase).
+		canView, err := h.social.CanViewProfile(ctx, claims.UserID, target.ID)
+		if err != nil {
+			return err
+		}
+		if !canView {
+			return echo.NewHTTPError(http.StatusForbidden, "profile is private")
+		}
 	}
 
 	list, err := h.tracking.ListShows(ctx, target.ID, "")

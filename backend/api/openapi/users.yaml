@@ -96,12 +96,15 @@ components:
           items: { $ref: '#/components/schemas/UserSummary' }
     UserProfile:
       type: object
-      required: [id, display_name, is_public, shows_count]
+      required: [id, display_name, is_public, shows_count, is_following, followers_count, following_count]
       properties:
         id: { type: integer, format: int64 }
         display_name: { type: string }
         is_public: { type: boolean }
         shows_count: { type: integer }
+        is_following: { type: string, enum: [none, pending, accepted], description: The viewer's follow relationship to this user }
+        followers_count: { type: integer }
+        following_count: { type: integer }
     UserShow:
       type: object
       required: [id, show_id, status, favorite]

@@ -110,12 +110,37 @@ func TestTrackingUsecase_Flow(t *testing.T) {
 	// Update status + dubbing.
 	completed := string(entity.StatusCompleted)
 	dub := "LostFilm"
-	updated, err := uc.UpdateShow(ctx, user.ID, us.ShowID, &completed, nil, &dub)
+	updated, err := uc.UpdateShow(ctx, user.ID, us.ShowID, &completed, nil, &dub, nil, false)
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	if updated.Status != entity.StatusCompleted || updated.PreferredDubbing != "LostFilm" {
 		t.Fatalf("update not applied: %+v", updated)
+	}
+
+	// Rating: set, out-of-range rejected, status-only PATCH preserves it, then clear.
+	nine := 9
+	rated, err := uc.UpdateShow(ctx, user.ID, us.ShowID, nil, nil, nil, &nine, false)
+	if err != nil || rated.Rating == nil || *rated.Rating != 9 {
+		t.Fatalf("set rating: %v (%+v)", err, rated.Rating)
+	}
+	bad := 11
+	if _, err := uc.UpdateShow(ctx, user.ID, us.ShowID, nil, nil, nil, &bad, false); !errors.Is(err, usecase.ErrInvalidRating) {
+		t.Fatalf("want ErrInvalidRating, got %v", err)
+	}
+	watching := string(entity.StatusWatching)
+	keep, err := uc.UpdateShow(ctx, user.ID, us.ShowID, &watching, nil, nil, nil, false)
+	if err != nil || keep.Rating == nil || *keep.Rating != 9 {
+		t.Fatalf("status-only PATCH should preserve rating: %v (%+v)", err, keep.Rating)
+	}
+	cleared, err := uc.UpdateShow(ctx, user.ID, us.ShowID, nil, nil, nil, nil, true)
+	if err != nil || cleared.Rating != nil {
+		t.Fatalf("clear rating: %v (%+v)", err, cleared.Rating)
+	}
+	// Confirm the clear persisted (re-read from storage).
+	reloaded, _ := uc.GetTracked(ctx, user.ID, us.ShowID)
+	if reloaded != nil && reloaded.UserShow.Rating != nil {
+		t.Fatalf("rating not cleared in storage: %+v", reloaded.UserShow.Rating)
 	}
 
 	// Links.

@@ -32,11 +32,17 @@ struct MainTabsView: View {
 struct MoreView: View {
     @EnvironmentObject private var session: Session
     @State private var busy = false
+    @State private var pendingRequests = 0
     @State private var error: String?
     var body: some View {
         List {
             Section {
+                NavigationLink { FeedView() } label: { Label("Лента", systemImage: "square.stack.3d.up") }
                 NavigationLink { UsersView() } label: { Label("Пользователи", systemImage: "person.2") }
+                NavigationLink { FollowsView() } label: {
+                    Label("Подписки", systemImage: "person.2.badge.gearshape")
+                        .badge(pendingRequests)
+                }
                 NavigationLink { SettingsView() } label: { Label("Настройки", systemImage: "gearshape") }
             }
             Section("О сервисе") {

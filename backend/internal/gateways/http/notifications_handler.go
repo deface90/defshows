@@ -175,5 +175,6 @@ func toAPINotification(n *entity.Notification) notificationsapi.NotificationItem
 		Read:      n.ReadAt != nil,
 		Payload:   n.Payload,
 		CreatedAt: n.CreatedAt.Format(time.RFC3339),
+		ActorId:   n.ActorID,
 	}
 }

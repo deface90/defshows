@@ -15,6 +15,7 @@ export * from './trackedShow';
 export * from './trackedShowList';
 export * from './userList';
 export * from './userProfile';
+export * from './userProfileIsFollowing';
 export * from './userShow';
 export * from './userShowStatus';
 export * from './userSummary';

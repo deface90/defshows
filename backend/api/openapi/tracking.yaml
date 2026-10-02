@@ -245,6 +245,7 @@ components:
         status: { type: string, enum: [watching, plan_to_watch, on_hold, completed, dropped] }
         favorite: { type: boolean }
         preferred_dubbing: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 10, nullable: true, description: The user's own 1..10 score; null when unrated }
     ShowRef:
       type: object
       required: [id, tmdb_id, title, airing_status]
@@ -296,6 +297,8 @@ components:
         status: { type: string, enum: [watching, plan_to_watch, on_hold, completed, dropped] }
         favorite: { type: boolean }
         preferred_dubbing: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 10, description: Set the user's 1..10 score }
+        clear_rating: { type: boolean, description: "When true, remove the existing rating (ignored if rating is also set)" }
     Link:
       type: object
       required: [id, kind, url]

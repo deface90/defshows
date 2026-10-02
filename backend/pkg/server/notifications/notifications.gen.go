@@ -30,6 +30,8 @@ type NotificationFeed struct {
 
 // NotificationItem defines model for NotificationItem.
 type NotificationItem struct {
+	// ActorId User who triggered the notification (e.g. the follower for follow_request/follow_accepted)
+	ActorId   *int64 `json:"actor_id,omitempty"`
 	CreatedAt string `json:"created_at"`
 	Id        int64  `json:"id"`
 	Payload   string `json:"payload"`
@@ -269,23 +271,24 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

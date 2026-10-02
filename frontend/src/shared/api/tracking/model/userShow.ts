@@ -12,4 +12,11 @@ export interface UserShow {
   status: UserShowStatus;
   favorite: boolean;
   preferred_dubbing?: string;
+  /**
+     * The user's own 1..10 score; null when unrated
+     * @minimum 1
+     * @maximum 10
+     * @nullable
+     */
+  rating?: number | null;
 }

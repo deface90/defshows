@@ -21,8 +21,10 @@ type UserShow struct {
 	Status           WatchStatus
 	Favorite         bool
 	PreferredDubbing string
-	AddedAt          time.Time
-	UpdatedAt        time.Time
+	// Rating is the user's own 1..10 score for the show; nil = unrated.
+	Rating    *int
+	AddedAt   time.Time
+	UpdatedAt time.Time
 }
 
 // TableName maps UserShow to the user_shows table.

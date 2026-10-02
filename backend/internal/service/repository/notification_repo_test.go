@@ -71,6 +71,63 @@ func TestNotificationRepository_PrefsAndDedup(t *testing.T) {
 	}
 }
 
+func TestNotificationRepository_InAppNotDispatched(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "users", "shows")
+	repo := repository.NewNotificationRepository(gdb)
+	ctx := context.Background()
+
+	actor := &entity.User{Email: strptr("actor@example.com"), Role: entity.RoleUser, Timezone: "UTC"}
+	target := &entity.User{Email: strptr("target@example.com"), Role: entity.RoleUser, Timezone: "UTC"}
+	for _, u := range []*entity.User{actor, target} {
+		if err := gdb.Create(u).Error; err != nil {
+			t.Fatalf("seed user: %v", err)
+		}
+	}
+	// The target is Telegram-linked, so a telegram notification WOULD dispatch — proving
+	// the in_app notification is withheld by channel, not by a missing chat.
+	if err := repository.NewUserRepository(gdb).SetTelegramChatID(ctx, target.ID, 777); err != nil {
+		t.Fatalf("set chat: %v", err)
+	}
+
+	n := &entity.Notification{
+		UserID: target.ID, Type: entity.NotifyFollowRequest, ActorID: &actor.ID,
+		Channel: entity.ChannelInApp, Status: entity.NotifyPending, ScheduledFor: time.Now(),
+		DedupeKey: "follow_request:1:2", Payload: "кто-то хочет подписаться",
+	}
+	if created, err := repo.CreateNotificationIfAbsent(ctx, n); err != nil || !created {
+		t.Fatalf("create in_app: %v created=%v", err, created)
+	}
+
+	// No outbox sender polls the in_app channel: it isn't a known channel at all.
+	if _, err := repo.Pending(ctx, entity.ChannelInApp, 10); err == nil {
+		t.Fatal("Pending(in_app) should error — no sender queries it")
+	}
+	// And a real sender's query never returns the in_app row.
+	for _, ch := range []string{"telegram", "apns", "fcm"} {
+		if pend, _ := repo.Pending(ctx, ch, 10); len(pend) != 0 {
+			t.Fatalf("%s sender must not pick up the in_app notification, got %d", ch, len(pend))
+		}
+	}
+
+	// But it IS in the in-app feed, with the actor preserved.
+	feed, err := repo.ListForUser(ctx, target.ID, 10)
+	if err != nil || len(feed) != 1 {
+		t.Fatalf("feed: len=%d err=%v", len(feed), err)
+	}
+	if feed[0].ActorID == nil || *feed[0].ActorID != actor.ID || feed[0].Type != entity.NotifyFollowRequest {
+		t.Fatalf("unexpected feed item: %+v", feed[0])
+	}
+
+	// DeleteByDedupeKeys clears it (re-fire support on unfollow/reject).
+	if err := repo.DeleteByDedupeKeys(ctx, "follow_request:1:2"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if feed, _ := repo.ListForUser(ctx, target.ID, 10); len(feed) != 0 {
+		t.Fatalf("want empty feed after delete, got %d", len(feed))
+	}
+}
+
 func TestNotificationRepository_ReleaseCandidatesAndLinkTokens(t *testing.T) {
 	gdb := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, gdb, "users", "shows")

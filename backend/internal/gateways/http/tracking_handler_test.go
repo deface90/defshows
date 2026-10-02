@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +30,7 @@ func newWebServer(t *testing.T) *echo.Echo {
 	userRepo := repository.NewUserRepository(gdb)
 	catalogRepo := repository.NewCatalogRepository(gdb)
 	trackingRepo := repository.NewTrackingRepository(gdb)
+	socialRepo := repository.NewSocialRepository(gdb)
 
 	notificationRepo := repository.NewNotificationRepository(gdb)
 	notesRepo := repository.NewNotesRepository(gdb)
@@ -38,19 +40,22 @@ func newWebServer(t *testing.T) *echo.Echo {
 	catalogUC := usecase.NewCatalogUsecase(catalogRepo, fakeShowProvider{})
 	trackingUC := usecase.NewTrackingUsecase(trackingRepo, catalogUC)
 	homeUC := usecase.NewHomeUsecase(repository.NewHomeRepository(gdb))
+	socialUC := usecase.NewSocialUsecase(socialRepo, userRepo, notificationRepo)
+	feedUC := usecase.NewFeedUsecase(repository.NewActivityRepository(gdb), socialRepo, 12*time.Hour)
 	notificationUC := usecase.NewNotificationUsecase(notificationRepo, userRepo, "defShowsBot", time.Hour)
 	notesUC := usecase.NewNotesUsecase(notesRepo)
 	adminH := httpapi.NewAdminHandler(crud.NewRepository[entity.DubbingStudio](gdb))
-	usersH := httpapi.NewUsersHandler(authUC, trackingUC)
+	usersH := httpapi.NewUsersHandler(authUC, trackingUC, socialUC)
 
 	return httpapi.NewWebRouter(
 		httpapi.NewAuthHandler(authUC),
 		httpapi.NewShowsHandler(catalogUC),
-		httpapi.NewTrackingHandler(trackingUC, homeUC, authUC),
+		httpapi.NewTrackingHandler(trackingUC, homeUC, authUC, socialUC),
 		httpapi.NewNotificationsHandler(notificationUC),
 		httpapi.NewNotesHandler(notesUC),
 		adminH,
 		usersH,
+		httpapi.NewSocialHandler(socialUC, feedUC, catalogUC, userRepo),
 		jwtMgr,
 		nil,
 		nil,
@@ -191,6 +196,42 @@ func TestWebSlice_EndToEnd(t *testing.T) {
 		map[string]string{"status": "completed"})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update: %d", rec.Code)
+	}
+
+	// Rating: set to 8 → 200 with rating echoed.
+	rec = doJSON(t, e, http.MethodPatch, "/me/shows/"+strconv.FormatInt(showID, 10), token,
+		map[string]any{"rating": 8})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("set rating: %d (%s)", rec.Code, rec.Body.String())
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &us)
+	if us.Rating == nil || *us.Rating != 8 {
+		t.Fatalf("rating not echoed: %+v", us.Rating)
+	}
+	// Invalid rating → 400.
+	rec = doJSON(t, e, http.MethodPatch, "/me/shows/"+strconv.FormatInt(showID, 10), token,
+		map[string]any{"rating": 11})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid rating: want 400, got %d", rec.Code)
+	}
+	// Rating must NOT leak through the public /users/{id}/shows surface.
+	rec = doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(reg.User.Id, 10)+"/shows", token, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("user shows: %d", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "rating") {
+		t.Fatalf("/users/{id}/shows leaked rating: %s", rec.Body.String())
+	}
+	// Clear rating → 200, back to null (fresh struct: cleared rating is omitted from JSON).
+	rec = doJSON(t, e, http.MethodPatch, "/me/shows/"+strconv.FormatInt(showID, 10), token,
+		map[string]any{"clear_rating": true})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("clear rating: %d", rec.Code)
+	}
+	var afterClear trackingapi.UserShow
+	_ = json.Unmarshal(rec.Body.Bytes(), &afterClear)
+	if afterClear.Rating != nil {
+		t.Fatalf("rating not cleared: %+v", afterClear.Rating)
 	}
 
 	// Settings roundtrip.

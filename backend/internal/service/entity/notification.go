@@ -8,7 +8,14 @@ const (
 	NotifyEpisodeUpcoming = "episode_upcoming"
 	NotifySeasonUpcoming  = "season_upcoming"
 	NotifySeasonFinale    = "season_finale"
+	NotifyFollowRequest   = "follow_request"
+	NotifyFollowAccepted  = "follow_accepted"
 )
+
+// ChannelInApp is a delivery channel with no outbox sender: notifications on this
+// channel are surfaced only in the in-app feed (follow_request/follow_accepted).
+// It is deliberately absent from the sender's pendingQueries, so nothing dispatches it.
+const ChannelInApp = "in_app"
 
 // Notification statuses.
 const (
@@ -47,11 +54,14 @@ func DefaultNotificationPref(userID int64) NotificationPref {
 
 // Notification is an outbox entry that also serves as the in-app feed.
 type Notification struct {
-	ID           int64 `gorm:"primaryKey"`
-	UserID       int64
-	Type         string
-	ShowID       *int64
-	EpisodeID    *int64
+	ID        int64 `gorm:"primaryKey"`
+	UserID    int64
+	Type      string
+	ShowID    *int64
+	EpisodeID *int64
+	// ActorID references the user who triggered the notification (e.g. the follower
+	// for follow_request/follow_accepted); nil for catalog/episode notifications.
+	ActorID      *int64
 	Channel      string
 	Status       string
 	ScheduledFor time.Time

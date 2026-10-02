@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Badge,
   Box,
   Burger,
   Button,
@@ -15,6 +16,7 @@ import { useDisclosure } from '@mantine/hooks'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { QueryErrorBoundary } from '@/app/QueryErrorBoundary'
 import { logout } from '@/shared/api/auth/endpoints'
+import { useListIncomingRequests } from '@/shared/api/social/endpoints'
 import { getRefreshToken, useAuthStore } from '@/shared/auth/authStore'
 import { LegalFooter } from './LegalFooter'
 
@@ -28,7 +30,9 @@ const publicNavItems = [
 const userNavItems = [
   { to: '/my', label: 'Мои сериалы' },
   ...publicNavItems,
+  { to: '/feed', label: 'Лента' },
   { to: '/users', label: 'Пользователи' },
+  { to: '/follows', label: 'Подписки' },
   { to: '/notifications', label: 'Уведомления' },
 ]
 
@@ -42,6 +46,8 @@ export function Layout() {
   const [drawerOpen, drawer] = useDisclosure(false)
 
   const navItems = isAuthenticated ? userNavItems : publicNavItems
+  const incoming = useListIncomingRequests({ query: { enabled: isAuthenticated } })
+  const pendingCount = incoming.data?.users.length ?? 0
 
   const onLogout = async () => {
     const rt = getRefreshToken()
@@ -83,6 +89,11 @@ export function Layout() {
                     className={({ isActive }) => `app-navlink${isActive ? ' active' : ''}`}
                   >
                     {item.label}
+                    {item.to === '/follows' && pendingCount > 0 && (
+                      <Badge size="sm" circle color="orange" ml={6}>
+                        {pendingCount}
+                      </Badge>
+                    )}
                   </NavLink>
                 ))}
               </Group>
@@ -152,6 +163,11 @@ export function Layout() {
               className={({ isActive }) => `app-drawer-link${isActive ? ' active' : ''}`}
             >
               {item.label}
+              {item.to === '/follows' && pendingCount > 0 && (
+                <Badge size="sm" circle color="orange" ml={6}>
+                  {pendingCount}
+                </Badge>
+              )}
             </NavLink>
           ))}
           {!isAuthenticated && (

@@ -82,6 +82,12 @@ struct PublicProfileView: View {
     @State private var loaded = false
     @State private var error: String?
 
+    private var isSelf: Bool { session.currentUserID == user.id }
+    private var canView: Bool {
+        guard let profile else { return false }
+        return profile.isPublic || profile.isFollowing == "accepted" || isSelf
+    }
+
     var body: some View {
         List {
             if let error {
@@ -89,8 +95,26 @@ struct PublicProfileView: View {
                 Button("Повторить") { Task { await load() } }.disabled(busy)
             }
             if busy { ProgressView() }
-            if let profile, !profile.isPublic {
-                ContentUnavailableView("Закрытый профиль", systemImage: "lock", description: Text("Пользователь скрыл свою коллекцию."))
+            if let profile {
+                Section {
+                    if let followers = profile.followersCount, let following = profile.followingCount {
+                        Text("\(followers) подписчиков · \(following) подписок")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if !isSelf { followButton(profile) }
+                }
+            }
+            if let profile, canView {
+                Section {
+                    NavigationLink {
+                        FeedList(source: .profile(userID: user.id))
+                            .navigationTitle("Активность")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: { Label("Активность", systemImage: "square.stack.3d.up") }
+                }
+            }
+            if let profile, !canView {
+                ContentUnavailableView("Закрытый профиль", systemImage: "lock", description: Text("Коллекция видна только одобренным подписчикам."))
             } else if loaded && shows.isEmpty {
                 ContentUnavailableView("Пока нет сериалов", systemImage: "tv")
             }
@@ -107,15 +131,37 @@ struct PublicProfileView: View {
         .refreshable { await load() }
     }
 
+    @ViewBuilder private func followButton(_ profile: PublicUser) -> some View {
+        switch profile.isFollowing {
+        case "accepted":
+            Button("Вы подписаны") { Task { await toggleFollow(unfollow: true) } }.disabled(busy)
+        case "pending":
+            Button("Запрос отправлен") { Task { await toggleFollow(unfollow: true) } }.disabled(busy)
+        default:
+            Button("Подписаться") { Task { await toggleFollow(unfollow: false) } }.disabled(busy)
+        }
+    }
+
+    private func toggleFollow(unfollow: Bool) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            if unfollow { try await session.unfollow(userID: user.id) }
+            else { _ = try await session.follow(userID: user.id) }
+            await load()
+        } catch { self.error = error.localizedDescription }
+    }
+
     private func load() async {
         guard !busy else { return }
         busy = true
         defer { busy = false }
         do {
-            let profile: PublicUser = try await session.get("users/\(user.id)")
-            self.profile = profile
+            let fetched: PublicUser = try await session.get("users/\(user.id)")
+            self.profile = fetched
             shows = []
-            if profile.isPublic {
+            if fetched.isPublic || fetched.isFollowing == "accepted" || isSelf {
                 let result: PublicCollection = try await session.get("users/\(user.id)/shows")
                 shows = result.tracked
             }

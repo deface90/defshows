@@ -34,12 +34,16 @@ struct FeedItem: Decodable, Identifiable {
     var read: Bool
     let payload: String
     let createdAt: String
+    // Present for follow_request/follow_accepted — the user who triggered it.
+    let actorId: Int?
     var title: String {
         switch type {
         case "episode_released": return "Новая серия"
         case "episode_upcoming": return "Скоро серия"
         case "season_upcoming": return "Скоро сезон"
         case "season_finale": return "Финал сезона"
+        case "follow_request": return "Запрос на подписку"
+        case "follow_accepted": return "Новый подписчик"
         default: return "Уведомление"
         }
     }
@@ -61,6 +65,10 @@ struct PublicUser: Decodable, Identifiable {
     let displayName: String
     let isPublic: Bool
     let showsCount: Int
+    // Present only on the single-profile endpoint (GET /users/{id}); nil in the directory.
+    let isFollowing: String?
+    let followersCount: Int?
+    let followingCount: Int?
 }
 // Public profiles deliberately omit watched episode IDs.
 struct PublicCollection: Decodable { let tracked: [PublicTrackedShow] }

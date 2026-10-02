@@ -1,4 +1,5 @@
-import { ActionIcon, Badge, Card, Group, Text } from '@mantine/core'
+import { ActionIcon, Anchor, Badge, Card, Group, Text } from '@mantine/core'
+import { Link } from 'react-router-dom'
 import type { NotificationItem as NotificationItemModel } from '@/shared/api/notifications/model'
 
 const typeLabels: Record<string, string> = {
@@ -6,6 +7,8 @@ const typeLabels: Record<string, string> = {
   episode_upcoming: 'Скоро эпизод',
   season_upcoming: 'Скоро сезон',
   season_finale: 'Финал сезона',
+  follow_request: 'Запрос на подписку',
+  follow_accepted: 'Новый подписчик',
 }
 
 interface NotificationItemProps {
@@ -29,7 +32,13 @@ export function NotificationItem({ item, onMarkRead, markPending }: Notification
               </Badge>
             )}
           </Group>
-          <Text size="sm">{item.payload}</Text>
+          {item.actor_id ? (
+            <Anchor component={Link} to={`/users/${item.actor_id}`} size="sm" c="inherit">
+              {item.payload}
+            </Anchor>
+          ) : (
+            <Text size="sm">{item.payload}</Text>
+          )}
         </div>
         <Group gap="xs" wrap="nowrap">
           <Text c="dimmed" size="xs" style={{ whiteSpace: 'nowrap' }}>

@@ -116,11 +116,88 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(aired.code, "S02E03")
     }
 
+    func testUserShowDecodesOwnRatingWhenPresentOrAbsent() throws {
+        let rated = try decode(TrackedList.self, #"{"tracked":[{"show":{"id":1,"tmdb_id":42,"title":"Тест","airing_status":"ended"},"user_show":{"id":3,"show_id":1,"status":"watching","favorite":false,"rating":8},"progress":{"watched":1,"total":2,"watched_episode_ids":[1],"next_unwatched_episode_id":2}}]}"#)
+        XCTAssertEqual(rated.tracked.first?.userShow.rating, 8)
+        // Absent rating stays nil (unrated show).
+        let unrated = try decode(TrackedList.self, #"{"tracked":[{"show":{"id":1,"tmdb_id":42,"title":"Тест","airing_status":"ended"},"user_show":{"id":3,"show_id":1,"status":"watching","favorite":false},"progress":{"watched":1,"total":2,"watched_episode_ids":[1],"next_unwatched_episode_id":2}}]}"#)
+        XCTAssertNil(unrated.tracked.first?.userShow.rating)
+    }
+
     func testPrivateNotesDecodeScopeAndMultilineBody() throws {
         let result = try decode(NoteList.self, #"{"notes":[{"id":3,"scope":"episode","season_number":2,"episode_number":4,"body":"Первая строка\nВторая строка"},{"id":4,"scope":"show","season_number":null,"episode_number":null,"body":"Общее"}]}"#)
         XCTAssertEqual(result.notes[0].scopeTitle, "S2E4")
         XCTAssertTrue(result.notes[0].body.contains("\n"))
         XCTAssertEqual(result.notes[1].scopeTitle, "Сериал")
+    }
+
+    func testProfileDecodesFollowFieldsWhenPresentOrAbsent() throws {
+        let withFollow = try decode(PublicUser.self, #"{"id":7,"display_name":"Аня","is_public":false,"shows_count":12,"is_following":"accepted","followers_count":5,"following_count":3}"#)
+        XCTAssertEqual(withFollow.isFollowing, "accepted")
+        XCTAssertEqual(withFollow.followersCount, 5)
+        XCTAssertEqual(withFollow.followingCount, 3)
+        // Directory listings omit the follow fields.
+        let directory = try decode(PublicUser.self, #"{"id":7,"display_name":"Аня","is_public":true,"shows_count":12}"#)
+        XCTAssertNil(directory.isFollowing)
+        XCTAssertNil(directory.followersCount)
+        XCTAssertNil(directory.followingCount)
+    }
+
+    func testFollowResultDecodesStatus() throws {
+        XCTAssertEqual(try decode(FollowResult.self, #"{"status":"pending"}"#).status, "pending")
+        XCTAssertEqual(try decode(FollowResult.self, #"{"status":"accepted"}"#).status, "accepted")
+    }
+
+    func testFollowUserListDecodesFollowersFollowingAndIncoming() throws {
+        let list = try decode(FollowUserList.self, #"{"users":[{"id":1,"display_name":"Аня","is_public":true},{"id":2,"display_name":"Петя","is_public":false}],"total":2}"#)
+        XCTAssertEqual(list.total, 2)
+        XCTAssertEqual(list.users.count, 2)
+        XCTAssertEqual(list.users.first?.displayName, "Аня")
+        XCTAssertTrue(list.users[0].isPublic)
+        XCTAssertFalse(list.users[1].isPublic)
+        // An empty incoming-requests list decodes to zero rows.
+        let empty = try decode(FollowUserList.self, #"{"users":[],"total":0}"#)
+        XCTAssertEqual(empty.total, 0)
+        XCTAssertTrue(empty.users.isEmpty)
+    }
+
+    func testFeedCardGroupsWatchedEpisodesIntoARange() throws {
+        let card = try decode(FeedCard.self, #"{"type":"watched_episode","count":3,"created_at":"2026-05-01T10:00:00Z","show":{"id":1,"tmdb_id":1399,"title":"Game of Thrones","poster_url":"https://cdn/p.jpg"},"episodes":[{"season_number":2,"episode_number":5},{"season_number":2,"episode_number":1},{"season_number":2,"episode_number":3}]}"#)
+        XCTAssertNil(card.actor)
+        XCTAssertEqual(card.show.tmdbId, 1399)
+        XCTAssertEqual(card.label, "Серии S02E01–E05 · 3 серий")
+    }
+
+    func testFeedCardDecodesStandaloneTypesAndActor() throws {
+        let rated = try decode(FeedCard.self, #"{"type":"rated_show","count":0,"created_at":"2026-05-01T10:00:00Z","show":{"id":1,"tmdb_id":1399,"title":"GoT"},"rating":8,"actor":{"id":5,"display_name":"Аня","is_public":true}}"#)
+        XCTAssertEqual(rated.actor?.displayName, "Аня")
+        XCTAssertEqual(rated.label, "Оценка 8/10")
+
+        let season = try decode(FeedCard.self, #"{"type":"finished_season","count":0,"created_at":"2026-05-01T10:00:00Z","show":{"id":1,"tmdb_id":1,"title":"GoT"},"season_number":2}"#)
+        XCTAssertEqual(season.label, "Сезон 2 завершён")
+
+        let added = try decode(FeedCard.self, #"{"type":"added_show","count":0,"created_at":"2026-05-01T10:00:00Z","show":{"id":1,"tmdb_id":1,"title":"GoT"}}"#)
+        XCTAssertEqual(added.label, "Добавлен в коллекцию")
+    }
+
+    func testFeedCardPageDecodesCardsAndCursor() throws {
+        let page = try decode(FeedCardPage.self, #"{"cards":[{"type":"added_show","count":0,"created_at":"2026-05-01T10:00:00Z","show":{"id":1,"tmdb_id":1,"title":"GoT"}}],"next_cursor":"abc"}"#)
+        XCTAssertEqual(page.cards.count, 1)
+        XCTAssertEqual(page.nextCursor, "abc")
+        let last = try decode(FeedCardPage.self, #"{"cards":[]}"#)
+        XCTAssertNil(last.nextCursor)
+    }
+
+    func testFollowNotificationTitles() throws {
+        let request = try decode(FeedItem.self, #"{"id":1,"type":"follow_request","read":false,"payload":"Аня хочет на вас подписаться","created_at":"2026-05-01T10:00:00Z","actor_id":42}"#)
+        XCTAssertEqual(request.title, "Запрос на подписку")
+        XCTAssertEqual(request.actorId, 42)
+        let accepted = try decode(FeedItem.self, #"{"id":2,"type":"follow_accepted","read":true,"payload":"Петя принял вашу заявку","created_at":"2026-05-01T10:00:00Z","actor_id":7}"#)
+        XCTAssertEqual(accepted.title, "Новый подписчик")
+        // A non-follow notification without actor_id still decodes (actorId nil).
+        let release = try decode(FeedItem.self, #"{"id":3,"type":"episode_released","read":false,"payload":"Вышла серия","created_at":"2026-05-01T10:00:00Z"}"#)
+        XCTAssertEqual(release.title, "Новая серия")
+        XCTAssertNil(release.actorId)
     }
 
 }

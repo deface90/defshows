@@ -13,6 +13,7 @@ import (
 	notesapi "github.com/deface90/defshows/backend/pkg/server/notes"
 	notificationsapi "github.com/deface90/defshows/backend/pkg/server/notifications"
 	showsapi "github.com/deface90/defshows/backend/pkg/server/shows"
+	socialapi "github.com/deface90/defshows/backend/pkg/server/social"
 	trackingapi "github.com/deface90/defshows/backend/pkg/server/tracking"
 	usersapi "github.com/deface90/defshows/backend/pkg/server/users"
 	"github.com/deface90/defshows/backend/pkg/storage"
@@ -61,7 +62,7 @@ func NewAuthRouter(h *AuthHandler, jwt *auth.JWTManager) *echo.Echo {
 // NewWebRouter builds the echo router for the web service: auth, catalog, and
 // tracking on one echo. Public auth endpoints and catalog images do not require
 // a Bearer access token.
-func NewWebRouter(authH *AuthHandler, showsH *ShowsHandler, trackingH *TrackingHandler, notificationsH *NotificationsHandler, notesH *NotesHandler, adminH *AdminHandler, usersH *UsersHandler, jwt *auth.JWTManager, imageStore *storage.S3, imageClient *http.Client, corsOrigins ...string) *echo.Echo {
+func NewWebRouter(authH *AuthHandler, showsH *ShowsHandler, trackingH *TrackingHandler, notificationsH *NotificationsHandler, notesH *NotesHandler, adminH *AdminHandler, usersH *UsersHandler, socialH *SocialHandler, jwt *auth.JWTManager, imageStore *storage.S3, imageClient *http.Client, corsOrigins ...string) *echo.Echo {
 	e := echo.New()
 	e.Use(middleware.Recover())
 	// CORS runs before the auth guard so browser preflight (OPTIONS) is answered
@@ -82,6 +83,7 @@ func NewWebRouter(authH *AuthHandler, showsH *ShowsHandler, trackingH *TrackingH
 	notesapi.RegisterHandlers(e, notesH)
 	adminapi.RegisterHandlers(e, adminH)
 	usersapi.RegisterHandlers(e, usersH)
+	socialapi.RegisterHandlers(e, socialH)
 	return e
 }
 

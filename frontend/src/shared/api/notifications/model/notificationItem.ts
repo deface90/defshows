@@ -12,4 +12,6 @@ export interface NotificationItem {
   read: boolean;
   payload: string;
   created_at: string;
+  /** User who triggered the notification (e.g. the follower for follow_request/follow_accepted) */
+  actor_id?: number;
 }

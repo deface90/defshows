@@ -21,14 +21,17 @@ func NewTrackingRepository(db *gorm.DB) *TrackingRepository {
 }
 
 // AddUserShow inserts a tracked show. Returns ErrConflict if already tracked.
-func (r *TrackingRepository) AddUserShow(ctx context.Context, us *entity.UserShow) error {
-	if err := r.db.WithContext(ctx).Create(us).Error; err != nil {
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return ErrConflict
+// Any activity events are written in the same transaction as the insert.
+func (r *TrackingRepository) AddUserShow(ctx context.Context, us *entity.UserShow, events ...entity.ActivityEvent) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(us).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return ErrConflict
+			}
+			return err
 		}
-		return err
-	}
-	return nil
+		return insertActivityEvents(tx, events...)
+	})
 }
 
 // GetUserShow returns a user's tracked show by (userID, showID) or ErrNotFound.
@@ -94,6 +97,23 @@ func (r *TrackingRepository) UpdateUserShow(ctx context.Context, us *entity.User
 		}).Error
 }
 
+// SetRating writes only the rating column for a tracked show (nil clears it),
+// leaving status/favorite/dubbing untouched so a rating change never clobbers them
+// and vice versa.
+func (r *TrackingRepository) SetRating(ctx context.Context, userShowID int64, rating *int, events ...entity.ActivityEvent) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&entity.UserShow{}).
+			Where("id = ?", userShowID).
+			Updates(map[string]any{
+				"rating":     rating,
+				"updated_at": gorm.Expr("now()"),
+			}).Error; err != nil {
+			return err
+		}
+		return insertActivityEvents(tx, events...)
+	})
+}
+
 // RemoveUserShow deletes a user's tracked show.
 func (r *TrackingRepository) RemoveUserShow(ctx context.Context, userID, showID int64) error {
 	return r.db.WithContext(ctx).
@@ -101,12 +121,18 @@ func (r *TrackingRepository) RemoveUserShow(ctx context.Context, userID, showID 
 		Delete(&entity.UserShow{}).Error
 }
 
-// UpsertUserEpisode marks/updates a per-episode watch record.
-func (r *TrackingRepository) UpsertUserEpisode(ctx context.Context, ue *entity.UserEpisode) error {
-	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "user_show_id"}, {Name: "episode_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"watched", "watched_at", "rating"}),
-	}).Create(ue).Error
+// UpsertUserEpisode marks/updates a per-episode watch record. Any activity events
+// are written in the same transaction as the upsert.
+func (r *TrackingRepository) UpsertUserEpisode(ctx context.Context, ue *entity.UserEpisode, events ...entity.ActivityEvent) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_show_id"}, {Name: "episode_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"watched", "watched_at", "rating"}),
+		}).Create(ue).Error; err != nil {
+			return err
+		}
+		return insertActivityEvents(tx, events...)
+	})
 }
 
 // WatchedEpisodeIDs returns the ids of watched episodes for a user show.
@@ -142,7 +168,7 @@ func (r *TrackingRepository) DeleteLink(ctx context.Context, userShowID, linkID 
 // separately) and skips episodes that have not aired yet (air_date in the
 // future or unknown). Existing watch dates and ratings are preserved on
 // repeated calls.
-func (r *TrackingRepository) WatchShow(ctx context.Context, userID, showID int64) error {
+func (r *TrackingRepository) WatchShow(ctx context.Context, userID, showID int64, events ...entity.ActivityEvent) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&entity.UserShow{}).
@@ -153,7 +179,7 @@ func (r *TrackingRepository) WatchShow(ctx context.Context, userID, showID int64
 		if count == 0 {
 			return ErrNotFound
 		}
-		return tx.Exec(`
+		if err := tx.Exec(`
    INSERT INTO user_episodes (user_show_id, episode_id, watched, watched_at)
    SELECT us.id, e.id, true, now()
    FROM user_shows us JOIN episodes e ON e.show_id = us.show_id
@@ -162,7 +188,10 @@ func (r *TrackingRepository) WatchShow(ctx context.Context, userID, showID int64
    ON CONFLICT (user_show_id, episode_id) DO UPDATE
    SET watched = true, watched_at = EXCLUDED.watched_at
    WHERE user_episodes.watched = false
-  `, userID, showID).Error
+  `, userID, showID).Error; err != nil {
+			return err
+		}
+		return insertActivityEvents(tx, events...)
 	})
 }
 

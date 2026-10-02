@@ -121,6 +121,10 @@ components:
         read: { type: boolean }
         payload: { type: string }
         created_at: { type: string }
+        actor_id:
+          type: integer
+          format: int64
+          description: User who triggered the notification (e.g. the follower for follow_request/follow_accepted)
     NotificationFeed:
       type: object
       required: [notifications]

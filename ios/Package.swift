@@ -11,8 +11,9 @@ let package = Package(
             "Assets.xcassets", "PushNotifications.swift", "DefShows.entitlements",
             "DefShowsApp.swift", "Keychain.swift", "Session.swift", "LibraryView.swift",
             "ShowView.swift", "ShowInformation.swift", "ShowNotesView.swift", "MainTabsView.swift", "CatalogBrowseView.swift",
-            "NotificationsView.swift", "UsersView.swift", "SettingsView.swift"
-        ], sources: ["Models.swift", "BrowseModels.swift"]),
+            "NotificationsView.swift", "UsersView.swift", "SettingsView.swift", "FollowsView.swift",
+            "FeedView.swift"
+        ], sources: ["Models.swift", "BrowseModels.swift", "Social.swift"]),
         .testTarget(name: "DefShowsModelsTests", dependencies: ["DefShowsModels"], path: "Tests")
     ]
 )

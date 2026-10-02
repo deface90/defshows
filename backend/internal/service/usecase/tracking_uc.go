@@ -14,18 +14,20 @@ import (
 var (
 	ErrAlreadyTracked = errors.New("usecase: show already tracked")
 	ErrNotTracked     = errors.New("usecase: show not tracked")
+	ErrInvalidRating  = errors.New("usecase: rating must be between 1 and 10")
 )
 
 // TrackingRepo is the storage dependency of TrackingUsecase.
 type TrackingRepo interface {
 	UpdateLink(ctx context.Context, userShowID, linkID int64, value string) error
-	WatchShow(ctx context.Context, userID, showID int64) error
-	AddUserShow(ctx context.Context, us *entity.UserShow) error
+	WatchShow(ctx context.Context, userID, showID int64, events ...entity.ActivityEvent) error
+	AddUserShow(ctx context.Context, us *entity.UserShow, events ...entity.ActivityEvent) error
 	GetUserShow(ctx context.Context, userID, showID int64) (*entity.UserShow, error)
 	ListUserShows(ctx context.Context, userID int64, status string) ([]entity.UserShow, error)
 	UpdateUserShow(ctx context.Context, us *entity.UserShow) error
+	SetRating(ctx context.Context, userShowID int64, rating *int, events ...entity.ActivityEvent) error
 	RemoveUserShow(ctx context.Context, userID, showID int64) error
-	UpsertUserEpisode(ctx context.Context, ue *entity.UserEpisode) error
+	UpsertUserEpisode(ctx context.Context, ue *entity.UserEpisode, events ...entity.ActivityEvent) error
 	WatchedEpisodeIDs(ctx context.Context, userShowID int64) ([]int64, error)
 	AddLink(ctx context.Context, link *entity.UserShowLink) error
 	ListLinks(ctx context.Context, userShowID int64) ([]entity.UserShowLink, error)
@@ -93,7 +95,8 @@ func (uc *TrackingUsecase) AddShow(ctx context.Context, userID, tmdbID int64) (*
 		return nil, err
 	}
 	us := &entity.UserShow{UserID: userID, ShowID: show.ID, Status: entity.StatusWatching}
-	if err := uc.repo.AddUserShow(ctx, us); err != nil {
+	event := entity.ActivityEvent{UserID: userID, Type: entity.EventAddedShow, ShowID: show.ID}
+	if err := uc.repo.AddUserShow(ctx, us, event); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
 			return nil, ErrAlreadyTracked
 		}
@@ -156,7 +159,14 @@ func (uc *TrackingUsecase) tracked(ctx context.Context, us *entity.UserShow) (Tr
 }
 
 // UpdateShow updates status/favorite/preferred dubbing.
-func (uc *TrackingUsecase) UpdateShow(ctx context.Context, userID, showID int64, status *string, favorite *bool, dubbing *string) (*entity.UserShow, error) {
+// UpdateShow applies a partial update. status/favorite/dubbing follow absent=unchanged.
+// Rating is special: rating!=nil sets it (validated 1..10), while clearRating removes it;
+// if neither is given the rating is left untouched. Rating is persisted separately from
+// the other fields so the two never clobber each other.
+func (uc *TrackingUsecase) UpdateShow(ctx context.Context, userID, showID int64, status *string, favorite *bool, dubbing *string, rating *int, clearRating bool) (*entity.UserShow, error) {
+	if rating != nil && (*rating < 1 || *rating > 10) {
+		return nil, ErrInvalidRating
+	}
 	us, err := uc.repo.GetUserShow(ctx, userID, showID)
 	if err != nil {
 		return nil, notTracked(err)
@@ -173,21 +183,116 @@ func (uc *TrackingUsecase) UpdateShow(ctx context.Context, userID, showID int64,
 	if err := uc.repo.UpdateUserShow(ctx, us); err != nil {
 		return nil, err
 	}
+	if rating != nil || clearRating {
+		newRating := rating // nil when clearRating
+		var events []entity.ActivityEvent
+		// Emit rated_show on a genuine set or change, but not on a clear or a no-op
+		// re-set of the same value.
+		if rating != nil && (us.Rating == nil || *us.Rating != *rating) {
+			events = append(events, entity.ActivityEvent{
+				UserID: userID, Type: entity.EventRatedShow, ShowID: showID, Rating: rating,
+			})
+		}
+		if err := uc.repo.SetRating(ctx, us.ID, newRating, events...); err != nil {
+			return nil, err
+		}
+		us.Rating = newRating
+	}
 	return us, nil
 }
 
-// SetEpisodeWatched marks or unmarks an episode as watched.
+// SetEpisodeWatched marks or unmarks an episode as watched. Marking a newly-watched
+// episode emits a watched_episode event, plus finished_season / finished_show when
+// that mark completes the season or the whole show (aired episodes only). Un-marking,
+// or re-marking an already-watched episode, emits nothing.
 func (uc *TrackingUsecase) SetEpisodeWatched(ctx context.Context, userID, showID, episodeID int64, watched bool) error {
 	us, err := uc.repo.GetUserShow(ctx, userID, showID)
 	if err != nil {
 		return notTracked(err)
 	}
 	ue := &entity.UserEpisode{UserShowID: us.ID, EpisodeID: episodeID, Watched: watched}
+	var events []entity.ActivityEvent
 	if watched {
 		now := time.Now()
 		ue.WatchedAt = &now
+		if events, err = uc.watchEpisodeEvents(ctx, us, episodeID, now); err != nil {
+			return err
+		}
 	}
-	return uc.repo.UpsertUserEpisode(ctx, ue)
+	return uc.repo.UpsertUserEpisode(ctx, ue, events...)
+}
+
+// watchEpisodeEvents builds the activity events produced by marking episodeID
+// watched: a watched_episode event, and finished_season / finished_show when this
+// mark completes the season or the show (over aired episodes). Returns no events when
+// the episode was already watched (idempotent re-mark) or is unknown to the catalog.
+func (uc *TrackingUsecase) watchEpisodeEvents(ctx context.Context, us *entity.UserShow, episodeID int64, now time.Time) ([]entity.ActivityEvent, error) {
+	episodes, err := uc.catalog.Episodes(ctx, us.ShowID)
+	if err != nil {
+		return nil, err
+	}
+	watchedIDs, err := uc.repo.WatchedEpisodeIDs(ctx, us.ID)
+	if err != nil {
+		return nil, err
+	}
+	watched := make(map[int64]bool, len(watchedIDs))
+	for _, id := range watchedIDs {
+		watched[id] = true
+	}
+	if watched[episodeID] {
+		return nil, nil // already watched — the mark is a no-op, emit nothing
+	}
+	var target *entity.Episode
+	for i := range episodes {
+		if episodes[i].ID == episodeID {
+			target = &episodes[i]
+			break
+		}
+	}
+	if target == nil {
+		return nil, nil // not in the catalog — nothing to describe
+	}
+	season := target.SeasonNumber
+	events := []entity.ActivityEvent{{
+		UserID: us.UserID, Type: entity.EventWatchedEpisode, ShowID: us.ShowID,
+		SeasonNumber: &season, EpisodeID: &episodeID,
+	}}
+	// Completion is defined over aired episodes only, matching progress semantics.
+	// An unaired mark can never complete anything, so it stays a lone watched event.
+	if !aired(target.AirDate, now) {
+		return events, nil
+	}
+	seasonAired, seasonWatched := 0, 0
+	showAired, showWatched := 0, 0
+	for i := range episodes {
+		e := &episodes[i]
+		if !aired(e.AirDate, now) {
+			continue
+		}
+		watchedAfter := watched[e.ID] || e.ID == episodeID
+		showAired++
+		if watchedAfter {
+			showWatched++
+		}
+		if e.SeasonNumber == season {
+			seasonAired++
+			if watchedAfter {
+				seasonWatched++
+			}
+		}
+	}
+	if season > 0 && seasonAired > 0 && seasonWatched == seasonAired {
+		sn := season
+		events = append(events, entity.ActivityEvent{
+			UserID: us.UserID, Type: entity.EventFinishedSeason, ShowID: us.ShowID, SeasonNumber: &sn,
+		})
+	}
+	if showAired > 0 && showWatched == showAired {
+		events = append(events, entity.ActivityEvent{
+			UserID: us.UserID, Type: entity.EventFinishedShow, ShowID: us.ShowID,
+		})
+	}
+	return events, nil
 }
 
 // GetProgress returns progress for a tracked show.
@@ -374,9 +479,45 @@ func notTracked(err error) error {
 }
 
 // WatchShow marks all currently-aired episodes watched, without changing the
-// show's status.
+// show's status. Because every aired episode ends up watched, it emits a single
+// finished_show event plus one finished_season per aired season — never per-episode
+// watched events. Emits nothing when the show has no aired episodes.
 func (uc *TrackingUsecase) WatchShow(ctx context.Context, userID, showID int64) error {
-	return notTracked(uc.repo.WatchShow(ctx, userID, showID))
+	episodes, err := uc.catalog.Episodes(ctx, showID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	airedSeasons := map[int]bool{}
+	anyAired := false
+	for i := range episodes {
+		e := &episodes[i]
+		if !aired(e.AirDate, now) {
+			continue
+		}
+		anyAired = true
+		if e.SeasonNumber > 0 {
+			airedSeasons[e.SeasonNumber] = true
+		}
+	}
+	var events []entity.ActivityEvent
+	if anyAired {
+		nums := make([]int, 0, len(airedSeasons))
+		for n := range airedSeasons {
+			nums = append(nums, n)
+		}
+		sort.Ints(nums)
+		for _, n := range nums {
+			sn := n
+			events = append(events, entity.ActivityEvent{
+				UserID: userID, Type: entity.EventFinishedSeason, ShowID: showID, SeasonNumber: &sn,
+			})
+		}
+		events = append(events, entity.ActivityEvent{
+			UserID: userID, Type: entity.EventFinishedShow, ShowID: showID,
+		})
+	}
+	return notTracked(uc.repo.WatchShow(ctx, userID, showID, events...))
 }
 
 // UpdateLink edits an existing link without changing its identity, label or kind.

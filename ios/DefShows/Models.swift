@@ -40,6 +40,8 @@ struct ShowReference: Decodable {
 struct UserShow: Decodable {
     let status: String
     let favorite: Bool
+    /// The user's own 1..10 score; nil when unrated.
+    let rating: Int?
     var statusTitle: String {
         switch status {
         case "watching": return "Смотрю"

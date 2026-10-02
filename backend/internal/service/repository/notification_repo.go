@@ -57,6 +57,15 @@ func (r *NotificationRepository) CreateNotificationIfAbsent(ctx context.Context,
 	return res.RowsAffected > 0, nil
 }
 
+// DeleteByDedupeKeys removes notifications by their dedupe keys. Used to clear stale
+// follow notifications on unfollow/reject so a later re-follow re-fires them.
+func (r *NotificationRepository) DeleteByDedupeKeys(ctx context.Context, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Where("dedupe_key IN ?", keys).Delete(&entity.Notification{}).Error
+}
+
 // ListForUser returns a user's notification feed, newest first.
 func (r *NotificationRepository) ListForUser(ctx context.Context, userID int64, limit int) ([]entity.Notification, error) {
 	if limit <= 0 || limit > 200 {

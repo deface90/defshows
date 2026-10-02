@@ -1,0 +1,219 @@
+openapi: 3.0.3
+info:
+  title: defShows Social API
+  version: 0.1.0
+security:
+  - bearerAuth: []
+paths:
+  /me/follows/{userId}:
+    post:
+      operationId: followUser
+      summary: Follow a user (instant for public, a pending request for private). Idempotent.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FollowResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: unfollowUser
+      summary: Unfollow a user or cancel a pending request. Idempotent.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Error' }
+  /me/follows/incoming:
+    get:
+      operationId: listIncomingRequests
+      summary: Pending follow requests addressed to the current user
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FollowUserList' }
+        '401': { $ref: '#/components/responses/Error' }
+  /me/follows/incoming/{userId}/approve:
+    post:
+      operationId: approveFollower
+      summary: Approve a pending follow request
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /me/follows/incoming/{userId}/reject:
+    post:
+      operationId: rejectFollower
+      summary: Reject (delete) a pending follow request
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /users/{userId}/followers:
+    get:
+      operationId: listFollowers
+      summary: A user's accepted followers (visible per profile privacy)
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FollowUserList' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /users/{userId}/following:
+    get:
+      operationId: listFollowing
+      summary: Users this user follows (visible per profile privacy)
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FollowUserList' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /me/feed:
+    get:
+      operationId: getHomeFeed
+      summary: Aggregated activity of everyone the current user follows (accepted)
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FeedPage' }
+        '401': { $ref: '#/components/responses/Error' }
+  /users/{userId}/feed:
+    get:
+      operationId: getProfileFeed
+      summary: A user's activity feed (visible per profile privacy)
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FeedPage' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+      description: Opaque keyset cursor from a previous page's next_cursor
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    FollowResult:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [pending, accepted], description: Resulting follow state }
+    FollowUser:
+      type: object
+      required: [id, display_name, is_public]
+      properties:
+        id: { type: integer, format: int64 }
+        display_name: { type: string }
+        is_public: { type: boolean }
+    FollowUserList:
+      type: object
+      required: [users, total]
+      properties:
+        total: { type: integer, format: int64 }
+        users:
+          type: array
+          items: { $ref: '#/components/schemas/FollowUser' }
+    FeedShow:
+      type: object
+      required: [id, tmdb_id, title]
+      properties:
+        id: { type: integer, format: int64 }
+        tmdb_id: { type: integer, format: int64 }
+        title: { type: string }
+        poster_url: { type: string }
+    FeedEpisode:
+      type: object
+      required: [season_number, episode_number]
+      properties:
+        season_number: { type: integer }
+        episode_number: { type: integer }
+    FeedCard:
+      type: object
+      required: [type, show, count, created_at]
+      properties:
+        actor: { $ref: '#/components/schemas/FollowUser' }
+        type:
+          type: string
+          enum: [watched_episode, finished_season, finished_show, added_show, rated_show]
+        show: { $ref: '#/components/schemas/FeedShow' }
+        season_number: { type: integer }
+        episodes:
+          type: array
+          description: Episodes grouped into a watched_episode card, newest first
+          items: { $ref: '#/components/schemas/FeedEpisode' }
+        count: { type: integer, description: Number of episodes in a watched_episode group }
+        rating: { type: integer }
+        created_at: { type: string, format: date-time }
+    FeedPage:
+      type: object
+      required: [cards]
+      properties:
+        cards:
+          type: array
+          items: { $ref: '#/components/schemas/FeedCard' }
+        next_cursor: { type: string }

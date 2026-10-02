@@ -62,9 +62,56 @@ final class Session: ObservableObject {
 
     func collectionDidChange() { collectionRevision += 1 }
 
+    /// Sets (1...10) or clears (nil) the user's own rating for a show.
+    func setRating(showID: Int, rating: Int?) async throws {
+        let body: [String: Any] = rating == nil ? ["clear_rating": true] : ["rating": rating!]
+        try await mutate("me/shows/\(showID)", method: "PATCH", body: body)
+    }
+
     func setWatched(showID: Int, episodeID: Int, watched: Bool, notifyCollection: Bool = true) async throws {
         _ = try await authorized("me/shows/\(showID)/episodes/\(episodeID)/watch", method: watched ? "POST" : "DELETE")
         if notifyCollection { collectionDidChange() }
+    }
+
+    /// The signed-in user's id, read from the `uid` claim of the access token
+    /// (decoded without verification — fine for client-side display only).
+    var currentUserID: Int? {
+        guard let token = tokens?.accessToken else { return nil }
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else { return nil }
+        var b64 = String(parts[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while b64.count % 4 != 0 { b64 += "=" }
+        guard let data = Data(base64Encoded: b64),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let uid = obj["uid"] as? Int else { return nil }
+        return uid
+    }
+
+    // MARK: Social / follows
+
+    func follow(userID: Int) async throws -> FollowResult {
+        let data = try await authorized("me/follows/\(userID)", method: "POST")
+        return try decoder.decode(FollowResult.self, from: data)
+    }
+    func unfollow(userID: Int) async throws { _ = try await authorized("me/follows/\(userID)", method: "DELETE") }
+    func approveFollower(userID: Int) async throws { _ = try await authorized("me/follows/incoming/\(userID)/approve", method: "POST") }
+    func rejectFollower(userID: Int) async throws { _ = try await authorized("me/follows/incoming/\(userID)/reject", method: "POST") }
+    func incomingRequests() async throws -> FollowUserList { try await get("me/follows/incoming") }
+    func followers(userID: Int) async throws -> FollowUserList { try await get("users/\(userID)/followers") }
+    func following(userID: Int) async throws -> FollowUserList { try await get("users/\(userID)/following") }
+
+    // MARK: Feeds
+
+    func homeFeed(cursor: String? = nil) async throws -> FeedCardPage {
+        try await get("me/feed", query: feedQuery(cursor))
+    }
+    func profileFeed(userID: Int, cursor: String? = nil) async throws -> FeedCardPage {
+        try await get("users/\(userID)/feed", query: feedQuery(cursor))
+    }
+    private func feedQuery(_ cursor: String?) -> [URLQueryItem] {
+        var q = [URLQueryItem(name: "limit", value: "20")]
+        if let cursor { q.append(URLQueryItem(name: "cursor", value: cursor)) }
+        return q
     }
 
     func logout() async throws {

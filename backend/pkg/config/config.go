@@ -30,6 +30,7 @@ type Config struct {
 	Seed     Seed
 	S3       S3
 	SMTP     SMTP
+	Social   Social
 	// Proxy, when set, routes ALL outbound service traffic that can be blocked
 	// from the host (Telegram Bot API, TMDB API, image downloads) through a
 	// proxy — e.g. socks5://user:pass@host:1080 or http://host:3128.
@@ -146,6 +147,13 @@ type Worker struct {
 	StaleAge     time.Duration
 	Throttle     time.Duration
 	Batch        int
+}
+
+// Social holds social-feed settings.
+type Social struct {
+	// FeedGroupWindow is the maximum gap between consecutive watched-episode events
+	// of the same show that still collapse into a single feed card.
+	FeedGroupWindow time.Duration
 }
 
 // TMDB holds catalog provider settings.
@@ -266,6 +274,9 @@ func Load() (Config, error) {
 		Seed: Seed{
 			AdminEmail:    getEnv("SEED_ADMIN_EMAIL", ""),
 			AdminPassword: getEnv("SEED_ADMIN_PASSWORD", ""),
+		},
+		Social: Social{
+			FeedGroupWindow: getEnvDuration("SOCIAL_FEED_GROUP_WINDOW", 12*time.Hour),
 		},
 	}
 	if err := cfg.Validate(); err != nil {

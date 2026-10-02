@@ -4,10 +4,15 @@
  * defShows Users API
  * OpenAPI spec version: 0.1.0
  */
+import type { UserProfileIsFollowing } from './userProfileIsFollowing';
 
 export interface UserProfile {
   id: number;
   display_name: string;
   is_public: boolean;
   shows_count: number;
+  /** The viewer's follow relationship to this user */
+  is_following: UserProfileIsFollowing;
+  followers_count: number;
+  following_count: number;
 }

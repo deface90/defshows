@@ -10,4 +10,12 @@ export interface UpdateShowRequest {
   status?: UpdateShowRequestStatus;
   favorite?: boolean;
   preferred_dubbing?: string;
+  /**
+     * Set the user's 1..10 score
+     * @minimum 1
+     * @maximum 10
+     */
+  rating?: number;
+  /** When true, remove the existing rating (ignored if rating is also set) */
+  clear_rating?: boolean;
 }

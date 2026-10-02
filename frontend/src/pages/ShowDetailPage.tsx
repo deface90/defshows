@@ -5,6 +5,7 @@ import { AddShowButton } from '@/features/add-show/AddShowButton'
 import { ContinueWatching } from '@/features/mark-watched/ContinueWatching'
 import { NotesList } from '@/features/notes/NotesList'
 import { StatusSelect } from '@/features/show-status/StatusSelect'
+import { RatingControl } from '@/features/rate-show/RatingControl'
 // import { RecapView } from '@/entities/recap/RecapView'
 import { SeasonAccordion } from '@/entities/episode/SeasonAccordion'
 import { AiringStatusBadge } from '@/entities/show/AiringStatusBadge'
@@ -101,12 +102,20 @@ export function ShowDetailContent({ show, preview = false, backTo = '/search' }:
 
             {trackedShow && !preview ? (
               <Stack gap="sm" mt="xs">
-                <Box maw={260}>
-                  <Text size="xs" c="dimmed" mb={4}>
-                    Мой статус
-                  </Text>
-                  <StatusSelect showId={show.id} status={trackedShow.user_show.status} />
-                </Box>
+                <Group gap="md" align="flex-start">
+                  <Box maw={260}>
+                    <Text size="xs" c="dimmed" mb={4}>
+                      Мой статус
+                    </Text>
+                    <StatusSelect showId={show.id} status={trackedShow.user_show.status} />
+                  </Box>
+                  <Box>
+                    <Text size="xs" c="dimmed" mb={4}>
+                      Моя оценка
+                    </Text>
+                    <RatingControl showId={show.id} rating={trackedShow.user_show.rating} />
+                  </Box>
+                </Group>
                 <Box>
                   <WatchShowButton
                     showId={show.id}

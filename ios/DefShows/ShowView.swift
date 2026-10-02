@@ -75,6 +75,15 @@ struct ShowView: View {
                 }
             } label: { LabeledContent("Мой статус", value: tracked.userShow.statusTitle) }
             .disabled(changing || loading)
+            Menu {
+                Button("Без оценки") { Task { await perform { try await session.setRating(showID: showID, rating: nil) } } }
+                ForEach(Array(stride(from: 10, through: 1, by: -1)), id: \.self) { score in
+                    Button("\(score)") { Task { await perform { try await session.setRating(showID: showID, rating: score) } } }
+                }
+            } label: {
+                LabeledContent("Моя оценка", value: tracked.userShow.rating.map { "\($0)" } ?? "—")
+            }
+            .disabled(changing || loading)
             let progress = tracked.progress
             ProgressView(value: Double(min(progress.watched, progress.total)), total: Double(max(progress.total, 1)))
             Text("\(progress.watched) из \(progress.total) вышедших серий · \(progress.total > 0 ? Int((Double(progress.watched) / Double(progress.total) * 100).rounded()) : 0)%")

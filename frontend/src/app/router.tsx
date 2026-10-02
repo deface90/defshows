@@ -10,6 +10,8 @@ import { HomePage } from '@/pages/HomePage'
 import { LegalPage } from '@/pages/LegalPage'
 import { PrivacyPage } from '@/pages/PrivacyPage'
 import { MyShowsPage } from '@/pages/MyShowsPage'
+import { FollowsPage } from '@/pages/FollowsPage'
+import { FeedPage } from '@/pages/FeedPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
 import { RegisterPage } from '@/pages/RegisterPage'
@@ -54,6 +56,8 @@ export const router = createBrowserRouter([
               { path: 'shows/:id', element: <ShowDetailPage /> },
               { path: 'users', element: <UsersPage /> },
               { path: 'users/:id', element: <UserProfilePage /> },
+              { path: 'follows', element: <FollowsPage /> },
+              { path: 'feed', element: <FeedPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'settings', element: <SettingsPage /> },
               {

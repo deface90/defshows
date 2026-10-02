@@ -28,4 +28,5 @@ export default defineConfig({
   notes: contract('notes'),
   admin: contract('admin'),
   users: contract('users'),
+  social: contract('social'),
 })

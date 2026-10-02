@@ -59,7 +59,7 @@ func TestTMDBImagesPublicProxy(t *testing.T) {
 					Header: http.Header{"Content-Type": {tc.contentType}, "Etag": {`"poster-etag"`}, "Location": {"https://evil.example/"}},
 				}, nil
 			})}
-			e := NewWebRouter(nil, nil, nil, nil, nil, nil, nil, auth.NewJWTManager("secret", time.Hour), nil, client)
+			e := NewWebRouter(nil, nil, nil, nil, nil, nil, nil, nil, auth.NewJWTManager("secret", time.Hour), nil, client)
 			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
 			req.Header.Set("Cookie", "private=value")
 			req.Header.Set("If-None-Match", `"poster-etag"`)

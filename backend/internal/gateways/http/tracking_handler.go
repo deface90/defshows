@@ -14,14 +14,15 @@ import (
 
 // TrackingHandler implements the generated tracking ServerInterface.
 type TrackingHandler struct {
-	uc   *usecase.TrackingUsecase
-	home *usecase.HomeUsecase
-	auth *usecase.AuthUsecase
+	uc     *usecase.TrackingUsecase
+	home   *usecase.HomeUsecase
+	auth   *usecase.AuthUsecase
+	social *usecase.SocialUsecase
 }
 
 // NewTrackingHandler creates a TrackingHandler.
-func NewTrackingHandler(uc *usecase.TrackingUsecase, homeUC *usecase.HomeUsecase, authUC *usecase.AuthUsecase) *TrackingHandler {
-	return &TrackingHandler{uc: uc, home: homeUC, auth: authUC}
+func NewTrackingHandler(uc *usecase.TrackingUsecase, homeUC *usecase.HomeUsecase, authUC *usecase.AuthUsecase, socialUC *usecase.SocialUsecase) *TrackingHandler {
+	return &TrackingHandler{uc: uc, home: homeUC, auth: authUC, social: socialUC}
 }
 
 var _ trackingapi.ServerInterface = (*TrackingHandler)(nil)
@@ -131,7 +132,8 @@ func (h *TrackingHandler) UpdateShow(c echo.Context, showID trackingapi.ShowId) 
 		s := string(*req.Status)
 		status = &s
 	}
-	us, err := h.uc.UpdateShow(c.Request().Context(), uid, showID, status, req.Favorite, req.PreferredDubbing)
+	clearRating := req.ClearRating != nil && *req.ClearRating
+	us, err := h.uc.UpdateShow(c.Request().Context(), uid, showID, status, req.Favorite, req.PreferredDubbing, req.Rating, clearRating)
 	if err != nil {
 		return trackingErr(err)
 	}
@@ -273,6 +275,12 @@ func (h *TrackingHandler) UpdateSettings(c echo.Context) error {
 		if err != nil {
 			return err
 		}
+		// Opting the profile public auto-accepts everyone who was waiting on a request.
+		if *req.IsPublic && h.social != nil {
+			if err := h.social.OnProfileMadePublic(ctx, uid); err != nil {
+				return err
+			}
+		}
 	}
 	return c.JSON(http.StatusOK, trackingapi.Settings{Timezone: u.Timezone, IsPublic: u.IsPublic})
 }
@@ -280,6 +288,9 @@ func (h *TrackingHandler) UpdateSettings(c echo.Context) error {
 func trackingErr(err error) error {
 	if errors.Is(err, usecase.ErrNotTracked) {
 		return echo.NewHTTPError(http.StatusNotFound, "not tracked")
+	}
+	if errors.Is(err, usecase.ErrInvalidRating) {
+		return echo.NewHTTPError(http.StatusBadRequest, "rating must be between 1 and 10")
 	}
 	return err
 }
@@ -292,6 +303,7 @@ func toAPIUserShow(us *entity.UserShow) trackingapi.UserShow {
 		Status:           trackingapi.UserShowStatus(us.Status),
 		Favorite:         us.Favorite,
 		PreferredDubbing: &dub,
+		Rating:           us.Rating,
 	}
 }
 
