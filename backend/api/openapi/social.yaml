@@ -58,6 +58,14 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FollowUserList' }
         '401': { $ref: '#/components/responses/Error' }
+  /me/followers/{userId}:
+    delete:
+      operationId: removeFollower
+      summary: Remove (eject) an existing follower or pending requester. Idempotent.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Error' }
   /me/follows/incoming:
     get:
       operationId: listIncomingRequests

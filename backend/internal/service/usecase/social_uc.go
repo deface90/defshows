@@ -214,6 +214,21 @@ func (uc *SocialUsecase) Reject(ctx context.Context, ownerID, followerID int64) 
 	return nil
 }
 
+// RemoveFollower ejects followerID from ownerID's followers (or a pending requester):
+// it deletes the follower→owner edge and clears its follow notifications. Idempotent:
+// a no-op when there is no such edge.
+func (uc *SocialUsecase) RemoveFollower(ctx context.Context, ownerID, followerID int64) error {
+	err := uc.repo.DeleteFollow(ctx, followerID, ownerID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	uc.clearFollowNotifications(ctx, followerID, ownerID)
+	return nil
+}
+
 // Incoming returns the users with a pending request to the owner.
 func (uc *SocialUsecase) Incoming(ctx context.Context, ownerID int64) ([]entity.User, error) {
 	return uc.repo.ListIncoming(ctx, ownerID)

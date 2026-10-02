@@ -347,15 +347,15 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: `backend/internal/gateways/http/social_handler_test.go`
 - Regenerate: `backend/pkg/server/social` (via `make generate`)
 
-- [ ] add `RemoveFollower(ctx, ownerID, followerID)` to the usecase: delete the
+- [x] add `RemoveFollower(ctx, ownerID, followerID)` to the usecase: delete the
       follower→owner edge (reuse `DeleteFollow(followerID, ownerID)`), clear its follow
       notifications; idempotent (no-op if absent)
-- [ ] add `DELETE /me/followers/{userId}` to `social.yaml` (204); `make generate`
-- [ ] implement `RemoveFollower` handler method
-- [ ] write usecase tests: removes an accepted follower, idempotent when none, pending request
+- [x] add `DELETE /me/followers/{userId}` to `social.yaml` (204); `make generate`
+- [x] implement `RemoveFollower` handler method
+- [x] write usecase tests: removes an accepted follower, idempotent when none, pending request
       also removable (equivalent to reject)
-- [ ] write handler test: 204 + the follower disappears from `GET /users/{me}/followers`
-- [ ] run `go test ./...` (backend) — green before next task
+- [x] write handler test: 204 + the follower disappears from `GET /users/{me}/followers`
+- [x] run `go test ./...` (backend) — green before next task
 
 ### Slice 4 — Report (backend)
 

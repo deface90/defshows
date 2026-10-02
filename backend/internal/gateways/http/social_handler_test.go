@@ -286,6 +286,48 @@ func TestSocial_Blocks(t *testing.T) {
 	}
 }
 
+func TestSocial_RemoveFollower(t *testing.T) {
+	e := newWebServer(t)
+
+	aID, aTok := registerUser(t, e, "rmalice@soc.com")
+	bID, bTok := registerUser(t, e, "rmbob@soc.com")
+
+	// alice goes public so bob's follow is accepted immediately.
+	if rec := doJSON(t, e, http.MethodPatch, "/me/settings", aTok, map[string]any{"is_public": true}); rec.Code != http.StatusOK {
+		t.Fatalf("alice public: %d", rec.Code)
+	}
+
+	// bob follows alice → accepted.
+	if rec := doJSON(t, e, http.MethodPost, "/me/follows/"+strconv.FormatInt(aID, 10), bTok, nil); rec.Code != http.StatusOK {
+		t.Fatalf("bob follow alice: %d", rec.Code)
+	}
+
+	// alice sees bob among her followers.
+	rec := doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(aID, 10)+"/followers", aTok, nil)
+	var followers socialapi.FollowUserList
+	_ = json.Unmarshal(rec.Body.Bytes(), &followers)
+	if followers.Total != 1 || len(followers.Users) != 1 || followers.Users[0].Id != bID {
+		t.Fatalf("followers before remove: %+v", followers)
+	}
+
+	// alice removes bob → 204.
+	if rec := doJSON(t, e, http.MethodDelete, "/me/followers/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("remove follower: want 204, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	// bob disappears from alice's followers.
+	rec = doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(aID, 10)+"/followers", aTok, nil)
+	_ = json.Unmarshal(rec.Body.Bytes(), &followers)
+	if followers.Total != 0 {
+		t.Fatalf("followers after remove: %d", followers.Total)
+	}
+
+	// Idempotent: removing again → 204.
+	if rec := doJSON(t, e, http.MethodDelete, "/me/followers/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("re-remove follower: want 204, got %d", rec.Code)
+	}
+}
+
 func TestSocial_AutoAcceptOnGoingPublic(t *testing.T) {
 	e := newWebServer(t)
 	ownerID, ownerTok := registerUser(t, e, "owner@soc.com")

@@ -191,6 +191,9 @@ type ServerInterface interface {
 	// GetHomeFeed Aggregated activity of everyone the current user follows (accepted)
 	// (GET /me/feed)
 	GetHomeFeed(ctx echo.Context, params GetHomeFeedParams) error
+	// RemoveFollower Remove (eject) an existing follower or pending requester. Idempotent.
+	// (DELETE /me/followers/{userId})
+	RemoveFollower(ctx echo.Context, userId UserId) error
 	// ListIncomingRequests Pending follow requests addressed to the current user
 	// (GET /me/follows/incoming)
 	ListIncomingRequests(ctx echo.Context) error
@@ -301,6 +304,22 @@ func (w *ServerInterfaceWrapper) GetHomeFeed(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.GetHomeFeed(ctx, params)
+	return err
+}
+
+// RemoveFollower converts echo context to params.
+func (w *ServerInterfaceWrapper) RemoveFollower(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.RemoveFollower(ctx, userId)
 	return err
 }
 
@@ -525,6 +544,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.DELETE(options.BaseURL+"/me/blocks/:userId", wrapper.UnblockUser, options.OperationMiddlewares["unblockUser"]...)
 	router.POST(options.BaseURL+"/me/blocks/:userId", wrapper.BlockUser, options.OperationMiddlewares["blockUser"]...)
 	router.GET(options.BaseURL+"/me/blocks", wrapper.ListBlocks, options.OperationMiddlewares["listBlocks"]...)
+	router.DELETE(options.BaseURL+"/me/followers/:userId", wrapper.RemoveFollower, options.OperationMiddlewares["removeFollower"]...)
 	router.GET(options.BaseURL+"/me/follows/incoming", wrapper.ListIncomingRequests, options.OperationMiddlewares["listIncomingRequests"]...)
 	router.POST(options.BaseURL+"/me/follows/incoming/:userId/approve", wrapper.ApproveFollower, options.OperationMiddlewares["approveFollower"]...)
 	router.POST(options.BaseURL+"/me/follows/incoming/:userId/reject", wrapper.RejectFollower, options.OperationMiddlewares["rejectFollower"]...)
@@ -540,30 +560,31 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7FhRb9s2EP4rBDegCaDGTpvtwW9pUW/ZijVoVuwhCAyaPNlsJZIhT069wP99IClZki3HStu0S7c8ReaJ",
-	"d/fdx7uPuqVc50YrUOjo6JYaZlkOCDY8vSys09b/J8BxKw1KreiIvjHsugDyAZYOkPBgRVKrc8KIsbCQ",
-	"unDEsBk8cUTBR5xEE5pQ6V+/LsAuaUIVy4GO6HrR8TnkzLvDpfErDq1UM7paJfS1zCX6pa4dsrDY3EBA",
-	"yooM6ejZMKE5+yjzIqejn/yDVPHhOKncSIUwAxv8nLMZ7HLjM+r2ctxwcjwMf708Xci/7/Q2cd5gf2LH",
-	"Pfy9c2DPxNqbYTivnRVxMaEWrgtpQdAR2gKanlNtc4Zx059PaIePlX/dGa0cBPq8sjayh2uFoEL5mDGZ",
-	"5MwTafDeeTbdNnz8aCGlI/rDoGblIK66QdwteGmzsVqogm37NlYbsChjSDk4V1Z4m2N17pdrw6t1nnr6",
-	"HjjSVULHAOIls2J7e8Yxer0rkbHOMn3jy+E347qIyLST+qPIp2CJTgkY6bQAR6QijNww5HMQk/JXMrO6",
-	"MB3FSCi3wBDEhGGreoIhPEWZQ/1SBUFCK1/b8byqoggOQRCpUHfEw5kVCVFwAw5JKq3z51Ii5G4vLACi",
-	"9OJDKWNj1rKlf7YMfZB14RqpOmBOq4kKmO0wmeubPhFceLu1+1sKyp+oS7qRJ01oKpV0/qfovfWL3ySh",
-	"TIj6wYZihIerZA/5wmoZc8WQVkF3sbLCb4uYZdh3Q7QPxY0o2/bJpo9dMVYdth2g5034pzdXwgnsIEpz",
-	"4Ow95tHtrlAvStK0Q5WiVztMqNEOwU4Km3UEklCUmEH3Si6mk55uNhKSvolX71c+OvMLXegtuDBNNnN0",
-	"yLDoaAPRXqoZScP7xBt6rlbnxIASPouEMs7BIIj9dC+d7Y4y9MqtGIV0JmPLSRxhHTD2LpR0E1NMM8kb",
-	"20y1zoCpboBbrpvv353Da+k6sEaNLOsZqZ/T9zgmrUnTPigbacWNkzKY7TRCf+CFlbi88LvH0KfALNjT",
-	"Auf107jK4re//qykSwA0rNZZzRFNHOdSpToAEQ+E1zj+5DlyoblkGTk9P6MJXYB1kYTDo+Ojoc9IG1DM",
-	"SDqiz4+GR89pElRNiGyQw2Caaf4hPM0g4O5RD9LD6yDqq/EimiQt4XvZjWptMgg9bJX0sgsab3W1oY2e",
-	"DYdfTBltEKxDIr353cN1MjzetdU6tkFDTRV5zuySjoJ0dATn4LW+BYXE04XMmSMBYxDkwLCZVH4+HYaX",
-	"a/wHt1FcrmI3yQBhuxbvVDAOVL1vMUph2wHxSYeu0uRliflnIRLjJSwgcUTOBORG+22Pqs6/neSLb5Pi",
-	"sHeK9wPEW598GnwvGuCRg7zAgmWEF/hUp+nhBpolmVIAsfMo/wL4q87Bz+x7Y1tecnuc5ngHfdijXAmk",
-	"L3+IT2czCzN/QgnjKBcSl+F6sQC71Aq2j3ec8I4cVJO8Ptnl0kAqrvNSlu/ssWel0Vu4LsCho4+5FZ5H",
-	"fVPJH1vmRJgQFpwDQVBvQbkTt3VvHDBjrF5EYdzZPE6jQUzw39slP6MplBkSRkwnyD1QtBDUyk4Q34b1",
-	"7xjDmCA5iHP2sD+W/YZ0WgvKxzGly6zLSaMt4UxxyBq4lID0HOHjhwDgS7e/8lJ3R/N7SEnw/GvwfNyq",
-	"64FUDplCkmpL4k0s2S5xXLVywRC6REa4AtW9ZJ/gOLc6ldmnaY6KC8l/WZ18NbKcBpY8cbXu8bUlBwvp",
-	"5DQDYsDzIlQz8oMvD7spUQ6Ou++U47XVw9Hi+7+Afgt2RJlL1mX+ZIrsk8TjtdX/FHkEFKm+f0i3cTPa",
-	"Q4/GR7NQ2+bnssur1dXqnwAAAP//",
+	"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",
+	"AP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -116,6 +116,18 @@ func (h *SocialHandler) UnfollowUser(c echo.Context, targetID socialapi.UserId) 
 	return c.NoContent(http.StatusNoContent)
 }
 
+// RemoveFollower handles DELETE /me/followers/{userId}.
+func (h *SocialHandler) RemoveFollower(c echo.Context, targetID socialapi.UserId) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	if err := h.social.RemoveFollower(c.Request().Context(), uid, targetID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 // ListIncomingRequests handles GET /me/follows/incoming.
 func (h *SocialHandler) ListIncomingRequests(c echo.Context) error {
 	uid, ok := userID(c)

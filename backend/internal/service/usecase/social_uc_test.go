@@ -491,6 +491,54 @@ func TestSocialUsecase_Approve_BlockedIsNoop(t *testing.T) {
 	}
 }
 
+func TestSocialUsecase_RemoveFollower(t *testing.T) {
+	ctx := context.Background()
+	const owner, follower = int64(2), int64(3)
+
+	// Removing an accepted follower drops them and clears the pair's follow notifications.
+	uc, notifier := newSocialUC(owner, follower)
+	if _, err := uc.Follow(ctx, follower, owner); err != nil { // follower -> owner (owner is public → accepted)
+		t.Fatalf("follow: %v", err)
+	}
+	if followers, _, _ := uc.Followers(ctx, owner, 10, 0); len(followers) != 1 {
+		t.Fatalf("expected one follower before remove, got %d", len(followers))
+	}
+	if err := uc.RemoveFollower(ctx, owner, follower); err != nil {
+		t.Fatalf("remove follower: %v", err)
+	}
+	if followers, _, _ := uc.Followers(ctx, owner, 10, 0); len(followers) != 0 {
+		t.Fatalf("follower should be gone after remove, got %d", len(followers))
+	}
+	if len(notifier.created) != 0 {
+		t.Fatalf("remove should clear follow notifications, got %+v", notifier.created)
+	}
+
+	// Removing again (none present) is a no-op.
+	if err := uc.RemoveFollower(ctx, owner, follower); err != nil {
+		t.Fatalf("second remove should be a no-op: %v", err)
+	}
+
+	// A pending requester is also removable (equivalent to reject). Here the private
+	// user is the owner, so a follow request to them stays pending.
+	const pubUser, privOwner = int64(2), int64(3)
+	uc2, notifier2 := newSocialUC(pubUser, privOwner)
+	if _, err := uc2.Follow(ctx, pubUser, privOwner); err != nil { // pubUser -> privOwner stays pending
+		t.Fatalf("pending follow: %v", err)
+	}
+	if len(mustIncoming(t, uc2, privOwner)) != 1 {
+		t.Fatalf("expected one pending requester before remove")
+	}
+	if err := uc2.RemoveFollower(ctx, privOwner, pubUser); err != nil {
+		t.Fatalf("remove pending requester: %v", err)
+	}
+	if len(mustIncoming(t, uc2, privOwner)) != 0 {
+		t.Fatalf("pending requester should be gone after remove")
+	}
+	if len(notifier2.created) != 0 {
+		t.Fatalf("remove should clear the pending request notification, got %+v", notifier2.created)
+	}
+}
+
 func mustIncoming(t *testing.T, uc *usecase.SocialUsecase, id int64) []entity.User {
 	t.Helper()
 	in, err := uc.Incoming(context.Background(), id)
