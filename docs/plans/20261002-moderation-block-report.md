@@ -570,12 +570,12 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 
 ### Task 17: Documentation
 
-- [ ] update `backend/CLAUDE.md` (blocks + block-aware `CanViewProfile`/`Follow`, reports
+- [x] update `backend/CLAUDE.md` (blocks + block-aware `CanViewProfile`/`Follow`, reports
       repo/usecase + admin moderation, remove-follower, display_name in settings)
-- [ ] update `frontend/CLAUDE.md` (block/report features, admin reports section) and
+- [x] update `frontend/CLAUDE.md` (block/report features, admin reports section) and
       `ios/README.md` (new settings/moderation UI)
-- [ ] update memory `impl-status` with the moderation layer
-- [ ] move this plan to `docs/plans/completed/` — **held until the iOS Mac/CI gate passes**
+- [x] update memory `impl-status` with the moderation layer
+- [ ] HELD — move to `docs/plans/completed/` after iOS Mac/CI gate passes
 
 ## Post-Completion
 *Manual / external — no checkboxes.*
