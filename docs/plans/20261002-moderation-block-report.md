@@ -452,15 +452,18 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: `frontend/src/entities/activity/FeedCard.tsx` (actor overflow: Block/Report)
 - Regenerate: `frontend/src/shared/api/social/*` (via `npm run api:gen`)
 
-- [ ] `npm run api:gen` for the new social endpoints
-- [ ] `BlockButton` (block/unblock) wired to mutations, invalidating the profile + directory
+- [x] `npm run api:gen` for the new social endpoints
+- [x] `BlockButton` (block/unblock) wired to mutations, invalidating the profile + directory
       queries; blocking a user also hides their collection/feed (handled server-side — just
-      refetch)
-- [ ] `ReportModal` (reason select + optional note) → `POST /me/reports`, success toast
-- [ ] mount both on the profile overflow menu and on feed-card actors
-- [ ] write tests: BlockButton block/unblock mutation bodies; ReportModal submit body +
-      validation (reason required)
-- [ ] run gate — `npx tsc -b` + `npx vitest run` + `npm run build` — green before next task
+      refetch) (added `useBlockMutations` hook + standalone `BlockButton` unblock control;
+      feed refetch via an `onBlocked`/`reload` slot since `ActivityFeed` holds local state)
+- [x] `ReportModal` (reason select + optional note) → `POST /me/reports`, success toast
+- [x] mount both on the profile overflow menu and on feed-card actors (shared `ModerationMenu`
+      composition; `FeedCardView`/`ActivityFeed` gained a page-supplied `renderActorMenu` slot
+      to respect the FSD rule that entities can't import features)
+- [x] write tests: BlockButton block/unblock mutation bodies; ReportModal submit body +
+      validation (reason required); ModerationMenu block + report-open flows
+- [x] run gate — `npx tsc -b` + `npx vitest run` + `npm run build` — green before next task
 
 #### Task 12: Settings (blocked list + display_name) + remove-follower in /follows
 
