@@ -102,6 +102,14 @@ func (r *UserRepository) SetPublic(ctx context.Context, userID int64, public boo
 		Updates(map[string]any{"is_public": public, "updated_at": time.Now()}).Error
 }
 
+// UpdateDisplayName sets a user's display name. An empty string is stored as-is
+// (callers reset to the derived default by passing "").
+func (r *UserRepository) UpdateDisplayName(ctx context.Context, userID int64, name string) error {
+	return r.db.WithContext(ctx).Model(&entity.User{}).
+		Where("id = ?", userID).
+		Updates(map[string]any{"display_name": name, "updated_at": time.Now()}).Error
+}
+
 // UpdateTimezone sets a user's timezone.
 func (r *UserRepository) UpdateTimezone(ctx context.Context, userID int64, tz string) error {
 	return r.db.WithContext(ctx).Model(&entity.User{}).

@@ -252,7 +252,7 @@ func (h *TrackingHandler) GetSettings(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
 	}
-	return c.JSON(http.StatusOK, trackingapi.Settings{Timezone: u.Timezone, IsPublic: u.IsPublic})
+	return c.JSON(http.StatusOK, toAPISettings(u))
 }
 
 // UpdateSettings handles PATCH /me/settings.
@@ -270,6 +270,15 @@ func (h *TrackingHandler) UpdateSettings(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if req.DisplayName != nil {
+		u, err = h.auth.SetDisplayName(ctx, uid, *req.DisplayName)
+		if err != nil {
+			if errors.Is(err, usecase.ErrInvalidName) {
+				return echo.NewHTTPError(http.StatusBadRequest, "display name must be 1..50 characters")
+			}
+			return err
+		}
+	}
 	if req.IsPublic != nil {
 		u, err = h.auth.SetProfileVisibility(ctx, uid, *req.IsPublic)
 		if err != nil {
@@ -282,7 +291,17 @@ func (h *TrackingHandler) UpdateSettings(c echo.Context) error {
 			}
 		}
 	}
-	return c.JSON(http.StatusOK, trackingapi.Settings{Timezone: u.Timezone, IsPublic: u.IsPublic})
+	return c.JSON(http.StatusOK, toAPISettings(u))
+}
+
+// toAPISettings builds the Settings payload, echoing the effective display name
+// (displayNameOf applies the derived fallback when the stored name is blank).
+func toAPISettings(u *entity.User) trackingapi.Settings {
+	return trackingapi.Settings{
+		Timezone:    u.Timezone,
+		IsPublic:    u.IsPublic,
+		DisplayName: displayNameOf(u),
+	}
 }
 
 func trackingErr(err error) error {

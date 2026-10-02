@@ -73,6 +73,13 @@ func (f *fakeRepo) UpdateTimezone(_ context.Context, id int64, tz string) error 
 	return nil
 }
 
+func (f *fakeRepo) UpdateDisplayName(_ context.Context, id int64, name string) error {
+	if u, ok := f.users[id]; ok {
+		u.DisplayName = name
+	}
+	return nil
+}
+
 func (f *fakeRepo) ListUsers(_ context.Context, _ string, _ []int64, _, _ int) ([]entity.User, int64, error) {
 	out := make([]entity.User, 0, len(f.users))
 	for _, u := range f.users {
@@ -512,5 +519,66 @@ func TestAuth_ResetPassword_InvalidToken(t *testing.T) {
 	uc := newUC(repo)
 	if err := uc.ResetPassword(context.Background(), "bogus", "newpass1"); !errors.Is(err, usecase.ErrInvalidResetToken) {
 		t.Fatalf("want ErrInvalidResetToken, got %v", err)
+	}
+}
+
+func TestAuth_SetDisplayName(t *testing.T) {
+	repo := newFake()
+	uc := newUC(repo)
+	ctx := context.Background()
+	u, _, err := uc.Register(ctx, "name@x.io", "pw12345", "agent")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	// Set a name.
+	got, err := uc.SetDisplayName(ctx, u.ID, "Алиса")
+	if err != nil {
+		t.Fatalf("set name: %v", err)
+	}
+	if got.DisplayName != "Алиса" {
+		t.Fatalf("want stored name Алиса, got %q", got.DisplayName)
+	}
+
+	// Trims surrounding whitespace.
+	got, err = uc.SetDisplayName(ctx, u.ID, "  Bob  ")
+	if err != nil {
+		t.Fatalf("set trimmed name: %v", err)
+	}
+	if got.DisplayName != "Bob" {
+		t.Fatalf("want trimmed name Bob, got %q", got.DisplayName)
+	}
+
+	// Blank (whitespace-only) resets to the empty stored value.
+	got, err = uc.SetDisplayName(ctx, u.ID, "   ")
+	if err != nil {
+		t.Fatalf("blank reset: %v", err)
+	}
+	if got.DisplayName != "" {
+		t.Fatalf("want blank reset to empty, got %q", got.DisplayName)
+	}
+}
+
+func TestAuth_SetDisplayName_TooLong(t *testing.T) {
+	repo := newFake()
+	uc := newUC(repo)
+	ctx := context.Background()
+	u, _, err := uc.Register(ctx, "long@x.io", "pw12345", "agent")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	// 51 runes exceeds the 50-rune bound.
+	tooLong := strings.Repeat("я", 51)
+	if _, err := uc.SetDisplayName(ctx, u.ID, tooLong); !errors.Is(err, usecase.ErrInvalidName) {
+		t.Fatalf("want ErrInvalidName, got %v", err)
+	}
+
+	// Exactly 50 runes is accepted.
+	ok := strings.Repeat("я", 50)
+	if got, err := uc.SetDisplayName(ctx, u.ID, ok); err != nil {
+		t.Fatalf("50 runes should be valid: %v", err)
+	} else if got.DisplayName != ok {
+		t.Fatalf("want 50-rune name stored, got %q", got.DisplayName)
 	}
 }

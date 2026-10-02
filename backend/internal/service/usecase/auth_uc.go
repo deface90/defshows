@@ -10,7 +10,9 @@ import (
 	"errors"
 	"html"
 	"net/url"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -27,7 +29,12 @@ var (
 	ErrInvalidHandoff     = errors.New("usecase: invalid oauth handoff code")
 	ErrInvalidResetToken  = errors.New("usecase: invalid or expired reset token")
 	ErrNoPassword         = errors.New("usecase: account has no password set")
+	ErrInvalidName        = errors.New("usecase: display name must be 1..50 characters")
 )
+
+// displayNameMaxRunes bounds an explicit display name (blank input resets to the
+// derived default instead of storing an empty string).
+const displayNameMaxRunes = 50
 
 // passwordResetTTL is how long an emailed reset link stays valid.
 const passwordResetTTL = time.Hour
@@ -55,6 +62,7 @@ type UserRepo interface {
 	FindUserByID(ctx context.Context, id int64) (*entity.User, error)
 	ListUsers(ctx context.Context, query string, excludeIDs []int64, limit, offset int) ([]entity.User, int64, error)
 	UpdateTimezone(ctx context.Context, userID int64, tz string) error
+	UpdateDisplayName(ctx context.Context, userID int64, name string) error
 	SetPublic(ctx context.Context, userID int64, public bool) error
 	UpdatePasswordHash(ctx context.Context, userID int64, hash string) error
 	DeleteUser(ctx context.Context, userID int64) error
@@ -308,6 +316,20 @@ func (uc *AuthUsecase) DeleteAccount(ctx context.Context, userID int64) error {
 // UpdateTimezone updates the user's timezone and returns the fresh user.
 func (uc *AuthUsecase) UpdateTimezone(ctx context.Context, userID int64, tz string) (*entity.User, error) {
 	if err := uc.repo.UpdateTimezone(ctx, userID, tz); err != nil {
+		return nil, err
+	}
+	return uc.repo.FindUserByID(ctx, userID)
+}
+
+// SetDisplayName updates the user's display name and returns the fresh user. The
+// name is trimmed; a blank result is stored as "" so displayNameOf falls back to
+// the derived default. A non-blank name must be 1..50 runes, else ErrInvalidName.
+func (uc *AuthUsecase) SetDisplayName(ctx context.Context, userID int64, name string) (*entity.User, error) {
+	name = strings.TrimSpace(name)
+	if name != "" && utf8.RuneCountInString(name) > displayNameMaxRunes {
+		return nil, ErrInvalidName
+	}
+	if err := uc.repo.UpdateDisplayName(ctx, userID, name); err != nil {
 		return nil, err
 	}
 	return uc.repo.FindUserByID(ctx, userID)

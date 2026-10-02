@@ -235,16 +235,37 @@ func TestWebSlice_EndToEnd(t *testing.T) {
 		t.Fatalf("rating not cleared: %+v", afterClear.Rating)
 	}
 
-	// Settings roundtrip.
-	rec = doJSON(t, e, http.MethodPatch, "/me/settings", token, map[string]string{"timezone": "Europe/Moscow"})
+	// Settings roundtrip, including an editable display name.
+	rec = doJSON(t, e, http.MethodPatch, "/me/settings", token, map[string]string{"timezone": "Europe/Moscow", "display_name": "  Slice User  "})
 	if rec.Code != http.StatusOK {
-		t.Fatalf("update settings: %d", rec.Code)
+		t.Fatalf("update settings: %d (%s)", rec.Code, rec.Body.String())
+	}
+	var updated trackingapi.Settings
+	_ = json.Unmarshal(rec.Body.Bytes(), &updated)
+	if updated.DisplayName != "Slice User" {
+		t.Fatalf("display name not trimmed/echoed: %+v", updated)
 	}
 	rec = doJSON(t, e, http.MethodGet, "/me/settings", token, nil)
 	var settings trackingapi.Settings
 	_ = json.Unmarshal(rec.Body.Bytes(), &settings)
-	if settings.Timezone != "Europe/Moscow" {
+	if settings.Timezone != "Europe/Moscow" || settings.DisplayName != "Slice User" {
 		t.Fatalf("settings: %+v", settings)
+	}
+
+	// Blank display name resets to the derived default (email local part).
+	rec = doJSON(t, e, http.MethodPatch, "/me/settings", token, map[string]string{"timezone": "Europe/Moscow", "display_name": "   "})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("reset display name: %d (%s)", rec.Code, rec.Body.String())
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &updated)
+	if updated.DisplayName != "slice" {
+		t.Fatalf("blank display name should fall back to email local part, got %+v", updated)
+	}
+
+	// Over-long display name → 400.
+	rec = doJSON(t, e, http.MethodPatch, "/me/settings", token, map[string]string{"timezone": "Europe/Moscow", "display_name": strings.Repeat("я", 51)})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("over-long display name: want 400, got %d", rec.Code)
 	}
 
 	// Unauthenticated access → 401.

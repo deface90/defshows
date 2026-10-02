@@ -426,20 +426,20 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: `backend/internal/gateways/http/tracking_handler.go` (+ `tracking_handler_test.go`)
 - Regenerate: `backend/pkg/server/tracking` (via `make generate`)
 
-- [ ] add `AuthUsecase.SetDisplayName(ctx, userID, name)`: trim; blank → store `""` (reset);
+- [x] add `AuthUsecase.SetDisplayName(ctx, userID, name)`: trim; blank → store `""` (reset);
       else 1..50 runes else `ErrInvalidName`; return fresh user
-- [ ] add a `display_name` setter on the user repo if one isn't already reusable
-- [ ] extend `UpdateSettingsRequest` with optional `display_name`; add `display_name` to the
+- [x] add a `display_name` setter on the user repo (`UserRepository.UpdateDisplayName`)
+- [x] extend `UpdateSettingsRequest` with optional `display_name`; add `display_name` to the
       `Settings` response schema (echo effective name via `displayNameOf`); `make generate`
-- [ ] handle `display_name` in `UpdateSettings` (call `SetDisplayName` when present;
+- [x] handle `display_name` in `UpdateSettings` (call `SetDisplayName` when present;
       `ErrInvalidName` → 400)
-- [ ] note the inherited fallback mismatch (conscious choice, don't "fix" here): after a user
+- [x] note the inherited fallback mismatch (conscious choice, don't "fix" here): after a user
       blanks their name, `displayNameOf` falls back to the email local part while
       `actorName` (notification payloads, `social_uc.go`) falls back to `Пользователь #id` —
       labels may differ across surfaces; acceptable for now
-- [ ] write usecase tests: set name, trim, blank resets, too-long → error; handler test:
-      settings PATCH sets name (echoed) + invalid 400
-- [ ] run `go test ./...` (backend) — green before next task
+- [x] write usecase tests: set name, trim, blank resets, too-long → error; handler test:
+      settings PATCH sets name (echoed) + invalid 400 + blank-reset fallback
+- [x] run `go test ./...` (backend) — green before next task
 
 ### Slice 6 — Web frontend
 

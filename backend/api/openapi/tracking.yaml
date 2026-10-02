@@ -368,13 +368,15 @@ components:
         minutes_watched: { type: integer, format: int64, description: "Summed runtime of watched episodes, in minutes" }
     Settings:
       type: object
-      required: [timezone, is_public]
+      required: [timezone, is_public, display_name]
       properties:
         timezone: { type: string }
         is_public: { type: boolean }
+        display_name: { type: string, description: Effective display name (falls back to a derived default when unset) }
     UpdateSettingsRequest:
       type: object
       required: [timezone]
       properties:
         timezone: { type: string }
         is_public: { type: boolean }
+        display_name: { type: string, description: "New display name; blank resets to the derived default; 1..50 characters otherwise" }
