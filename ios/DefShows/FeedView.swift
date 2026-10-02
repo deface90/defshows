@@ -21,6 +21,7 @@ struct FeedList: View {
     @State private var loaded = false
     @State private var busy = false
     @State private var error: String?
+    @State private var reportingActor: FollowUser?
 
     var body: some View {
         List {
@@ -28,13 +29,33 @@ struct FeedList: View {
             if loaded && cards.isEmpty {
                 ContentUnavailableView("Пока пусто", systemImage: "square.stack.3d.up", description: Text(emptyText))
             }
-            ForEach(cards) { FeedCardRow(card: $0) }
+            ForEach(cards) { card in
+                FeedCardRow(card: card)
+                    .modifier(FeedActorActions(actor: card.actor,
+                                               onBlock: { actor in Task { await block(actor) } },
+                                               onReport: { actor in reportingActor = actor }))
+            }
             if cursor != nil {
                 Button("Показать ещё") { Task { await loadMore() } }.disabled(busy)
             }
         }
+        .sheet(item: $reportingActor) { actor in
+            ReportSheet(userID: actor.id, displayName: actor.displayName)
+        }
         .task { await reload() }
         .refreshable { await reload() }
+    }
+
+    /// Blocks a feed-card actor; the server tears down the follow edge, so a reload
+    /// drops their activity from the home feed.
+    private func block(_ actor: FollowUser) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await session.block(userID: actor.id)
+            await reload()
+        } catch { self.error = error.localizedDescription }
     }
 
     private var emptyText: String {
@@ -89,5 +110,28 @@ struct FeedCardRow: View {
             Text(card.label).font(.subheadline).foregroundStyle(.orange)
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// Adds a long-press context menu (Block / Report) to a feed card when it carries
+/// an actor (home feed only). Profile feeds have no actor, so the menu is absent.
+private struct FeedActorActions: ViewModifier {
+    let actor: FollowUser?
+    let onBlock: (FollowUser) -> Void
+    let onReport: (FollowUser) -> Void
+
+    func body(content: Content) -> some View {
+        if let actor {
+            content.contextMenu {
+                Button(role: .destructive) { onBlock(actor) } label: {
+                    Label("Заблокировать \(actor.displayName)", systemImage: "hand.raised")
+                }
+                Button { onReport(actor) } label: {
+                    Label("Пожаловаться", systemImage: "exclamationmark.bubble")
+                }
+            }
+        } else {
+            content
+        }
     }
 }

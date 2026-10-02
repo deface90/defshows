@@ -84,6 +84,14 @@ struct AccountSettings: Decodable {
     var isPublic: Bool
     // Effective display name (server falls back to a derived default when unset).
     var displayName: String
+
+    /// Whether a proposed display name is acceptable before saving. Blank is allowed
+    /// (resets to the server default); otherwise 1...50 characters after trimming,
+    /// mirroring the backend `SetDisplayName` bounds.
+    static func isValidDisplayName(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed.count <= 50
+    }
 }
 struct NotificationPreferences: Decodable {
     var episodeRelease: Bool

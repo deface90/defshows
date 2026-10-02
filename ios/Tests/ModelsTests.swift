@@ -195,6 +195,18 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(settings.displayName, "Аня")
     }
 
+    func testDisplayNameValidationBounds() throws {
+        // Blank (or whitespace-only) resets to the server default — allowed.
+        XCTAssertTrue(AccountSettings.isValidDisplayName(""))
+        XCTAssertTrue(AccountSettings.isValidDisplayName("   "))
+        // A normal name and a 50-char name are accepted; a 51-char name is rejected.
+        XCTAssertTrue(AccountSettings.isValidDisplayName("Аня"))
+        XCTAssertTrue(AccountSettings.isValidDisplayName(String(repeating: "x", count: 50)))
+        XCTAssertFalse(AccountSettings.isValidDisplayName(String(repeating: "x", count: 51)))
+        // Surrounding whitespace is trimmed before the length check.
+        XCTAssertTrue(AccountSettings.isValidDisplayName("  " + String(repeating: "x", count: 50) + "  "))
+    }
+
     func testBlockedListDecodesAsFollowUserList() throws {
         // GET /me/blocks reuses the FollowUserList shape.
         let list = try decode(FollowUserList.self, #"{"users":[{"id":9,"display_name":"Тролль","is_public":false}],"total":1}"#)

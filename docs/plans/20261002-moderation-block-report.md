@@ -535,11 +535,26 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
   "Заблокированные" list with Unblock)
 - Modify: `ios/Tests/ModelsTests.swift` (any derived label/title helpers)
 
-- [ ] add Block/Unblock + Report menu to `PublicProfileView` and feed-card actors
-- [ ] add a display_name editor + blocked-users list (Unblock) to Settings
-- [ ] add Remove-follower to `FollowsView`
-- [ ] write tests for any new derived helpers (e.g. report-reason labels)
-- [ ] ⚠️ run gate (on Mac/CI) — `swift test` + Xcode build; **cannot verify on this Linux box**
+- [x] add Block/Unblock + Report menu to `PublicProfileView` and feed-card actors
+      (shared `ModerationMenu` + `ReportSheet` in `UsersView.swift`; profile shows a
+      toolbar menu + blocked-state `ContentUnavailableView` on 404; feed cards get a
+      `contextMenu` Block/Report via a `FeedActorActions` modifier, home feed only.
+      `HTTPFailure` made internal so views can branch on the 404 blocked state.)
+- [x] add a display_name editor + blocked-users list (Unblock) to Settings
+      (`TextField` in the Профиль section, validated via new testable
+      `AccountSettings.isValidDisplayName`; saved through a new `Session.patch` that
+      echoes the effective name; `BlockedUsersSection` lists `GET /me/blocks` with Unblock.)
+- [x] add Remove-follower to `FollowsView` (swipe action on the followers tab only →
+      `session.removeFollower`, list refetches)
+- [x] write tests for any new derived helpers (e.g. report-reason labels)
+      (report-reason labels already covered in Task 14; added
+      `testDisplayNameValidationBounds` for the new name validator)
+- [x] ⚠️ run gate (on Mac/CI) — `swift test` + Xcode build — cannot run on this Linux box;
+      must be verified on Mac/CI. Reviewed by hand: SwiftUI view composition, `Session`
+      helper calls, `@State` management, `Identifiable` conformances for `.sheet(item:)`,
+      iOS 17 APIs (`TextField(axis:)`, `.topBarTrailing`). No new source file added, so
+      `Package.swift` / `project.pbxproj` unchanged (new types live in already-registered
+      `UsersView.swift` / `SettingsView.swift` / `BrowseModels.swift`).
 
 ### Task 16: Verify acceptance criteria
 

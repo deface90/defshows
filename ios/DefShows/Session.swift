@@ -56,6 +56,13 @@ final class Session: ObservableObject {
         if path.hasPrefix("me/shows") { collectionDidChange() }
     }
 
+    /// A mutation that returns a decoded response body (e.g. PATCH /me/settings echoes
+    /// the effective settings, including the server-derived display name).
+    func patch<T: Decodable>(_ path: String, body: [String: Any]? = nil) async throws -> T {
+        let data = try await authorized(path, method: "PATCH", body: body)
+        return try decoder.decode(T.self, from: data)
+    }
+
     func addShow(tmdbID: Int) async throws {
         try await mutate("me/shows", body: ["tmdb_id": tmdbID])
     }
@@ -249,7 +256,9 @@ final class Session: ObservableObject {
     }
 }
 
-private struct HTTPFailure: LocalizedError {
+/// An HTTP error carrying the status code so callers can branch on it
+/// (e.g. treat 404 on a blocked profile as a blocked state, not a failure).
+struct HTTPFailure: LocalizedError {
     let status: Int
     let message: String
     var errorDescription: String? { message }

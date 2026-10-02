@@ -39,6 +39,7 @@ private struct EdgeList: View {
     @EnvironmentObject private var session: Session
     @State private var users: [FollowUser] = []
     @State private var loaded = false
+    @State private var busy = false
     @State private var error: String?
 
     var body: some View {
@@ -56,6 +57,13 @@ private struct EdgeList: View {
                         Text(u.displayName)
                     }
                 }
+                .swipeActions(edge: .trailing) {
+                    if kind == .followers {
+                        Button(role: .destructive) { Task { await removeFollower(u) } } label: {
+                            Label("Убрать", systemImage: "person.badge.minus")
+                        }.disabled(busy)
+                    }
+                }
             }
         }
         .task { await load() }
@@ -69,6 +77,18 @@ private struct EdgeList: View {
             users = result.users
             loaded = true
             error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// Ejects an accepted follower (followers tab only); the list refetches so the
+    /// removed user disappears.
+    private func removeFollower(_ user: FollowUser) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await session.removeFollower(userID: user.id)
+            await load()
         } catch { self.error = error.localizedDescription }
     }
 }

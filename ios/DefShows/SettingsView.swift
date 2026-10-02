@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var preferences: NotificationPreferences?
     @State private var timezone = ""
     @State private var isPublic = false
+    @State private var displayName = ""
     @State private var episodeRelease = false
     @State private var seasonStart = false
     @State private var seasonFinale = false
@@ -29,7 +30,9 @@ struct SettingsView: View {
             if let message { Section { Text(message).foregroundStyle(.secondary) } }
             if busy { ProgressView() }
             if settings != nil {
-                Section("Профиль") {
+                Section {
+                    TextField("Отображаемое имя", text: $displayName)
+                        .textInputAutocapitalization(.words)
                     Toggle("Публичная коллекция", isOn: $isPublic)
                     Picker("Часовой пояс", selection: $timezone) {
                         ForEach(Array(Set(TimeZone.knownTimeZoneIdentifiers + [timezone])).sorted(), id: \.self) { zone in
@@ -37,7 +40,13 @@ struct SettingsView: View {
                         }
                     }
                     Button("Сохранить профиль") { Task { await saveProfile() } }
+                        .disabled(!displayNameValid)
+                } header: {
+                    Text("Профиль")
+                } footer: {
+                    Text("Имя видят другие пользователи. Пусто — вернётся имя по умолчанию. До 50 символов.")
                 }.disabled(busy)
+                BlockedUsersSection()
             }
             if preferences != nil {
                 Section {
@@ -69,6 +78,8 @@ struct SettingsView: View {
         .task { await load() }
     }
 
+    private var displayNameValid: Bool { AccountSettings.isValidDisplayName(displayName) }
+
     private func load() async {
         guard !busy else { return }
         busy = true
@@ -78,6 +89,7 @@ struct SettingsView: View {
             settings = account
             timezone = account.timezone
             isPublic = account.isPublic
+            displayName = account.displayName
             let prefs: NotificationPreferences = try await session.get("me/notifications/prefs")
             preferences = prefs
             episodeRelease = prefs.episodeRelease
@@ -107,7 +119,14 @@ struct SettingsView: View {
         message = nil
         defer { busy = false }
         do {
-            try await session.mutate("me/settings", method: "PATCH", body: ["timezone": timezone, "is_public": isPublic])
+            // The server echoes the effective display name (derived default when blank),
+            // so reload from the PATCH response to reflect any fallback.
+            let updated: AccountSettings = try await session.patch("me/settings", body: [
+                "timezone": timezone, "is_public": isPublic,
+                "display_name": displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            ])
+            settings = updated
+            displayName = updated.displayName
             message = "Настройки профиля сохранены."
         } catch { self.error = error.localizedDescription }
     }
@@ -125,6 +144,54 @@ struct SettingsView: View {
                 "lead_time_hours": leadTimeHours
             ])
             message = "Настройки уведомлений сохранены."
+        } catch { self.error = error.localizedDescription }
+    }
+}
+
+/// Lists the users the current user has blocked (GET /me/blocks) with an Unblock action.
+private struct BlockedUsersSection: View {
+    @EnvironmentObject private var session: Session
+    @State private var users: [FollowUser] = []
+    @State private var loaded = false
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        Section {
+            if let error { Text(error).foregroundStyle(.red) }
+            if loaded && users.isEmpty {
+                Text("Нет заблокированных пользователей").foregroundStyle(.secondary)
+            }
+            ForEach(users) { u in
+                HStack {
+                    Text(u.displayName)
+                    Spacer()
+                    Button("Разблокировать") { Task { await unblock(u) } }
+                        .buttonStyle(.bordered).controlSize(.small).disabled(busy)
+                }
+            }
+        } header: {
+            Text("Заблокированные")
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        do {
+            users = try await session.blocks().users
+            loaded = true
+            error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func unblock(_ user: FollowUser) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await session.unblock(userID: user.id)
+            users.removeAll { $0.id == user.id }
+            error = nil
         } catch { self.error = error.localizedDescription }
     }
 }
