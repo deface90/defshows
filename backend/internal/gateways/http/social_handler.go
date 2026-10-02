@@ -52,10 +52,56 @@ func (h *SocialHandler) FollowUser(c echo.Context, targetID socialapi.UserId) er
 		return echo.NewHTTPError(http.StatusBadRequest, "cannot follow yourself")
 	case errors.Is(err, usecase.ErrUserNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+	case errors.Is(err, usecase.ErrBlocked):
+		return echo.NewHTTPError(http.StatusForbidden, "blocked")
 	case err != nil:
 		return err
 	}
 	return c.JSON(http.StatusOK, socialapi.FollowResult{Status: socialapi.FollowResultStatus(f.Status)})
+}
+
+// BlockUser handles POST /me/blocks/{userId}.
+func (h *SocialHandler) BlockUser(c echo.Context, targetID socialapi.UserId) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	err := h.social.Block(c.Request().Context(), uid, targetID)
+	switch {
+	case errors.Is(err, usecase.ErrSelfBlock):
+		return echo.NewHTTPError(http.StatusBadRequest, "cannot block yourself")
+	case errors.Is(err, usecase.ErrUserNotFound):
+		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+	case err != nil:
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// UnblockUser handles DELETE /me/blocks/{userId}.
+func (h *SocialHandler) UnblockUser(c echo.Context, targetID socialapi.UserId) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	if err := h.social.Unblock(c.Request().Context(), uid, targetID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// ListBlocks handles GET /me/blocks: the users the current user has blocked.
+func (h *SocialHandler) ListBlocks(c echo.Context, params socialapi.ListBlocksParams) error {
+	uid, ok := userID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+	}
+	p := pageParams(params.Page, params.PageSize)
+	users, total, err := h.social.Blocked(c.Request().Context(), uid, p.limit, p.offset)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, toFollowUserList(users, total))
 }
 
 // UnfollowUser handles DELETE /me/follows/{userId}.

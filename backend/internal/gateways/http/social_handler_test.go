@@ -193,6 +193,99 @@ func TestSocial_Feeds(t *testing.T) {
 	}
 }
 
+func TestSocial_Blocks(t *testing.T) {
+	e := newWebServer(t)
+
+	aID, aTok := registerUser(t, e, "blockalice@soc.com")
+	bID, bTok := registerUser(t, e, "blockbob@soc.com")
+
+	// Both go public so profiles/directory are otherwise visible.
+	for _, tok := range []string{aTok, bTok} {
+		if rec := doJSON(t, e, http.MethodPatch, "/me/settings", tok, map[string]any{"is_public": true}); rec.Code != http.StatusOK {
+			t.Fatalf("go public: %d", rec.Code)
+		}
+	}
+
+	// bob follows alice (public → accepted); establishes an edge to be torn down.
+	if rec := doJSON(t, e, http.MethodPost, "/me/follows/"+strconv.FormatInt(aID, 10), bTok, nil); rec.Code != http.StatusOK {
+		t.Fatalf("bob follow alice: %d", rec.Code)
+	}
+
+	// Self-block → 400.
+	if rec := doJSON(t, e, http.MethodPost, "/me/blocks/"+strconv.FormatInt(aID, 10), aTok, nil); rec.Code != http.StatusBadRequest {
+		t.Fatalf("self-block: want 400, got %d", rec.Code)
+	}
+
+	// alice blocks bob → 204.
+	if rec := doJSON(t, e, http.MethodPost, "/me/blocks/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("block: want 204, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	// Idempotent re-block → 204.
+	if rec := doJSON(t, e, http.MethodPost, "/me/blocks/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("re-block: want 204, got %d", rec.Code)
+	}
+
+	// alice's blocked list contains bob.
+	rec := doJSON(t, e, http.MethodGet, "/me/blocks", aTok, nil)
+	var blocked socialapi.FollowUserList
+	_ = json.Unmarshal(rec.Body.Bytes(), &blocked)
+	if blocked.Total != 1 || len(blocked.Users) != 1 || blocked.Users[0].Id != bID {
+		t.Fatalf("blocked list: %+v", blocked)
+	}
+
+	// The follow edge was torn down: bob no longer follows alice.
+	rec = doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(aID, 10)+"/followers", aTok, nil)
+	var followers socialapi.FollowUserList
+	_ = json.Unmarshal(rec.Body.Bytes(), &followers)
+	if followers.Total != 0 {
+		t.Fatalf("followers after block: %d", followers.Total)
+	}
+
+	// bob (the blocked side) cannot re-follow alice → 403.
+	if rec := doJSON(t, e, http.MethodPost, "/me/follows/"+strconv.FormatInt(aID, 10), bTok, nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("blocked re-follow: want 403, got %d", rec.Code)
+	}
+	// alice (the blocker) cannot follow bob either → 403.
+	if rec := doJSON(t, e, http.MethodPost, "/me/follows/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("blocker follow: want 403, got %d", rec.Code)
+	}
+
+	// Profile-by-id is hidden both directions → 404.
+	if rec := doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("blocker views blocked profile: want 404, got %d", rec.Code)
+	}
+	if rec := doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(aID, 10), bTok, nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("blocked views blocker profile: want 404, got %d", rec.Code)
+	}
+
+	// Directory search omits the counterpart in both directions.
+	for _, tc := range []struct {
+		tok    string
+		absent int64
+	}{{aTok, bID}, {bTok, aID}} {
+		rec := doJSON(t, e, http.MethodGet, "/users", tc.tok, nil)
+		var list usersapi.UserList
+		_ = json.Unmarshal(rec.Body.Bytes(), &list)
+		for _, u := range list.Users {
+			if u.Id == tc.absent {
+				t.Fatalf("directory still lists blocked user %d for %+v", tc.absent, list.Users)
+			}
+		}
+	}
+
+	// alice unblocks bob → 204; profile becomes viewable again.
+	if rec := doJSON(t, e, http.MethodDelete, "/me/blocks/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("unblock: want 204, got %d", rec.Code)
+	}
+	// Idempotent unblock → 204.
+	if rec := doJSON(t, e, http.MethodDelete, "/me/blocks/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("re-unblock: want 204, got %d", rec.Code)
+	}
+	if rec := doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(bID, 10), aTok, nil); rec.Code != http.StatusOK {
+		t.Fatalf("profile after unblock: want 200, got %d", rec.Code)
+	}
+}
+
 func TestSocial_AutoAcceptOnGoingPublic(t *testing.T) {
 	e := newWebServer(t)
 	ownerID, ownerTok := registerUser(t, e, "owner@soc.com")

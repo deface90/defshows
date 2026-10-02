@@ -68,12 +68,17 @@ func (r *UserRepository) FindUserByID(ctx context.Context, id int64) (*entity.Us
 }
 
 // ListUsers searches displayed names and reads only the requested directory page.
-func (r *UserRepository) ListUsers(ctx context.Context, query string, limit, offset int) ([]entity.User, int64, error) {
+func (r *UserRepository) ListUsers(ctx context.Context, query string, excludeIDs []int64, limit, offset int) ([]entity.User, int64, error) {
 	const displayName = "COALESCE(NULLIF(display_name, ''), NULLIF(split_part(email, '@', 1), ''), 'Пользователь #' || id::text)"
 	q := r.db.WithContext(ctx).Model(&entity.User{})
 	if query != "" {
 		literal := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
 		q = q.Where(displayName+" ILIKE ?", "%"+literal+"%")
+	}
+	// Skip the clause entirely when there is nothing to exclude: gorm renders
+	// `NOT IN (NULL)`, which matches nothing and would blank the directory.
+	if len(excludeIDs) > 0 {
+		q = q.Where("id NOT IN ?", excludeIDs)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {

@@ -200,22 +200,35 @@ func TestUserRepository_DirectoryPaginationAndLiteralSearch(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	first, total, err := repo.ListUsers(ctx, "alice", 1, 0)
+	first, total, err := repo.ListUsers(ctx, "alice", nil, 1, 0)
 	if err != nil || total != 2 || len(first) != 1 {
 		t.Fatalf("first page: %+v %d %v", first, total, err)
 	}
-	second, total, err := repo.ListUsers(ctx, "ALICE", 1, 1)
+	second, total, err := repo.ListUsers(ctx, "ALICE", nil, 1, 1)
 	if err != nil || total != 2 || len(second) != 1 || second[0].ID <= first[0].ID {
 		t.Fatalf("unstable pages: %+v %d %v", second, total, err)
 	}
 	for _, tc := range []struct{ q, name string }{{"%", "Bob%"}, {"_", "Bob_"}} {
-		users, total, err := repo.ListUsers(ctx, tc.q, 20, 0)
+		users, total, err := repo.ListUsers(ctx, tc.q, nil, 20, 0)
 		if err != nil || total != 1 || len(users) != 1 || users[0].DisplayName != tc.name {
 			t.Fatalf("literal search %q: %+v %d %v", tc.q, users, total, err)
 		}
 	}
-	users, total, err := repo.ListUsers(ctx, "", 2, 10)
+	users, total, err := repo.ListUsers(ctx, "", nil, 2, 10)
 	if err != nil || total != 5 || len(users) != 0 {
 		t.Fatalf("out of range: %+v %d %v", users, total, err)
+	}
+
+	// empty excludeIDs applies no exclusion (must not blank the directory via NOT IN (NULL)).
+	users, total, err = repo.ListUsers(ctx, "", []int64{}, 20, 0)
+	if err != nil || total != 5 || len(users) != 5 {
+		t.Fatalf("empty exclude no-op: %+v %d %v", users, total, err)
+	}
+
+	// non-empty excludeIDs drops the given ids from the result and the total.
+	excl := first[0].ID
+	users, total, err = repo.ListUsers(ctx, "alice", []int64{excl}, 20, 0)
+	if err != nil || total != 1 || len(users) != 1 || users[0].ID == excl {
+		t.Fatalf("exclude: %+v %d %v", users, total, err)
 	}
 }

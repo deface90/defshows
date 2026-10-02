@@ -316,24 +316,24 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - Modify: `backend/internal/gateways/http/users_handler_test.go`
 - Regenerate: `backend/pkg/server/social` (via `make generate`)
 
-- [ ] add to `social.yaml`: `POST /me/blocks/{userId}` (self → 400), `DELETE /me/blocks/{userId}`,
+- [x] add to `social.yaml`: `POST /me/blocks/{userId}` (self → 400), `DELETE /me/blocks/{userId}`,
       `GET /me/blocks` (paginated, reuse `FollowUserList`); `make generate`
-- [ ] implement `BlockUser`/`UnblockUser`/`ListBlocks` on `SocialHandler`; map `ErrSelfBlock`
+- [x] implement `BlockUser`/`UnblockUser`/`ListBlocks` on `SocialHandler`; map `ErrSelfBlock`
       → 400, `ErrUserNotFound` → 404
-- [ ] thread `ErrBlocked` → 403 through `FollowUser`
-- [ ] gate `GetUserProfile`: extract `viewerID` from claims (0 for guest; it already reads
+- [x] thread `ErrBlocked` → 403 through `FollowUser`
+- [x] gate `GetUserProfile`: extract `viewerID` from claims (0 for guest; it already reads
       claims only for follow-state) and return **404** when `IsBlockedEither(viewerID, targetID)`
-- [ ] add `excludeIDs []int64` to `auth.ListUsers` + repo `ListUsers`; in the repo **skip the
+- [x] add `excludeIDs []int64` to `auth.ListUsers` + repo `ListUsers`; in the repo **skip the
       `NOT IN` clause entirely when `excludeIDs` is empty** (gorm emits `NOT IN (NULL)` which
       matches nothing — would blank the directory for guests)
-- [ ] `UsersHandler.ListUsers` must now **extract `viewerID` from claims** (0 if guest — this
+- [x] `UsersHandler.ListUsers` must now **extract `viewerID` from claims** (0 if guest — this
       handler does not read claims today) and compute `excludeIDs` from
       `social.BlockedIDsEither(viewerID)` (empty for guests → clause skipped)
-- [ ] write handler tests: block 204/empty + self 400, unblock, list blocked; follow a blocker
+- [x] write handler tests: block 204/empty + self 400, unblock, list blocked; follow a blocker
       → 403; `GetUserProfile` of/by a blocked user → 404; directory search omits blocked users
       both directions; guest directory search still returns rows (empty `excludeIDs`)
-- [ ] write/extend repo test for `ListUsers` exclusion (incl. the empty-slice no-op case)
-- [ ] run `go test ./...` (backend) — green before next task
+- [x] write/extend repo test for `ListUsers` exclusion (incl. the empty-slice no-op case)
+- [x] run `go test ./...` (backend) — green before next task
 
 ### Slice 3 — Remove follower (backend)
 

@@ -17,6 +17,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FollowResult' }
         '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
     delete:
@@ -25,6 +26,37 @@ paths:
       parameters: [{ $ref: '#/components/parameters/UserId' }]
       responses:
         '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Error' }
+  /me/blocks/{userId}:
+    post:
+      operationId: blockUser
+      summary: Block a user (mutual cut-off). Idempotent.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '204': { description: No Content }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: unblockUser
+      summary: Unblock a user. Idempotent.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Error' }
+  /me/blocks:
+    get:
+      operationId: listBlocks
+      summary: Users the current user has blocked (paginated)
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FollowUserList' }
         '401': { $ref: '#/components/responses/Error' }
   /me/follows/incoming:
     get:

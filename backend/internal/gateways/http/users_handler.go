@@ -49,7 +49,15 @@ func (h *UsersHandler) ListUsers(c echo.Context, params usersapi.ListUsersParams
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid directory parameters")
 	}
 	ctx := c.Request().Context()
-	users, total, err := h.auth.ListUsers(ctx, query, pageSize, (page-1)*pageSize)
+	var excludeIDs []int64
+	if claims, ok := auth.ClaimsFromContext(c); ok && claims.UserID != 0 {
+		excl, err := h.social.BlockedIDs(ctx, claims.UserID)
+		if err != nil {
+			return err
+		}
+		excludeIDs = excl
+	}
+	users, total, err := h.auth.ListUsers(ctx, query, excludeIDs, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return err
 	}
@@ -78,6 +86,21 @@ func (h *UsersHandler) ListUsers(c echo.Context, params usersapi.ListUsersParams
 // GetUserProfile handles GET /users/{userId}.
 func (h *UsersHandler) GetUserProfile(c echo.Context, userID usersapi.UserId) error {
 	ctx := c.Request().Context()
+	viewerID := int64(0)
+	if claims, ok := auth.ClaimsFromContext(c); ok {
+		viewerID = claims.UserID
+	}
+	// A block hides existence both ways: return 404 (don't confirm the profile
+	// exists) when the viewer and target block each other.
+	if viewerID != 0 {
+		blocked, err := h.social.IsBlockedEither(ctx, viewerID, userID)
+		if err != nil {
+			return err
+		}
+		if blocked {
+			return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		}
+	}
 	u, err := h.auth.Me(ctx, userID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -88,10 +111,6 @@ func (h *UsersHandler) GetUserProfile(c echo.Context, userID usersapi.UserId) er
 	counts, err := h.tracking.ShowsCountByUser(ctx, userID)
 	if err != nil {
 		return err
-	}
-	viewerID := int64(0)
-	if claims, ok := auth.ClaimsFromContext(c); ok {
-		viewerID = claims.UserID
 	}
 	state, err := h.social.FollowState(ctx, viewerID, userID)
 	if err != nil {

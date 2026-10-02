@@ -73,7 +73,7 @@ func (f *fakeRepo) UpdateTimezone(_ context.Context, id int64, tz string) error 
 	return nil
 }
 
-func (f *fakeRepo) ListUsers(_ context.Context, _ string, _, _ int) ([]entity.User, int64, error) {
+func (f *fakeRepo) ListUsers(_ context.Context, _ string, _ []int64, _, _ int) ([]entity.User, int64, error) {
 	out := make([]entity.User, 0, len(f.users))
 	for _, u := range f.users {
 		out = append(out, *u)

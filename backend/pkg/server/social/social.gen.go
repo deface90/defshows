@@ -145,6 +145,12 @@ type PageSize = int
 // UserId defines model for UserId.
 type UserId = int64
 
+// ListBlocksParams defines parameters for ListBlocks.
+type ListBlocksParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // GetHomeFeedParams defines parameters for GetHomeFeed.
 type GetHomeFeedParams struct {
 	// Cursor Opaque keyset cursor from a previous page's next_cursor
@@ -173,6 +179,15 @@ type ListFollowingParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListBlocks Users the current user has blocked (paginated)
+	// (GET /me/blocks)
+	ListBlocks(ctx echo.Context, params ListBlocksParams) error
+	// UnblockUser Unblock a user. Idempotent.
+	// (DELETE /me/blocks/{userId})
+	UnblockUser(ctx echo.Context, userId UserId) error
+	// BlockUser Block a user (mutual cut-off). Idempotent.
+	// (POST /me/blocks/{userId})
+	BlockUser(ctx echo.Context, userId UserId) error
 	// GetHomeFeed Aggregated activity of everyone the current user follows (accepted)
 	// (GET /me/feed)
 	GetHomeFeed(ctx echo.Context, params GetHomeFeedParams) error
@@ -205,6 +220,63 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// ListBlocks converts echo context to params.
+func (w *ServerInterfaceWrapper) ListBlocks(ctx echo.Context) error {
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBlocksParams
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", ctx.QueryParams(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page: %s", err))
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", ctx.QueryParams(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page_size: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListBlocks(ctx, params)
+	return err
+}
+
+// UnblockUser converts echo context to params.
+func (w *ServerInterfaceWrapper) UnblockUser(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UnblockUser(ctx, userId)
+	return err
+}
+
+// BlockUser converts echo context to params.
+func (w *ServerInterfaceWrapper) BlockUser(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.BlockUser(ctx, userId)
+	return err
 }
 
 // GetHomeFeed converts echo context to params.
@@ -450,6 +522,9 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 
 	router.DELETE(options.BaseURL+"/me/follows/:userId", wrapper.UnfollowUser, options.OperationMiddlewares["unfollowUser"]...)
 	router.POST(options.BaseURL+"/me/follows/:userId", wrapper.FollowUser, options.OperationMiddlewares["followUser"]...)
+	router.DELETE(options.BaseURL+"/me/blocks/:userId", wrapper.UnblockUser, options.OperationMiddlewares["unblockUser"]...)
+	router.POST(options.BaseURL+"/me/blocks/:userId", wrapper.BlockUser, options.OperationMiddlewares["blockUser"]...)
+	router.GET(options.BaseURL+"/me/blocks", wrapper.ListBlocks, options.OperationMiddlewares["listBlocks"]...)
 	router.GET(options.BaseURL+"/me/follows/incoming", wrapper.ListIncomingRequests, options.OperationMiddlewares["listIncomingRequests"]...)
 	router.POST(options.BaseURL+"/me/follows/incoming/:userId/approve", wrapper.ApproveFollower, options.OperationMiddlewares["approveFollower"]...)
 	router.POST(options.BaseURL+"/me/follows/incoming/:userId/reject", wrapper.RejectFollower, options.OperationMiddlewares["rejectFollower"]...)
@@ -465,29 +540,30 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7Fhvb9u2E/4qBH8/oAmgxU6b7YXfBUW9ZSvWoFmxF0Fg0OLJZieRDHly6gX+7sORkiXZ8p8Uafe3r0Lz",
-	"yOfuueeOpz7y1BTWaNDo+eiRW+FEAQgurF6XzhtHf0nwqVMWldF8xN9ZcV8C+w2WHpClwYplzhRMMOtg",
-	"oUzpmRUzeOGZhk84iSY84YqO35fgljzhWhTAR3y96dM5FILgcGlpx6NTesZXq4S/VYVC2uq7IQ+b7Qsk",
-	"ZKLMkY9eDhNeiE+qKAs++pYWSsfFeVLDKI0wAxdwrsUMdsFQRP0o5y2Q82H4dxTSjfp9L9rEk8HhwM6P",
-	"wPvgwV3JNZoVOG/AyriZcAf3pXIg+QhdCW3kzLhCYLz0uwveg7Gi494a7SHI541zUT2p0Qg6pE9Ym6tU",
-	"kJAGHz2p6bGF8X8HGR/x/w0aVQ7irh/E2wJKV431Ru1sF9s6Y8Ghii4V4H2V4W2NNbHfrg3v1nGa6UdI",
-	"ka8SPgaQr4WT29eLFCPqvkDGJs/NA6WDLktNGZnpBvVzWUzBMZMxsMobCZ4pzQR7EJjOQU6qX9nMmdL2",
-	"JCPhqQOBICcCO9mTAuEbVAU0h2oKEl5jbfvzpvYiAIJkSqPp8ScVTiZMwwN4ZJlynupSIRT+IC0AskIh",
-	"VyrfhHNiSWsnkJxsEtcK1YPwRk904GyHydw8HOPBDdmt4R85aKqoW74RJ094prTy9FNE7/xClyRcSNks",
-	"XEhGWNwlB8QXdiufa4V0ErpLlTV/W8Ks3N5P0SEWN7zs2iebGLt8rDts10HSTfjjaK2ECuwRSvvBOVjm",
-	"EXaXqzeVaLquKnlUO0y4NR7BTUqX9ziScFSYQ/9OIaeTI2E2AlLUxOvzNUZvfKELvQcfXpPNGD0KLHva",
-	"QLRXesaycJ6RIWm1rhMLWlIUCRdpChZBHpZ7Bbbby9Art3yUyttcLCfxCeuh8ehEKT+x5TRXaeuaqTE5",
-	"CN1PcAe6fX5/DG+V7+EaDYr8SE/pnX5CmXRemm6hbIQVL04qZ7bDCP0hLZ3C5Q3dHl2fgnDgLkucN6tx",
-	"HcWPv/5Sjy6B0LDbRDVHtPE5VzozgYhYEDTjUOV5dmNSJXJ2eX3FE74A56MIh2fnZ0OKyFjQwio+4q/O",
-	"hmeveBKmmuDZoIBBBhAUMIPAOnEeBg+agvj3gD+YAqjMw7lm7r3tJ7UxGVRz8So5aBnH1tXdxmT0cjh8",
-	"trlo3VN7RqN3PxFNF8PzXZesvRq0pqiyKIRb8hG/nM0czOjRYSJFtVC4DBPJAtzSaGA4B5r+HWhkJKCq",
-	"KXh2Uhf/abgxJCNuDZROTVG95L2JoSK5qozew30JHj3/kvx1y/P5WbyOLbHumK6KiQkpHXgPkqHZonIn",
-	"b4PHOKuvBsJaZxbxLTW+h8nLaBADDKX3NJlXXww96r3oGVgNe12l44lkkfXFZwo0Rkifnb0kH8Gig9Dg",
-	"dpL4Puz/gzmMAbITCTkgnB7PZU1hjIMOb7P3QWfNG/QX5a7DRu0wE7GjGcdSoVPIW7xUhJyxKwmFNYR5",
-	"Vs972xSMvwQBz93+qjlwT/MbPkmLX0W5406mTpT2KDSyzDgWx7FkO2lx16mFQDjdyCDpO8xBTXc4NEJc",
-	"O5Op/POmiDq7yb953iDrV1/lqQgqeeGbSYZyy04WyqtpDswC6SJkM+ojXZ72S6J6CvzeCWa8tvpysohZ",
-	"OM4u/E/jV2gkzztH/RnqiIMrW6f5syVyaMgdr63+k8jfQCLktmc4V37jW+eAPFpfziG37W/m27vV3eqP",
-	"AAAA//8=",
+	"7FhRb9s2EP4rBDegCaDGTpvtwW9pUW/ZijVoVuwhCAyaPNlsJZIhT069wP99IClZki3HStu0S7c8ReaJ",
+	"d/fdx7uPuqVc50YrUOjo6JYaZlkOCDY8vSys09b/J8BxKw1KreiIvjHsugDyAZYOkPBgRVKrc8KIsbCQ",
+	"unDEsBk8cUTBR5xEE5pQ6V+/LsAuaUIVy4GO6HrR8TnkzLvDpfErDq1UM7paJfS1zCX6pa4dsrDY3EBA",
+	"yooM6ejZMKE5+yjzIqejn/yDVPHhOKncSIUwAxv8nLMZ7HLjM+r2ctxwcjwMf708Xci/7/Q2cd5gf2LH",
+	"Pfy9c2DPxNqbYTivnRVxMaEWrgtpQdAR2gKanlNtc4Zx059PaIePlX/dGa0cBPq8sjayh2uFoEL5mDGZ",
+	"5MwTafDeeTbdNnz8aCGlI/rDoGblIK66QdwteGmzsVqogm37NlYbsChjSDk4V1Z4m2N17pdrw6t1nnr6",
+	"HjjSVULHAOIls2J7e8Yxer0rkbHOMn3jy+E347qIyLST+qPIp2CJTgkY6bQAR6QijNww5HMQk/JXMrO6",
+	"MB3FSCi3wBDEhGGreoIhPEWZQ/1SBUFCK1/b8byqoggOQRCpUHfEw5kVCVFwAw5JKq3z51Ii5G4vLACi",
+	"9OJDKWNj1rKlf7YMfZB14RqpOmBOq4kKmO0wmeubPhFceLu1+1sKyp+oS7qRJ01oKpV0/qfovfWL3ySh",
+	"TIj6wYZihIerZA/5wmoZc8WQVkF3sbLCb4uYZdh3Q7QPxY0o2/bJpo9dMVYdth2g5034pzdXwgnsIEpz",
+	"4Ow95tHtrlAvStK0Q5WiVztMqNEOwU4Km3UEklCUmEH3Si6mk55uNhKSvolX71c+OvMLXegtuDBNNnN0",
+	"yLDoaAPRXqoZScP7xBt6rlbnxIASPouEMs7BIIj9dC+d7Y4y9MqtGIV0JmPLSRxhHTD2LpR0E1NMM8kb",
+	"20y1zoCpboBbrpvv353Da+k6sEaNLOsZqZ/T9zgmrUnTPigbacWNkzKY7TRCf+CFlbi88LvH0KfALNjT",
+	"Auf107jK4re//qykSwA0rNZZzRFNHOdSpToAEQ+E1zj+5DlyoblkGTk9P6MJXYB1kYTDo+Ojoc9IG1DM",
+	"SDqiz4+GR89pElRNiGyQw2Caaf4hPM0g4O5RD9LD6yDqq/EimiQt4XvZjWptMgg9bJX0sgsab3W1oY2e",
+	"DYdfTBltEKxDIr353cN1MjzetdU6tkFDTRV5zuySjoJ0dATn4LW+BYXE04XMmSMBYxDkwLCZVH4+HYaX",
+	"a/wHt1FcrmI3yQBhuxbvVDAOVL1vMUph2wHxSYeu0uRliflnIRLjJSwgcUTOBORG+22Pqs6/neSLb5Pi",
+	"sHeK9wPEW598GnwvGuCRg7zAgmWEF/hUp+nhBpolmVIAsfMo/wL4q87Bz+x7Y1tecnuc5ngHfdijXAmk",
+	"L3+IT2czCzN/QgnjKBcSl+F6sQC71Aq2j3ec8I4cVJO8Ptnl0kAqrvNSlu/ssWel0Vu4LsCho4+5FZ5H",
+	"fVPJH1vmRJgQFpwDQVBvQbkTt3VvHDBjrF5EYdzZPE6jQUzw39slP6MplBkSRkwnyD1QtBDUyk4Q34b1",
+	"7xjDmCA5iHP2sD+W/YZ0WgvKxzGly6zLSaMt4UxxyBq4lID0HOHjhwDgS7e/8lJ3R/N7SEnw/GvwfNyq",
+	"64FUDplCkmpL4k0s2S5xXLVywRC6REa4AtW9ZJ/gOLc6ldmnaY6KC8l/WZ18NbKcBpY8cbXu8bUlBwvp",
+	"5DQDYsDzIlQz8oMvD7spUQ6Ou++U47XVw9Hi+7+Afgt2RJlL1mX+ZIrsk8TjtdX/FHkEFKm+f0i3cTPa",
+	"Q4/GR7NQ2+bnssur1dXqnwAAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

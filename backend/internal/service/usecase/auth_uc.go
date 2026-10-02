@@ -53,7 +53,7 @@ type UserRepo interface {
 	CreateUser(ctx context.Context, u *entity.User) error
 	FindUserByEmail(ctx context.Context, email string) (*entity.User, error)
 	FindUserByID(ctx context.Context, id int64) (*entity.User, error)
-	ListUsers(ctx context.Context, query string, limit, offset int) ([]entity.User, int64, error)
+	ListUsers(ctx context.Context, query string, excludeIDs []int64, limit, offset int) ([]entity.User, int64, error)
 	UpdateTimezone(ctx context.Context, userID int64, tz string) error
 	SetPublic(ctx context.Context, userID int64, public bool) error
 	UpdatePasswordHash(ctx context.Context, userID int64, hash string) error
@@ -323,8 +323,10 @@ func (uc *AuthUsecase) SetProfileVisibility(ctx context.Context, userID int64, p
 }
 
 // ListUsers returns one filtered page of the public directory and its total size.
-func (uc *AuthUsecase) ListUsers(ctx context.Context, query string, limit, offset int) ([]entity.User, int64, error) {
-	return uc.repo.ListUsers(ctx, query, limit, offset)
+// excludeIDs removes the given user ids from the result (e.g. blocked users); an empty
+// slice applies no exclusion.
+func (uc *AuthUsecase) ListUsers(ctx context.Context, query string, excludeIDs []int64, limit, offset int) ([]entity.User, int64, error) {
+	return uc.repo.ListUsers(ctx, query, excludeIDs, limit, offset)
 }
 
 // Logout revokes the family the presented refresh token belongs to.
