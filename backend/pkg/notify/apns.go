@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +36,9 @@ var _ Channel = (*APNsChannel)(nil)
 // provider auth key. production selects api.push.apple.com over the sandbox
 // gateway.
 func NewAPNsChannel(teamID, keyID, keyPEM, topic string, production bool, client *http.Client) (*APNsChannel, error) {
+	// Accept the key pasted as a single .env line with literal "\n" escapes,
+	// in addition to a real multi-line PEM — real newlines pass through unchanged.
+	keyPEM = strings.ReplaceAll(keyPEM, `\n`, "\n")
 	key, err := jwt.ParseECPrivateKeyFromPEM([]byte(keyPEM))
 	if err != nil {
 		return nil, fmt.Errorf("apns: parse key: %w", err)

@@ -27,3 +27,5 @@ docs
 /logo.png
 
 ios/DefShows.xcodeproj/project.xcworkspace*
+
+android/app/google-services.json
