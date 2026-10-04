@@ -32,9 +32,10 @@ describe('DisplayNameForm', () => {
     await userEvent.type(input, 'Новое')
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
 
-    await waitFor(() =>
-      expect(body).toEqual({ timezone: 'UTC', is_public: true, display_name: 'Новое' }),
-    )
+    // is_public must NOT be sent — sending a cached value could revert a concurrent
+    // visibility change.
+    await waitFor(() => expect(body).toEqual({ timezone: 'UTC', display_name: 'Новое' }))
+    expect(body).not.toHaveProperty('is_public')
   })
 
   it('allows a blank value to reset the name', async () => {
@@ -53,9 +54,7 @@ describe('DisplayNameForm', () => {
     await userEvent.clear(input)
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
 
-    await waitFor(() =>
-      expect(body).toEqual({ timezone: 'UTC', is_public: true, display_name: '' }),
-    )
+    await waitFor(() => expect(body).toEqual({ timezone: 'UTC', display_name: '' }))
   })
 
   it('rejects names longer than 50 chars without calling the API', async () => {

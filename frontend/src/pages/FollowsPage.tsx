@@ -10,11 +10,11 @@ import {
   useListFollowing,
   useListIncomingRequests,
 } from '@/shared/api/social/endpoints'
+import { FollowRequests } from '@/features/follow/FollowRequests'
 import type { FollowUser } from '@/shared/api/social/model'
 import { useAuthStore } from '@/shared/auth/authStore'
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
-import { FollowRequests } from '@/features/follow/FollowRequests'
 
 const TABS = ['followers', 'following', 'requests'] as const
 type Tab = (typeof TABS)[number]

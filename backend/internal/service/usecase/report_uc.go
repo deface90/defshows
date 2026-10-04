@@ -24,7 +24,6 @@ const reportNoteMaxLen = 1000
 type ReportRepo interface {
 	Create(ctx context.Context, r *entity.Report) error
 	List(ctx context.Context, status string, limit, offset int) ([]entity.Report, int64, error)
-	Get(ctx context.Context, id int64) (*entity.Report, error)
 	Resolve(ctx context.Context, id, adminID int64, status entity.ReportStatus) error
 }
 

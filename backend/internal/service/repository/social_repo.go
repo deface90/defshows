@@ -30,6 +30,34 @@ func (r *SocialRepository) CreateFollow(ctx context.Context, f *entity.Follow) e
 	return nil
 }
 
+// CreateFollowGuarded inserts a follow edge inside a transaction that first re-checks
+// for a block in either direction, closing the Follow/Block TOCTOU window: a concurrent
+// Block that commits its block row before this transaction's block re-check will cause
+// the insert to be refused (ErrBlocked). Returns ErrConflict if the edge already exists.
+// This is the root fix for the race where a follow that passed an earlier (non-transactional)
+// block check could re-insert an edge after Block tore it down.
+func (r *SocialRepository) CreateFollowGuarded(ctx context.Context, f *entity.Follow) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var n int64
+		if err := tx.Model(&entity.Block{}).
+			Where("(blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)",
+				f.FollowerID, f.FolloweeID, f.FolloweeID, f.FollowerID).
+			Count(&n).Error; err != nil {
+			return err
+		}
+		if n > 0 {
+			return ErrBlocked
+		}
+		if err := tx.Create(f).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return ErrConflict
+			}
+			return err
+		}
+		return nil
+	})
+}
+
 // GetFollow returns the follow edge from follower to followee, or ErrNotFound.
 func (r *SocialRepository) GetFollow(ctx context.Context, followerID, followeeID int64) (*entity.Follow, error) {
 	var f entity.Follow
@@ -123,11 +151,19 @@ func (r *SocialRepository) listEdgeUsers(ctx context.Context, join, where string
 }
 
 // AcceptedFolloweeIDs returns the ids of users the given user follows with accepted
-// status — the subscription set backing the home feed.
+// status — the subscription set backing the home feed. Users involved in a block with
+// the viewer in either direction are excluded in SQL, so the home feed never surfaces a
+// blocked actor even if a follow edge lingers due to a Follow/Block race (a follow that
+// passed its block check can re-insert an edge after Block tore it down).
 func (r *SocialRepository) AcceptedFolloweeIDs(ctx context.Context, userID int64) ([]int64, error) {
 	var ids []int64
 	err := r.db.WithContext(ctx).Model(&entity.Follow{}).
 		Where("follower_id = ? AND status = ?", userID, entity.FollowAccepted).
+		Where(`followee_id NOT IN (
+			SELECT blocked_id FROM blocks WHERE blocker_id = ?
+			UNION
+			SELECT blocker_id FROM blocks WHERE blocked_id = ?
+		)`, userID, userID).
 		Pluck("followee_id", &ids).Error
 	return ids, err
 }

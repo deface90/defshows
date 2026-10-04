@@ -80,7 +80,13 @@ struct PublicProfileView: View {
     @State private var profile: PublicUser?
     @State private var busy = false
     @State private var loaded = false
-    @State private var blocked = false
+    // The profile endpoint returns 404 for a blocked pair (either direction), a deleted
+    // account, or an unknown id — it never confirms existence. `unavailable` captures that
+    // neutral "can't show this profile" state. `outgoingBlock` is tracked separately,
+    // derived from the viewer's own blocked-list, so Unblock is offered only when the
+    // viewer actually has an outgoing block (a 404 alone must not assert one).
+    @State private var unavailable = false
+    @State private var outgoingBlock = false
     @State private var error: String?
     @State private var reporting = false
 
@@ -97,11 +103,16 @@ struct PublicProfileView: View {
                 Button("Повторить") { Task { await load() } }.disabled(busy)
             }
             if busy { ProgressView() }
-            if blocked {
-                ContentUnavailableView("Пользователь заблокирован", systemImage: "hand.raised",
-                                       description: Text("Вы не видите коллекцию и активность заблокированного пользователя."))
+            if unavailable {
+                if outgoingBlock {
+                    ContentUnavailableView("Пользователь заблокирован", systemImage: "hand.raised",
+                                           description: Text("Вы не видите коллекцию и активность заблокированного пользователя."))
+                } else {
+                    ContentUnavailableView("Профиль недоступен", systemImage: "eye.slash",
+                                           description: Text("Этот профиль сейчас недоступен."))
+                }
             }
-            if let profile, !blocked {
+            if let profile, !unavailable {
                 Section {
                     if let followers = profile.followersCount, let following = profile.followingCount {
                         Text("\(followers) подписчиков · \(following) подписок")
@@ -110,7 +121,7 @@ struct PublicProfileView: View {
                     if !isSelf { followButton(profile) }
                 }
             }
-            if let profile, canView, !blocked {
+            if let profile, canView, !unavailable {
                 Section {
                     NavigationLink {
                         FeedList(source: .profile(userID: user.id))
@@ -119,7 +130,7 @@ struct PublicProfileView: View {
                     } label: { Label("Активность", systemImage: "square.stack.3d.up") }
                 }
             }
-            if !blocked {
+            if !unavailable {
                 if let profile, !canView {
                     ContentUnavailableView("Закрытый профиль", systemImage: "lock", description: Text("Коллекция видна только одобренным подписчикам."))
                 } else if loaded && shows.isEmpty {
@@ -138,7 +149,7 @@ struct PublicProfileView: View {
         .toolbar {
             if !isSelf {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ModerationMenu(blocked: blocked,
+                    ModerationMenu(blocked: outgoingBlock,
                                    onBlock: { Task { await setBlock(true) } },
                                    onUnblock: { Task { await setBlock(false) } },
                                    onReport: { reporting = true })
@@ -178,20 +189,48 @@ struct PublicProfileView: View {
     private func setBlock(_ block: Bool) async {
         guard !busy else { return }
         busy = true
-        defer { busy = false }
         do {
             if block {
                 try await session.block(userID: user.id)
-                blocked = true
+                outgoingBlock = true
+                unavailable = true
                 profile = nil
                 shows = []
+                error = nil
+                busy = false
             } else {
                 try await session.unblock(userID: user.id)
-                blocked = false
+                outgoingBlock = false
+                error = nil
+                // Clear busy before reload so load()'s `guard !busy` does not skip it.
+                busy = false
                 await load()
             }
-            error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            self.error = error.localizedDescription
+            busy = false
+        }
+    }
+
+    /// hasOutgoingBlock reports whether the viewer has blocked this user, derived from
+    /// the viewer's own blocked-list. Used to disambiguate a profile 404 (which could be a
+    /// block in *either* direction, a deleted account, or an unknown id) so Unblock is
+    /// offered only for an actual outgoing block. Best-effort: on error it reports false.
+    private func hasOutgoingBlock() async -> Bool {
+        guard session.currentUserID != nil else { return false }
+        // Page through the blocked-list until the user is found or the list is exhausted —
+        // checking only the first page would misclassify an older outgoing block as "no
+        // outgoing block" and wrongly offer Block (not Unblock). Bounded by the real total.
+        let pageSize = 50
+        var page = 1
+        var seen = 0
+        while true {
+            guard let list = try? await session.blocks(page: page, pageSize: pageSize) else { return false }
+            if list.users.contains(where: { $0.id == user.id }) { return true }
+            seen += list.users.count
+            if list.users.isEmpty || seen >= list.total { return false }
+            page += 1
+        }
     }
 
     private func load() async {
@@ -201,7 +240,8 @@ struct PublicProfileView: View {
         do {
             let fetched: PublicUser = try await session.get("users/\(user.id)")
             self.profile = fetched
-            blocked = false
+            unavailable = false
+            outgoingBlock = false
             shows = []
             if fetched.isPublic || fetched.isFollowing == "accepted" || isSelf {
                 let result: PublicCollection = try await session.get("users/\(user.id)/shows")
@@ -210,9 +250,12 @@ struct PublicProfileView: View {
             loaded = true
             error = nil
         } catch let failure as HTTPFailure where failure.status == 404 {
-            // The server returns 404 for a blocked profile (either direction) to avoid
-            // confirming existence; surface it as the blocked state rather than an error.
-            blocked = true
+            // The server returns 404 for a blocked pair (either direction), a deleted
+            // account, or an unknown id — it never confirms existence. Surface a neutral
+            // "unavailable" state; only assert an outgoing block (→ offer Unblock) when the
+            // viewer's own blocked-list actually contains this user.
+            unavailable = true
+            outgoingBlock = await hasOutgoingBlock()
             profile = nil
             shows = []
             loaded = true

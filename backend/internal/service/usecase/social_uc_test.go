@@ -14,6 +14,9 @@ import (
 type fakeSocialRepo struct {
 	edges  map[[2]int64]*entity.Follow
 	blocks map[[2]int64]bool // (blocker, blocked)
+	// beforeGuardedInsert simulates a concurrent operation interleaving inside
+	// CreateFollowGuarded's transaction (e.g. a Block committing its block row).
+	beforeGuardedInsert func()
 }
 
 func newFakeSocialRepo() *fakeSocialRepo {
@@ -74,6 +77,21 @@ func (r *fakeSocialRepo) CreateFollow(_ context.Context, f *entity.Follow) error
 	cp := *f
 	r.edges[k] = &cp
 	return nil
+}
+
+// beforeGuardedInsert, if set, runs inside CreateFollowGuarded after the block re-check
+// but could just as well model a block committed before it — tests set it to simulate a
+// concurrent Block interleaving with Follow. It mirrors the production transaction, which
+// re-checks the block atomically with the insert.
+func (r *fakeSocialRepo) CreateFollowGuarded(ctx context.Context, f *entity.Follow) error {
+	if r.beforeGuardedInsert != nil {
+		r.beforeGuardedInsert()
+	}
+	// Re-check the block atomically with the insert (production does this in one tx).
+	if r.blocks[[2]int64{f.FollowerID, f.FolloweeID}] || r.blocks[[2]int64{f.FolloweeID, f.FollowerID}] {
+		return repository.ErrBlocked
+	}
+	return r.CreateFollow(ctx, f)
 }
 func (r *fakeSocialRepo) GetFollow(_ context.Context, follower, followee int64) (*entity.Follow, error) {
 	if f, ok := r.edges[[2]int64{follower, followee}]; ok {
@@ -191,12 +209,18 @@ func (f *fakeFollowNotifier) DeleteByDedupeKeys(_ context.Context, keys ...strin
 }
 
 func newSocialUC(public, private int64) (*usecase.SocialUsecase, *fakeFollowNotifier) {
+	uc, _, notifier := newSocialUCWithRepo(public, private)
+	return uc, notifier
+}
+
+func newSocialUCWithRepo(public, private int64) (*usecase.SocialUsecase, *fakeSocialRepo, *fakeFollowNotifier) {
 	users := fakeSocialUsers{users: map[int64]*entity.User{
 		public:  {ID: public, IsPublic: true},
 		private: {ID: private, IsPublic: false},
 	}}
 	notifier := &fakeFollowNotifier{}
-	return usecase.NewSocialUsecase(newFakeSocialRepo(), users, notifier), notifier
+	repo := newFakeSocialRepo()
+	return usecase.NewSocialUsecase(repo, users, notifier), repo, notifier
 }
 
 func TestSocialUsecase_Follow(t *testing.T) {
@@ -443,6 +467,41 @@ func TestSocialUsecase_Block(t *testing.T) {
 	}
 	if _, err := uc.Follow(ctx, priv, pub); err != nil {
 		t.Fatalf("re-follow after unblock: %v", err)
+	}
+}
+
+// TestSocialUsecase_Follow_BlockRace simulates a Block committing between Follow's early
+// block check and its edge insert. Because the insert goes through CreateFollowGuarded,
+// which re-checks the block atomically with the insert, the follow is refused (ErrBlocked)
+// and no surviving edge/notification is left for a later Unblock to resurrect.
+func TestSocialUsecase_Follow_BlockRace(t *testing.T) {
+	ctx := context.Background()
+	const pub, other = int64(2), int64(3)
+	uc, repo, notifier := newSocialUCWithRepo(pub, other)
+
+	// Model the race: a Block for (other blocks pub) commits inside the window of the
+	// guarded insert (after Follow's early check passed). The guard must see it.
+	repo.beforeGuardedInsert = func() {
+		repo.blocks[[2]int64{other, pub}] = true
+	}
+
+	if _, err := uc.Follow(ctx, pub, other); !errors.Is(err, usecase.ErrBlocked) {
+		t.Fatalf("follow racing a block: want ErrBlocked, got %v", err)
+	}
+	// No surviving edge in either direction.
+	if state, _ := uc.FollowState(ctx, pub, other); state != "none" {
+		t.Fatalf("no edge should survive the race, got state %q", state)
+	}
+	// No follow_request notification was emitted (insert never completed).
+	if len(notifier.created) != 0 {
+		t.Fatalf("no notification should be emitted when the follow is refused, got %+v", notifier.created)
+	}
+	// A later Unblock cannot resurrect a relationship that never persisted.
+	if err := uc.Unblock(ctx, other, pub); err != nil {
+		t.Fatalf("unblock: %v", err)
+	}
+	if state, _ := uc.FollowState(ctx, pub, other); state != "none" {
+		t.Fatalf("after unblock, still no edge should exist, got state %q", state)
 	}
 }
 

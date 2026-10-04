@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { server } from '@/shared/testing/mswServer'
 import { renderWithProviders } from '@/test/render'
 import { ReportModal } from './ReportModal'
@@ -20,7 +20,8 @@ describe('ReportModal', () => {
         )
       }),
     )
-    renderWithProviders(<ReportModal userId={7} opened onClose={() => {}} />)
+    const onClose = vi.fn()
+    renderWithProviders(<ReportModal userId={7} opened onClose={onClose} />)
 
     const select = await screen.findByPlaceholderText('Выберите причину')
     await userEvent.click(select)
@@ -32,6 +33,8 @@ describe('ReportModal', () => {
     await waitFor(() =>
       expect(body).toEqual({ target_user_id: 7, reason: 'spam', note: 'bad user' }),
     )
+    // On success the modal closes (reset + onClose).
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
   it('requires a reason before submitting', async () => {

@@ -64,7 +64,14 @@ deploy/                          docker-compose, Dockerfile, .env.example
   `auth.ListUsers(ctx, query, excludeIDs, limit, offset)` with `excludeIDs` from
   `social.BlockedIDsEither(viewerID)`; the repo **skips the `NOT IN` clause entirely when
   `excludeIDs` is empty** (gorm would emit `NOT IN (NULL)` and blank the directory for guests).
-  Feeds/follow-lists need no new filtering — they join `follows` and the edges are already gone.
+  Follow-lists need no new filtering — they join `follows` and the edges are already gone. The
+  Follow/Block TOCTOU is closed **at the source**: `Follow` inserts through
+  `SocialRepository.CreateFollowGuarded`, a transaction that re-checks `blocks` (either
+  direction) atomically with the edge insert and returns `repository.ErrBlocked` (→ `ErrBlocked`
+  → 403) if a concurrent `Block` committed its row first — so no surviving edge/notification can
+  leak past a block or be resurrected by a later `Unblock`. As defence-in-depth the home feed
+  still excludes blocked ids (either direction) **in SQL** inside `AcceptedFolloweeIDs`. Profile
+  feed stays `CanViewProfile`-gated (block-aware).
   Endpoints: `POST`/`DELETE /me/blocks/{userId}`, `GET /me/blocks` (reuses `FollowUserList`).
 - **Moderation — reports** (`report_repo`/`report_uc`, migration `0025_reports`): dedicated
   repo/usecase (not generic `crud`) because they need a reporter/target join, a `status`

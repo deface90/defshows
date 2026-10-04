@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"gorm.io/gorm"
 
@@ -50,24 +49,13 @@ func (r *ReportRepository) List(ctx context.Context, status string, limit, offse
 	return reports, total, nil
 }
 
-// Get returns the report by id, or ErrNotFound.
-func (r *ReportRepository) Get(ctx context.Context, id int64) (*entity.Report, error) {
-	var rep entity.Report
-	err := r.db.WithContext(ctx).Where("id = ?", id).First(&rep).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &rep, nil
-}
-
-// Resolve transitions a report to the given terminal status, stamping
-// resolved_at/resolved_by. Returns ErrNotFound if no row matched.
+// Resolve transitions an open report to the given terminal status, stamping
+// resolved_at/resolved_by. The update is scoped to status = open so an already
+// resolved/dismissed report is never re-stamped. Returns ErrNotFound if no open
+// row matched (missing id or already terminal).
 func (r *ReportRepository) Resolve(ctx context.Context, id, adminID int64, status entity.ReportStatus) error {
 	res := r.db.WithContext(ctx).Model(&entity.Report{}).
-		Where("id = ?", id).
+		Where("id = ? AND status = ?", id, entity.ReportOpen).
 		Updates(map[string]any{
 			"status":      status,
 			"resolved_at": gorm.Expr("now()"),

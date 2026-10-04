@@ -33,7 +33,7 @@
 - В `FollowsView` на вкладке подписчиков — свайп «Убрать из подписчиков»
   (`session.removeFollower`, список обновляется).
 
-Модели и хелперы `Session` (block/unblock/blocks/removeFollower/report/setDisplayName) —
+Модели и хелперы `Session` (block/unblock/blocks/removeFollower/report) —
 в `Social.swift`/`BrowseModels.swift`; новых файлов не добавлялось, `Package.swift`/
 `project.pbxproj` без изменений.
 

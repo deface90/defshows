@@ -28,6 +28,23 @@ func TestReportRepository(t *testing.T) {
 	target := mkUser("target@r.com")
 	admin := mkUser("admin@r.com")
 
+	// getByID reads a single report back via List (the repo has no Get); fails the
+	// test if the id is not present.
+	getByID := func(id int64) entity.Report {
+		t.Helper()
+		all, _, err := repo.List(ctx, "", 0, 0)
+		if err != nil {
+			t.Fatalf("list for getByID: %v", err)
+		}
+		for _, r := range all {
+			if r.ID == id {
+				return r
+			}
+		}
+		t.Fatalf("getByID: report %d not found", id)
+		return entity.Report{}
+	}
+
 	// Insert a report; status defaults to open.
 	rep := &entity.Report{ReporterID: reporter.ID, TargetUserID: target.ID, Reason: entity.ReportSpam, Note: "buy stuff"}
 	if err := repo.Create(ctx, rep); err != nil {
@@ -46,14 +63,9 @@ func TestReportRepository(t *testing.T) {
 		t.Fatalf("create report 2: %v", err)
 	}
 
-	// Get returns the inserted report.
-	got, err := repo.Get(ctx, rep.ID)
-	if err != nil || got.Reason != entity.ReportSpam || got.Note != "buy stuff" {
-		t.Fatalf("get report: %v (%+v)", err, got)
-	}
-	// Get missing → ErrNotFound.
-	if _, err := repo.Get(ctx, 999999); !errors.Is(err, repository.ErrNotFound) {
-		t.Fatalf("get missing: want ErrNotFound, got %v", err)
+	// The inserted report reads back with its fields.
+	if got := getByID(rep.ID); got.Reason != entity.ReportSpam || got.Note != "buy stuff" {
+		t.Fatalf("read back report: %+v", got)
 	}
 
 	// List all (empty status) → 2.
@@ -87,10 +99,7 @@ func TestReportRepository(t *testing.T) {
 	if err := repo.Resolve(ctx, rep.ID, admin.ID, entity.ReportResolved); err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	gotResolved, err := repo.Get(ctx, rep.ID)
-	if err != nil {
-		t.Fatalf("get after resolve: %v", err)
-	}
+	gotResolved := getByID(rep.ID)
 	if gotResolved.Status != entity.ReportResolved {
 		t.Fatalf("resolve status: want resolved, got %q", gotResolved.Status)
 	}
@@ -105,7 +114,7 @@ func TestReportRepository(t *testing.T) {
 	if err := repo.Resolve(ctx, rep2.ID, admin.ID, entity.ReportDismissed); err != nil {
 		t.Fatalf("dismiss: %v", err)
 	}
-	gotDismissed, _ := repo.Get(ctx, rep2.ID)
+	gotDismissed := getByID(rep2.ID)
 	if gotDismissed.Status != entity.ReportDismissed {
 		t.Fatalf("dismiss status: want dismissed, got %q", gotDismissed.Status)
 	}
@@ -118,6 +127,17 @@ func TestReportRepository(t *testing.T) {
 	_, totalOpen2, _ := repo.List(ctx, string(entity.ReportOpen), 10, 0)
 	if totalOpen2 != 0 {
 		t.Fatalf("list open after resolve: want 0, got %d", totalOpen2)
+	}
+
+	// Re-resolving an already-terminal report → ErrNotFound; the original
+	// resolved_by/resolved_at are not overwritten.
+	before := getByID(rep.ID)
+	if err := repo.Resolve(ctx, rep.ID, target.ID, entity.ReportDismissed); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("re-resolve terminal: want ErrNotFound, got %v", err)
+	}
+	after := getByID(rep.ID)
+	if after.Status != entity.ReportResolved || after.ResolvedBy == nil || *after.ResolvedBy != admin.ID {
+		t.Fatalf("terminal report was re-stamped: before=%+v after=%+v", before, after)
 	}
 
 	// Resolve missing → ErrNotFound.

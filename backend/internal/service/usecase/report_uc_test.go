@@ -44,19 +44,11 @@ func (r *fakeReportRepo) List(_ context.Context, status string, limit, offset in
 	return matched, total, nil
 }
 
-func (r *fakeReportRepo) Get(_ context.Context, id int64) (*entity.Report, error) {
-	for i := range r.reports {
-		if r.reports[i].ID == id {
-			cp := r.reports[i]
-			return &cp, nil
-		}
-	}
-	return nil, repository.ErrNotFound
-}
-
 func (r *fakeReportRepo) Resolve(_ context.Context, id, adminID int64, status entity.ReportStatus) error {
 	for i := range r.reports {
-		if r.reports[i].ID == id {
+		// Mirror the repo guard: only an open report transitions; a terminal one
+		// (resolved/dismissed) is treated as not found so it is never re-stamped.
+		if r.reports[i].ID == id && r.reports[i].Status == entity.ReportOpen {
 			r.reports[i].Status = status
 			r.reports[i].ResolvedBy = &adminID
 			return nil
@@ -166,7 +158,7 @@ func TestReportUsecase_ListReports(t *testing.T) {
 func TestReportUsecase_ResolveReport(t *testing.T) {
 	ctx := context.Background()
 	const admin = int64(1)
-	uc, repo := newReportUC()
+	uc, _ := newReportUC()
 
 	if _, err := uc.Report(ctx, 1, 2, entity.ReportSpam, ""); err != nil {
 		t.Fatalf("report: %v", err)
@@ -184,15 +176,24 @@ func TestReportUsecase_ResolveReport(t *testing.T) {
 	if err := uc.ResolveReport(ctx, 1, admin, entity.ReportDismissed); err != nil {
 		t.Fatalf("resolve dismissed: %v", err)
 	}
-	got, err := repo.Get(ctx, 1)
+	dismissed, _, err := uc.ListReports(ctx, string(entity.ReportDismissed), 0, 0)
 	if err != nil {
-		t.Fatalf("get: %v", err)
+		t.Fatalf("list dismissed: %v", err)
 	}
+	if len(dismissed) != 1 {
+		t.Fatalf("list dismissed: want 1, got %d", len(dismissed))
+	}
+	got := dismissed[0]
 	if got.Status != entity.ReportDismissed {
 		t.Fatalf("status: want dismissed, got %s", got.Status)
 	}
 	if got.ResolvedBy == nil || *got.ResolvedBy != admin {
 		t.Fatalf("resolved_by: want %d, got %v", admin, got.ResolvedBy)
+	}
+
+	// Re-resolving an already-terminal report → ErrNotFound (no re-stamp).
+	if err := uc.ResolveReport(ctx, 1, admin, entity.ReportResolved); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("re-resolve terminal: want ErrNotFound, got %v", err)
 	}
 
 	// Missing report → ErrNotFound.

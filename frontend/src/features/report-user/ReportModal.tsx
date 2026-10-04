@@ -6,13 +6,12 @@ import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { createReport } from '@/shared/api/social/endpoints'
 import { ReportRequestReason } from '@/shared/api/social/model'
+import { reportReasonLabels } from '@/shared/lib/reportReasons'
 
-const reasonOptions = [
-  { value: ReportRequestReason.spam, label: 'Спам' },
-  { value: ReportRequestReason.harassment, label: 'Оскорбления' },
-  { value: ReportRequestReason.inappropriate, label: 'Неприемлемый контент' },
-  { value: ReportRequestReason.other, label: 'Другое' },
-]
+const reasonOptions = Object.values(ReportRequestReason).map((value) => ({
+  value,
+  label: reportReasonLabels[value],
+}))
 
 const reportSchema = z.object({
   reason: z.enum(['spam', 'harassment', 'inappropriate', 'other'], {

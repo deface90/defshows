@@ -1,6 +1,6 @@
 import { Button, Stack } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FeedCard, FeedPage } from '@/shared/api/social/model'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
@@ -29,12 +29,21 @@ export function ActivityFeed({
   const [reloadKey, setReloadKey] = useState(0)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadingMore, setLoadingMore] = useState(false)
+  // Generation counter: a reload (e.g. after blocking an actor) bumps it so an in-flight
+  // loadMore started on a previous generation is discarded instead of appending stale
+  // (pre-block) cards over the refreshed list.
+  const generation = useRef(0)
 
   useEffect(() => {
     let active = true
+    generation.current = reloadKey
     setPhase('loading')
     setCards([])
     setCursor(undefined)
+    // Reset the load-more flag: a reload that lands mid-flight bumps the generation so the
+    // stale loadMore's finally() skips its own reset — clear it here so "Показать ещё"
+    // re-enables once the refreshed first page lands (otherwise it stays disabled forever).
+    setLoadingMore(false)
     fetchPage(undefined)
       .then((page) => {
         if (!active) return
@@ -54,14 +63,22 @@ export function ActivityFeed({
 
   const loadMore = () => {
     if (!cursor) return
+    const startGen = generation.current
     setLoadingMore(true)
     fetchPage(cursor)
       .then((page) => {
+        // Discard if a reload happened while this request was in flight.
+        if (generation.current !== startGen) return
         setCards((prev) => [...prev, ...page.cards])
         setCursor(page.next_cursor)
       })
-      .catch(() => notifications.show({ message: 'Не удалось загрузить ещё', color: 'red' }))
-      .finally(() => setLoadingMore(false))
+      .catch(() => {
+        if (generation.current !== startGen) return
+        notifications.show({ message: 'Не удалось загрузить ещё', color: 'red' })
+      })
+      .finally(() => {
+        if (generation.current === startGen) setLoadingMore(false)
+      })
   }
 
   if (phase === 'loading') return <LoadingState />

@@ -1,6 +1,6 @@
 import { Anchor, Button, Card, Divider, Group, Stack, Tabs, Text, Title } from '@mantine/core'
 import { useCallback } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ActivityFeed } from '@/entities/activity/ActivityFeed'
 import { MyShowRow } from '@/entities/show/MyShowRow'
 import { AddShowButton } from '@/features/add-show/AddShowButton'
@@ -19,6 +19,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
  */
 export function UserProfilePage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.directoryFrom
   const directoryPath = typeof from === 'string' && /^\/users(?:\?.*)?$/.test(from) ? from : '/users'
@@ -71,7 +72,12 @@ export function UserProfilePage() {
             {!isSelf && (
               <Group gap="xs" wrap="nowrap">
                 <FollowButton userId={userId} state={profile.is_following} />
-                <ModerationMenu userId={userId} />
+                {/* Blocking hides this profile (server returns 404); navigate away rather
+                    than leaving the now-stale profile + collection rendered on screen. */}
+                <ModerationMenu
+                  userId={userId}
+                  onBlocked={() => navigate(directoryPath, { replace: true })}
+                />
               </Group>
             )}
           </Group>

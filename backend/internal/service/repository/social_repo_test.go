@@ -180,6 +180,51 @@ func TestSocialRepository_Blocks(t *testing.T) {
 	}
 }
 
+// TestSocialRepository_CreateFollowGuarded verifies the transactional block re-check:
+// an insert is refused with ErrBlocked when a block exists in either direction, and a
+// duplicate edge still returns ErrConflict. This is the root fix for the Follow/Block race.
+func TestSocialRepository_CreateFollowGuarded(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "blocks", "follows", "users")
+	userRepo := repository.NewUserRepository(gdb)
+	repo := repository.NewSocialRepository(gdb)
+	ctx := context.Background()
+
+	mkUser := func(email string) *entity.User {
+		u := newUser(email)
+		if err := userRepo.CreateUser(ctx, u); err != nil {
+			t.Fatalf("create user %s: %v", email, err)
+		}
+		return u
+	}
+	alice := mkUser("alice@cfg.com")
+	bob := mkUser("bob@cfg.com")
+
+	// No block: guarded insert succeeds.
+	if err := repo.CreateFollowGuarded(ctx, &entity.Follow{FollowerID: alice.ID, FolloweeID: bob.ID, Status: entity.FollowAccepted}); err != nil {
+		t.Fatalf("guarded insert without block: %v", err)
+	}
+	// Duplicate → ErrConflict.
+	if err := repo.CreateFollowGuarded(ctx, &entity.Follow{FollowerID: alice.ID, FolloweeID: bob.ID, Status: entity.FollowAccepted}); !errors.Is(err, repository.ErrConflict) {
+		t.Fatalf("dup guarded insert: want ErrConflict, got %v", err)
+	}
+
+	// Block in the reverse direction (bob blocks alice) then try alice→bob: refused.
+	if err := repo.DeleteFollow(ctx, alice.ID, bob.ID); err != nil {
+		t.Fatalf("cleanup edge: %v", err)
+	}
+	if err := repo.CreateBlock(ctx, &entity.Block{BlockerID: bob.ID, BlockedID: alice.ID}); err != nil {
+		t.Fatalf("create block bob→alice: %v", err)
+	}
+	if err := repo.CreateFollowGuarded(ctx, &entity.Follow{FollowerID: alice.ID, FolloweeID: bob.ID, Status: entity.FollowAccepted}); !errors.Is(err, repository.ErrBlocked) {
+		t.Fatalf("guarded insert against reverse block: want ErrBlocked, got %v", err)
+	}
+	// And no edge was left behind.
+	if _, err := repo.GetFollow(ctx, alice.ID, bob.ID); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("no edge should survive a refused guarded insert, got %v", err)
+	}
+}
+
 func TestSocialRepository_DeleteFollowEither(t *testing.T) {
 	gdb := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, gdb, "follows", "users")
@@ -219,5 +264,59 @@ func TestSocialRepository_DeleteFollowEither(t *testing.T) {
 	// Idempotent: calling again with no edges is not an error.
 	if err := repo.DeleteFollowEither(ctx, alice.ID, bob.ID); err != nil {
 		t.Fatalf("DeleteFollowEither idempotent: %v", err)
+	}
+}
+
+// TestSocialRepository_AcceptedFolloweeIDs_ExcludesBlocked guards the Follow/Block race:
+// even if an accepted follow edge lingers alongside a block (follow passed its block check
+// then re-inserted after Block tore the edge down), the home-feed followee set excludes the
+// blocked user in SQL — in both block directions.
+func TestSocialRepository_AcceptedFolloweeIDs_ExcludesBlocked(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "blocks", "follows", "users")
+	userRepo := repository.NewUserRepository(gdb)
+	repo := repository.NewSocialRepository(gdb)
+	ctx := context.Background()
+
+	mkUser := func(email string) *entity.User {
+		u := newUser(email)
+		if err := userRepo.CreateUser(ctx, u); err != nil {
+			t.Fatalf("create user %s: %v", email, err)
+		}
+		return u
+	}
+	alice := mkUser("alice@aff.com")
+	bob := mkUser("bob@aff.com")
+	carol := mkUser("carol@aff.com")
+
+	// alice follows bob and carol (both accepted).
+	for _, fe := range []int64{bob.ID, carol.ID} {
+		if err := repo.CreateFollow(ctx, &entity.Follow{FollowerID: alice.ID, FolloweeID: fe, Status: entity.FollowAccepted}); err != nil {
+			t.Fatalf("create follow: %v", err)
+		}
+	}
+
+	// Baseline: both followees present.
+	ids, err := repo.AcceptedFolloweeIDs(ctx, alice.ID)
+	if err != nil || len(ids) != 2 {
+		t.Fatalf("baseline followees: %v %v", err, ids)
+	}
+
+	// alice blocks bob but the follow edge lingers (race). bob must drop out.
+	if err := repo.CreateBlock(ctx, &entity.Block{BlockerID: alice.ID, BlockedID: bob.ID}); err != nil {
+		t.Fatalf("create block alice→bob: %v", err)
+	}
+	ids, err = repo.AcceptedFolloweeIDs(ctx, alice.ID)
+	if err != nil || len(ids) != 1 || ids[0] != carol.ID {
+		t.Fatalf("after alice blocks bob: want [carol], got %v (%v)", ids, err)
+	}
+
+	// Reverse direction: carol blocks alice; carol must also drop out.
+	if err := repo.CreateBlock(ctx, &entity.Block{BlockerID: carol.ID, BlockedID: alice.ID}); err != nil {
+		t.Fatalf("create block carol→alice: %v", err)
+	}
+	ids, err = repo.AcceptedFolloweeIDs(ctx, alice.ID)
+	if err != nil || len(ids) != 0 {
+		t.Fatalf("after carol blocks alice: want [], got %v (%v)", ids, err)
 	}
 }

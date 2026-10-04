@@ -41,4 +41,36 @@ describe('BlockedUsersList', () => {
     renderWithProviders(<BlockedUsersList />)
     expect(await screen.findByText('Вы никого не заблокировали.')).toBeInTheDocument()
   })
+
+  it('paginates to older blocked users via the page control', async () => {
+    const requestedPages: string[] = []
+    server.use(
+      http.get(`${base}/me/blocks`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page') ?? '1'
+        requestedPages.push(page)
+        // 25 total → 2 pages of 20.
+        if (page === '2') {
+          return HttpResponse.json({
+            users: [{ id: 99, display_name: 'Старый блок', is_public: true }],
+            total: 25,
+          })
+        }
+        return HttpResponse.json({
+          users: Array.from({ length: 20 }, (_, i) => ({
+            id: i + 1,
+            display_name: `Блок ${i + 1}`,
+            is_public: true,
+          })),
+          total: 25,
+        })
+      }),
+    )
+    renderWithProviders(<BlockedUsersList />)
+
+    expect(await screen.findByText('Блок 1')).toBeInTheDocument()
+    // Second Pagination page button.
+    await userEvent.click(screen.getByRole('button', { name: '2' }))
+    expect(await screen.findByText('Старый блок')).toBeInTheDocument()
+    await waitFor(() => expect(requestedPages).toContain('2'))
+  })
 })

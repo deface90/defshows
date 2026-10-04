@@ -26,7 +26,7 @@ describe('ReportsPage', () => {
 
     expect(await screen.findByText('Алиса')).toBeInTheDocument()
     expect(screen.getByText('Боб')).toBeInTheDocument()
-    expect(screen.getByText('Оскорбления')).toBeInTheDocument()
+    expect(screen.getByText('Оскорбления или травля')).toBeInTheDocument()
     expect(screen.getByText('груб')).toBeInTheDocument()
   })
 
@@ -70,6 +70,73 @@ describe('ReportsPage', () => {
     await waitFor(() => expect(posted).toEqual({ status: 'resolved' }))
     expect(await screen.findByText('Жалоб нет')).toBeInTheDocument()
     expect(listCalls).toBeGreaterThan(1)
+  })
+
+  it('paginates to older reports via the page control', async () => {
+    const requestedPages: string[] = []
+    server.use(
+      http.get(`${base}/admin/reports`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page') ?? '1'
+        requestedPages.push(page)
+        // 60 total → 2 pages of 50.
+        if (page === '2') {
+          return HttpResponse.json({
+            total: 60,
+            reports: [{ ...openReport, id: 2, reporter: { id: 11, display_name: 'Старый репортёр' } }],
+          })
+        }
+        return HttpResponse.json({ total: 60, reports: [openReport] })
+      }),
+    )
+    renderWithProviders(<ReportsPage />)
+
+    expect(await screen.findByText('Алиса')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '2' }))
+    expect(await screen.findByText('Старый репортёр')).toBeInTheDocument()
+    await waitFor(() => expect(requestedPages).toContain('2'))
+  })
+
+  it('clamps to the last page when resolving the sole report on the final page', async () => {
+    // Page 2 of 2 (total 60) holds one report; resolving it drops total to 50 (1 page).
+    // The view must clamp page 2 → page 1 and show the remaining reports, not "Жалоб нет".
+    let resolved = false
+    const page1 = Array.from({ length: 50 }, (_, i) => ({
+      ...openReport,
+      id: 100 + i,
+      reporter: { id: 100 + i, display_name: `Репортёр ${i}` },
+    }))
+    const requestedPages: string[] = []
+    server.use(
+      http.get(`${base}/admin/reports`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page') ?? '1'
+        requestedPages.push(page)
+        if (resolved) {
+          // After resolve: only the 50 page-1 reports remain (1 page total).
+          return page === '1'
+            ? HttpResponse.json({ total: 50, reports: page1 })
+            : HttpResponse.json({ total: 50, reports: [] })
+        }
+        return page === '2'
+          ? HttpResponse.json({ total: 60, reports: [openReport] })
+          : HttpResponse.json({ total: 60, reports: page1 })
+      }),
+      http.post(`${base}/admin/reports/1/resolve`, async () => {
+        resolved = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderWithProviders(<ReportsPage />)
+
+    // Go to page 2 where the lone extra report lives.
+    expect(await screen.findByText('Репортёр 0')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '2' }))
+    const row = (await screen.findByText('Алиса')).closest('tr') as HTMLElement
+    await userEvent.click(within(row).getByRole('button', { name: 'Решить' }))
+
+    // Must land back on page 1 content, NOT the empty state.
+    expect(await screen.findByText('Репортёр 0')).toBeInTheDocument()
+    expect(screen.queryByText('Жалоб нет')).not.toBeInTheDocument()
+    await waitFor(() => expect(requestedPages).toContain('1'))
   })
 
   it('dismisses an open report with the dismissed status', async () => {

@@ -69,6 +69,66 @@ describe('ActivityFeed', () => {
     )
   })
 
+  it('discards an in-flight loadMore when a reload happens first (block race)', async () => {
+    // page 1 resolves immediately; loadMore (page 2) is deferred so we can trigger a
+    // reload before it settles. The reloaded page 3 must win — stale page-2 cards dropped.
+    let releaseLoadMore: (v: { cards: FeedCard[]; next_cursor?: string }) => void = () => {}
+    const loadMorePromise = new Promise<{ cards: FeedCard[]; next_cursor?: string }>((res) => {
+      releaseLoadMore = res
+    })
+    const actor = { id: 42, display_name: 'Actor', is_public: true }
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        cards: [card({ type: 'added_show', actor, show: { id: 1, tmdb_id: 1, title: 'Page1' } })],
+        next_cursor: 'cursor-2',
+      })
+      .mockReturnValueOnce(loadMorePromise) // deferred page 2
+      .mockResolvedValueOnce({
+        cards: [card({ type: 'added_show', actor, show: { id: 3, tmdb_id: 3, title: 'Reloaded' } })],
+        // Reloaded feed has another page: the load-more button must come back ENABLED
+        // (loadingMore must have been reset by the reload, not left stuck true).
+        next_cursor: 'cursor-reloaded-2',
+      })
+      .mockResolvedValue({ cards: [], next_cursor: undefined })
+
+    renderWithProviders(
+      <ActivityFeed
+        fetchPage={fetchPage}
+        emptyText="пусто"
+        renderActorMenu={(_actorId, reload) => (
+          <button type="button" onClick={reload}>
+            reload
+          </button>
+        )}
+      />,
+    )
+
+    expect(await screen.findByText('Page1')).toBeInTheDocument()
+    // Start loadMore (page 2, deferred).
+    await userEvent.click(screen.getByRole('button', { name: 'Показать ещё' }))
+    // Trigger a reload (simulating block) before page 2 settles.
+    await userEvent.click(screen.getAllByRole('button', { name: 'reload' })[0])
+    expect(await screen.findByText('Reloaded')).toBeInTheDocument()
+
+    // Now release the stale page-2 response — it must be discarded.
+    releaseLoadMore({
+      cards: [card({ type: 'added_show', show: { id: 2, tmdb_id: 2, title: 'StalePage2' } })],
+      next_cursor: 'stale-cursor',
+    })
+    await waitFor(() => expect(screen.getByText('Reloaded')).toBeInTheDocument())
+    expect(screen.queryByText('StalePage2')).not.toBeInTheDocument()
+    expect(screen.queryByText('Page1')).not.toBeInTheDocument()
+
+    // The reloaded feed has another page, so "Показать ещё" must be present and ENABLED —
+    // i.e. loadingMore was reset by the reload (not left stuck true by the discarded loadMore).
+    const loadMoreBtn = await screen.findByRole('button', { name: 'Показать ещё' })
+    expect(loadMoreBtn).not.toBeDisabled()
+    // And it works: clicking it fetches the reloaded feed's next page.
+    await userEvent.click(loadMoreBtn)
+    expect(fetchPage).toHaveBeenLastCalledWith('cursor-reloaded-2')
+  })
+
   it('shows the empty state when there is no activity', async () => {
     const fetchPage = vi.fn().mockResolvedValue({ cards: [], next_cursor: undefined })
     renderWithProviders(<ActivityFeed fetchPage={fetchPage} emptyText="нет активности" />)

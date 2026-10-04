@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -385,6 +386,13 @@ func TestSocial_CreateReport(t *testing.T) {
 		"target_user_id": bID, "reason": "bogus",
 	}); rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad reason: want 400, got %d", rec.Code)
+	}
+
+	// Over-long note (>1000 runes) → 400 (ErrInvalidNote).
+	if rec := doJSON(t, e, http.MethodPost, "/me/reports", aTok, map[string]any{
+		"target_user_id": bID, "reason": "other", "note": strings.Repeat("x", 1001),
+	}); rec.Code != http.StatusBadRequest {
+		t.Fatalf("over-long note: want 400, got %d", rec.Code)
 	}
 
 	// Unknown target → 404.

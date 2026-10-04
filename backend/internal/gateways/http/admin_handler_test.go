@@ -110,8 +110,18 @@ func TestAdminHandler_Reports(t *testing.T) {
 		t.Fatalf("resolved filter: want 0, got %d", list.Total)
 	}
 
-	// Resolve the report → 204.
 	rid := strconv.FormatInt(created.Id, 10)
+
+	// Invalid target statuses are rejected with 400 (only resolved/dismissed are
+	// terminal; "open" and a bogus value are both outside the allowed set).
+	for _, bad := range []string{"open", "bogus"} {
+		if rec := doJSON(t, e, http.MethodPost, "/admin/reports/"+rid+"/resolve", adminToken,
+			map[string]any{"status": bad}); rec.Code != http.StatusBadRequest {
+			t.Fatalf("resolve status=%q: want 400, got %d (%s)", bad, rec.Code, rec.Body.String())
+		}
+	}
+
+	// Resolve the report → 204.
 	if rec := doJSON(t, e, http.MethodPost, "/admin/reports/"+rid+"/resolve", adminToken,
 		map[string]any{"status": "resolved"}); rec.Code != http.StatusNoContent {
 		t.Fatalf("resolve: want 204, got %d (%s)", rec.Code, rec.Body.String())
@@ -122,6 +132,12 @@ func TestAdminHandler_Reports(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
 	if list.Total != 1 || list.Reports[0].Status != "resolved" || list.Reports[0].ResolvedAt == nil {
 		t.Fatalf("after resolve: %+v", list)
+	}
+
+	// Re-resolving an already-terminal report → 404 (no re-stamp).
+	if rec := doJSON(t, e, http.MethodPost, "/admin/reports/"+rid+"/resolve", adminToken,
+		map[string]any{"status": "dismissed"}); rec.Code != http.StatusNotFound {
+		t.Fatalf("re-resolve terminal: want 404, got %d", rec.Code)
 	}
 
 	// Resolving a missing report → 404.

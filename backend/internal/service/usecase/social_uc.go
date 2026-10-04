@@ -20,6 +20,7 @@ var (
 // SocialRepo is the follow-storage dependency of SocialUsecase.
 type SocialRepo interface {
 	CreateFollow(ctx context.Context, f *entity.Follow) error
+	CreateFollowGuarded(ctx context.Context, f *entity.Follow) error
 	GetFollow(ctx context.Context, followerID, followeeID int64) (*entity.Follow, error)
 	DeleteFollow(ctx context.Context, followerID, followeeID int64) error
 	SetFollowStatus(ctx context.Context, followerID, followeeID int64, status entity.FollowStatus) error
@@ -160,7 +161,14 @@ func (uc *SocialUsecase) Follow(ctx context.Context, followerID, followeeID int6
 		status = entity.FollowAccepted
 	}
 	f := &entity.Follow{FollowerID: followerID, FolloweeID: followeeID, Status: status}
-	if err := uc.repo.CreateFollow(ctx, f); err != nil {
+	// CreateFollowGuarded re-checks the block inside the same transaction as the insert,
+	// so a concurrent Block that committed its block row after the check above cannot leave
+	// a surviving edge: the insert is refused with ErrBlocked. This closes the Follow/Block
+	// TOCTOU window at the source (the home-feed SQL exclusion is a defence-in-depth backstop).
+	if err := uc.repo.CreateFollowGuarded(ctx, f); err != nil {
+		if errors.Is(err, repository.ErrBlocked) {
+			return nil, ErrBlocked
+		}
 		// A concurrent insert may have won the race — return the winner.
 		if errors.Is(err, repository.ErrConflict) {
 			return uc.repo.GetFollow(ctx, followerID, followeeID)

@@ -17,6 +17,9 @@ var (
 	ErrNotFound = errors.New("repository: not found")
 	// ErrConflict is returned on a unique-constraint violation.
 	ErrConflict = errors.New("repository: conflict")
+	// ErrBlocked is returned when an operation is refused because a block exists
+	// between the two users in either direction (e.g. CreateFollowGuarded).
+	ErrBlocked = errors.New("repository: blocked")
 )
 
 // UserRepository is the data access layer for users, identities, and refresh

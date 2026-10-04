@@ -149,12 +149,18 @@ struct SettingsView: View {
 }
 
 /// Lists the users the current user has blocked (GET /me/blocks) with an Unblock action.
+/// Paginated: "Показать ещё" loads older blocks so none become unreachable.
 private struct BlockedUsersSection: View {
     @EnvironmentObject private var session: Session
+    private static let pageSize = 20
     @State private var users: [FollowUser] = []
+    @State private var total = 0
+    @State private var page = 0 // number of pages loaded so far
     @State private var loaded = false
     @State private var busy = false
     @State private var error: String?
+
+    private var hasMore: Bool { users.count < total }
 
     var body: some View {
         Section {
@@ -170,6 +176,9 @@ private struct BlockedUsersSection: View {
                         .buttonStyle(.bordered).controlSize(.small).disabled(busy)
                 }
             }
+            if hasMore {
+                Button("Показать ещё") { Task { await loadMore() } }.disabled(busy)
+            }
         } header: {
             Text("Заблокированные")
         }
@@ -177,9 +186,29 @@ private struct BlockedUsersSection: View {
     }
 
     private func load() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
         do {
-            users = try await session.blocks().users
+            let list = try await session.blocks(page: 1, pageSize: Self.pageSize)
+            users = list.users
+            total = list.total
+            page = 1
             loaded = true
+            error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func loadMore() async {
+        guard !busy, hasMore else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let next = page + 1
+            let list = try await session.blocks(page: next, pageSize: Self.pageSize)
+            users.append(contentsOf: list.users)
+            total = list.total
+            page = next
             error = nil
         } catch { self.error = error.localizedDescription }
     }
@@ -190,7 +219,23 @@ private struct BlockedUsersSection: View {
         defer { busy = false }
         do {
             try await session.unblock(userID: user.id)
-            users.removeAll { $0.id == user.id }
+            // Removing a row shifts every later block up by one slot in the offset-paginated
+            // result, so a naive local remove would make the next "Показать ещё" (page+1)
+            // skip the row that slid into the previous page's last position. Refetch all the
+            // currently-loaded pages (1..page) from a consistent offset instead.
+            let pagesLoaded = max(page, 1)
+            var refreshed: [FollowUser] = []
+            var newTotal = total
+            for p in 1...pagesLoaded {
+                let list = try await session.blocks(page: p, pageSize: Self.pageSize)
+                refreshed.append(contentsOf: list.users)
+                newTotal = list.total
+            }
+            users = refreshed
+            total = newTotal
+            // The last page may have emptied out after the removal; keep `page` consistent
+            // with how many pages actually returned rows so hasMore/loadMore stay correct.
+            page = max(1, Int((Double(refreshed.count) / Double(Self.pageSize)).rounded(.up)))
             error = nil
         } catch { self.error = error.localizedDescription }
     }

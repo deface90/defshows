@@ -14,12 +14,8 @@ import {
 import { ErrorState, LoadingState } from '@/shared/ui/states'
 
 const schema = z.object({
-  display_name: z
-    .string()
-    .trim()
-    .max(50, 'Не более 50 символов')
-    // blank is allowed and resets the name to the derived default
-    .refine((v) => v.length === 0 || v.length >= 1, { message: 'Укажите имя' }),
+  // blank is allowed and resets the name to the derived default
+  display_name: z.string().trim().max(50, 'Не более 50 символов'),
 })
 
 type Input = z.infer<typeof schema>
@@ -49,10 +45,12 @@ export function DisplayNameForm() {
   }, [settingsQuery.data, reset])
 
   const mutation = useMutation({
+    // Omit is_public: it is optional server-side, and sending a cached value could
+    // revert a concurrent visibility change (and auto-accept pending followers). timezone
+    // is required by the contract, so it is still sent.
     mutationFn: (input: Input) =>
       updateSettings({
         timezone: settingsQuery.data?.timezone ?? 'UTC',
-        is_public: settingsQuery.data?.is_public ?? false,
         display_name: input.display_name,
       }),
     onSuccess: () => {

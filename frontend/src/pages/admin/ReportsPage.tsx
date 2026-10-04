@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   Group,
+  Pagination,
   SegmentedControl,
   Stack,
   Table,
@@ -11,15 +12,16 @@ import {
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   getListReportsQueryKey,
   resolveReport,
   useListReports,
 } from '@/shared/api/admin/endpoints'
-import type { ListReportsStatus, Report, ReportReason, ReportStatus } from '@/shared/api/admin/model'
+import type { ListReportsStatus, Report, ReportStatus } from '@/shared/api/admin/model'
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
+import { reportReasonLabels } from '@/shared/lib/reportReasons'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { AdminNav } from './AdminNav'
 
@@ -34,13 +36,6 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'Все' },
 ]
 
-const reasonLabels: Record<ReportReason, string> = {
-  spam: 'Спам',
-  harassment: 'Оскорбления',
-  inappropriate: 'Недопустимый контент',
-  other: 'Другое',
-}
-
 const statusMeta: Record<ReportStatus, { label: string; color: string }> = {
   open: { label: 'Открыта', color: 'orange' },
   resolved: { label: 'Решена', color: 'green' },
@@ -52,10 +47,25 @@ export function ReportsPage() {
   useDocumentTitle('Жалобы')
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<Filter>('open')
+  const [page, setPage] = useState(1)
 
-  const params = { status: filter === 'all' ? undefined : filter, page_size: PAGE_SIZE }
+  const changeFilter = (v: Filter) => {
+    setFilter(v)
+    setPage(1) // a new filter has its own page count — restart at the first page
+  }
+
+  const params = { status: filter === 'all' ? undefined : filter, page, page_size: PAGE_SIZE }
   const query = useListReports(params)
+  const total = query.data?.total ?? 0
+  const totalPages = Math.ceil(total / PAGE_SIZE)
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListReportsQueryKey() })
+
+  // Clamp the current page when the result set shrinks (e.g. resolving the last report on
+  // the final page drops totalPages below `page`): otherwise we'd request an empty page and
+  // render "Жалоб нет" with pagination gone despite remaining reports on earlier pages.
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   const resolve = useMutation({
     mutationFn: ({ id, status }: { id: number; status: 'resolved' | 'dismissed' }) =>
@@ -74,7 +84,7 @@ export function ReportsPage() {
 
       <SegmentedControl
         value={filter}
-        onChange={(v) => setFilter(v as Filter)}
+        onChange={(v) => changeFilter(v as Filter)}
         data={FILTERS}
         aria-label="Фильтр по статусу"
       />
@@ -110,6 +120,12 @@ export function ReportsPage() {
           </Table>
         </Table.ScrollContainer>
       )}
+
+      {query.isSuccess && totalPages > 1 && (
+        <Group justify="center">
+          <Pagination total={totalPages} value={page} onChange={setPage} />
+        </Group>
+      )}
     </Stack>
   )
 }
@@ -141,7 +157,7 @@ function ReportRow({
         </Anchor>
       </Table.Td>
       <Table.Td>
-        <Text size="sm">{reasonLabels[report.reason]}</Text>
+        <Text size="sm">{reportReasonLabels[report.reason]}</Text>
         {report.note && (
           <Text c="dimmed" size="xs" style={{ whiteSpace: 'pre-wrap' }}>
             {report.note}

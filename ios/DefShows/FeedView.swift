@@ -47,15 +47,20 @@ struct FeedList: View {
     }
 
     /// Blocks a feed-card actor; the server tears down the follow edge, so a reload
-    /// drops their activity from the home feed.
+    /// drops their activity from the home feed. The busy flag is cleared before the
+    /// reload so reload()'s `guard !busy` does not skip the refresh.
     private func block(_ actor: FollowUser) async {
         guard !busy else { return }
         busy = true
-        defer { busy = false }
         do {
             try await session.block(userID: actor.id)
-            await reload()
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            self.error = error.localizedDescription
+            busy = false
+            return
+        }
+        busy = false
+        await reload()
     }
 
     private var emptyText: String {

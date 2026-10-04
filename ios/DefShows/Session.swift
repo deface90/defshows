@@ -113,8 +113,14 @@ final class Session: ObservableObject {
     func block(userID: Int) async throws { _ = try await authorized("me/blocks/\(userID)", method: "POST") }
     /// Unblock a user. Idempotent on the server.
     func unblock(userID: Int) async throws { _ = try await authorized("me/blocks/\(userID)", method: "DELETE") }
-    /// Users the current user has blocked (paginated, reuses FollowUserList).
-    func blocks() async throws -> FollowUserList { try await get("me/blocks") }
+    /// Users the current user has blocked (paginated, reuses FollowUserList). `page` is
+    /// 1-based; the response carries `total` so callers can page through older blocks.
+    func blocks(page: Int = 1, pageSize: Int = 20) async throws -> FollowUserList {
+        try await get("me/blocks", query: [
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "page_size", value: String(pageSize)),
+        ])
+    }
     /// Eject an existing follower or pending requester. Idempotent on the server.
     func removeFollower(userID: Int) async throws { _ = try await authorized("me/followers/\(userID)", method: "DELETE") }
 
@@ -126,13 +132,6 @@ final class Session: ObservableObject {
         if !trimmed.isEmpty { body["note"] = trimmed }
         let data = try await authorized("me/reports", method: "POST", body: body)
         return try decoder.decode(Report.self, from: data)
-    }
-
-    // MARK: Settings
-
-    /// Updates the editable display name. Blank resets to the server-derived default.
-    func setDisplayName(_ name: String) async throws {
-        try await mutate("me/settings", method: "PATCH", body: ["display_name": name])
     }
 
     // MARK: Feeds

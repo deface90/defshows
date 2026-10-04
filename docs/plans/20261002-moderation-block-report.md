@@ -87,6 +87,14 @@ admin reports section. iOS: hand-written models + SwiftUI mirroring the web.
 - **Feeds need no new filtering.** Home feed only queries *accepted followees*; blocking
   deletes those edges, so blocked actors vanish automatically. Profile feed is gated by
   `CanViewProfile`, which becomes block-aware. → no `feed_uc.go` / `activity_repo` changes.
+  - ⚠️ **Revised (code review):** this held *only* if no follow edge can ever coexist with a
+    block. But `Follow` and `Block` are not serialized: a follow request can pass its
+    `IsBlockedEither` check, then — after `Block` has already run `DeleteFollowEither` — insert
+    an accepted edge, which then lingers alongside the block. The home feed read
+    (`AcceptedFolloweeIDs`) would surface that blocked actor. Lowest-risk robust fix adopted:
+    `AcceptedFolloweeIDs` now excludes blocked ids (either direction) **in SQL**, so the home
+    feed never shows a blocked actor regardless of a lingering edge. (Profile feed stays
+    `CanViewProfile`-gated, which is already block-aware, so it needs nothing further.)
 - **Follower/following lists need no new filtering.** They join `follows`; block deletes the
   edges, so blocked users drop out, and the list view is already `CanViewProfile`-gated.
 - **Two read paths learn about blocks directly** (both return users independent of the follow
