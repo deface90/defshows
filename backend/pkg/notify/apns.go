@@ -99,7 +99,11 @@ func (a *APNsChannel) Send(ctx context.Context, msg Message) error {
 		Reason string `json:"reason"`
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&reason)
-	if resp.StatusCode == http.StatusGone || reason.Reason == "Unregistered" || reason.Reason == "BadDeviceToken" {
+	// 410 Gone / "Unregistered": the token was valid but the app was removed or the token
+	// invalidated — safe to purge this one device. BadDeviceToken (400) is deliberately NOT
+	// treated as purgeable: it usually signals an environment/topic misconfig that applies to
+	// every token, and auto-wiping all of them on one bad scan would be catastrophic.
+	if resp.StatusCode == http.StatusGone || reason.Reason == "Unregistered" {
 		return &UnregisteredTargetError{Target: msg.Target}
 	}
 	return fmt.Errorf("apns: send: status %d reason %s", resp.StatusCode, reason.Reason)

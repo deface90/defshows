@@ -99,15 +99,10 @@ func followChannels(u *entity.User) []string {
 	return channels
 }
 
-// actorName returns a label for a user to embed in a notification payload.
+// actorName returns a label for a user to embed in a notification payload. It matches the
+// name shown elsewhere (display name → email local part → "Пользователь #id").
 func actorName(u *entity.User) string {
-	if u != nil && u.DisplayName != "" {
-		return u.DisplayName
-	}
-	if u != nil {
-		return fmt.Sprintf("Пользователь #%d", u.ID)
-	}
-	return "Пользователь"
+	return u.DisplayLabel()
 }
 
 // emitFollow enqueues a follow notification for recipientID triggered by actorID.

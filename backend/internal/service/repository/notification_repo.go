@@ -197,6 +197,23 @@ func (r *NotificationRepository) MarkFailed(ctx context.Context, id int64) error
 		Update("status", entity.NotifyFailed).Error
 }
 
+// ClearTarget nulls a now-invalid delivery target for the channel, matched by value, so the
+// sender stops using it (the device re-registers a fresh one on next launch). Matching by
+// value (not user id) also covers a token that migrated between users.
+func (r *NotificationRepository) ClearTarget(ctx context.Context, channel, target string) error {
+	db := r.db.WithContext(ctx).Model(&entity.User{})
+	switch channel {
+	case "apns":
+		return db.Where("apns_device_token = ?", target).Update("apns_device_token", nil).Error
+	case "fcm":
+		return db.Where("fcm_device_token = ?", target).Update("fcm_device_token", nil).Error
+	case "telegram":
+		return db.Where("telegram_chat_id::text = ?", target).Update("telegram_chat_id", nil).Error
+	default:
+		return nil
+	}
+}
+
 // EventCandidate is a user+episode pair that should be notified about, along
 // with the channels currently available to reach that user.
 type EventCandidate struct {

@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strconv"
 	"time"
@@ -15,6 +16,9 @@ type SenderRepo interface {
 	Pending(ctx context.Context, channel string, limit int) ([]repository.PendingNotification, error)
 	MarkSent(ctx context.Context, id int64) error
 	MarkFailed(ctx context.Context, id int64) error
+	// ClearTarget drops a now-invalid delivery target (device token / chat id) for the
+	// channel so it stops being used; the device re-registers a fresh one on next launch.
+	ClearTarget(ctx context.Context, channel, target string) error
 }
 
 // NotifySender delivers a channel's pending notifications.
@@ -52,14 +56,22 @@ func (s *NotifySender) RunOnce(ctx context.Context) (sent, failed int, err error
 		sendErr := s.channel.Send(ctx, notify.Message{Target: p.Target, Title: p.Title, Body: p.Body, Data: data})
 		if sendErr != nil {
 			failed++
-			s.logger.Warn("send failed", "notification_id", p.ID, "err", sendErr)
+			s.logger.Warn("send failed", "delivery_id", p.ID, "err", sendErr)
+			var unreg *notify.UnregisteredTargetError
+			if errors.As(sendErr, &unreg) {
+				// Target is permanently invalid (app removed / token invalidated): drop it so
+				// we stop retrying. The device re-registers a fresh token on next launch.
+				if err := s.repo.ClearTarget(ctx, s.channelName, p.Target); err != nil {
+					s.logger.Error("clear dead target", "delivery_id", p.ID, "err", err)
+				}
+			}
 			if err := s.repo.MarkFailed(ctx, p.ID); err != nil {
-				s.logger.Error("mark failed", "notification_id", p.ID, "err", err)
+				s.logger.Error("mark failed", "delivery_id", p.ID, "err", err)
 			}
 			continue
 		}
 		if err := s.repo.MarkSent(ctx, p.ID); err != nil {
-			s.logger.Error("mark sent", "notification_id", p.ID, "err", err)
+			s.logger.Error("mark sent", "delivery_id", p.ID, "err", err)
 			continue
 		}
 		sent++

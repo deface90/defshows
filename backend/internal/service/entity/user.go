@@ -2,7 +2,11 @@
 // migrations; struct tags here are for mapping/reads, not AutoMigrate.
 package entity
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // Role enumerates user roles.
 type Role string
@@ -30,6 +34,25 @@ type User struct {
 
 // TableName maps User to the users table.
 func (User) TableName() string { return "users" }
+
+// DisplayLabel returns the name shown for a user: their display name, else the local
+// part of their email, else a "Пользователь #id" fallback. Shared by API responses and
+// notification payloads so a user is labelled the same everywhere.
+func (u *User) DisplayLabel() string {
+	if u == nil {
+		return "Пользователь"
+	}
+	if u.DisplayName != "" {
+		return u.DisplayName
+	}
+	if u.Email != nil && *u.Email != "" {
+		if at := strings.IndexByte(*u.Email, '@'); at > 0 {
+			return (*u.Email)[:at]
+		}
+		return *u.Email
+	}
+	return fmt.Sprintf("Пользователь #%d", u.ID)
+}
 
 // UserIdentity links a user to an external OAuth identity.
 type UserIdentity struct {

@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -181,16 +180,7 @@ func (h *UsersHandler) ListUserShows(c echo.Context, userID usersapi.UserId) err
 // displayNameOf returns a non-empty label for a user: their display name, else
 // the local part of their email, else "Пользователь #<id>".
 func displayNameOf(u *entity.User) string {
-	if u.DisplayName != "" {
-		return u.DisplayName
-	}
-	if u.Email != nil && *u.Email != "" {
-		if at := strings.IndexByte(*u.Email, '@'); at > 0 {
-			return (*u.Email)[:at]
-		}
-		return *u.Email
-	}
-	return fmt.Sprintf("Пользователь #%d", u.ID)
+	return u.DisplayLabel()
 }
 
 func toUsersUserShow(us *entity.UserShow) usersapi.UserShow {

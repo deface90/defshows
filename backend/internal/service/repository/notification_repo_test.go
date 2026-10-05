@@ -342,6 +342,41 @@ func TestNotificationRepository_FCMChannel(t *testing.T) {
 	}
 }
 
+func TestNotificationRepository_ClearTarget(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "users", "shows")
+	repo := repository.NewNotificationRepository(gdb)
+	userRepo := repository.NewUserRepository(gdb)
+	ctx := context.Background()
+
+	user := &entity.User{Email: strptr("clear@example.com"), Role: entity.RoleUser, Timezone: "UTC"}
+	if err := gdb.Create(user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := userRepo.SetAPNsToken(ctx, user.ID, "dead-token"); err != nil {
+		t.Fatalf("set apns token: %v", err)
+	}
+	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, DedupeKey: "clear-k1", Payload: "hi"}
+	if _, err := repo.EnqueueNotification(ctx, n, []string{"apns"}); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	if pend, _ := repo.Pending(ctx, "apns", 10); len(pend) != 1 {
+		t.Fatalf("want 1 pending before clear, got %d", len(pend))
+	}
+
+	// Clearing the dead token (by value) nulls it → the delivery is no longer pickable,
+	// and the stored token is gone so the device can re-register a fresh one.
+	if err := repo.ClearTarget(ctx, "apns", "dead-token"); err != nil {
+		t.Fatalf("clear target: %v", err)
+	}
+	if pend, _ := repo.Pending(ctx, "apns", 10); len(pend) != 0 {
+		t.Fatalf("want 0 pending after clear, got %d", len(pend))
+	}
+	if tok, _ := userRepo.APNsToken(ctx, user.ID); tok != nil {
+		t.Fatalf("want apns token cleared, got %v", *tok)
+	}
+}
+
 func TestNotificationRepository_UpcomingCandidates(t *testing.T) {
 	gdb := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, gdb, "users", "shows")

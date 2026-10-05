@@ -116,7 +116,15 @@ deploy/                          docker-compose, Dockerfile, .env.example
   `notification_deliveries → notifications → users`; `PendingNotification.ID` is a *delivery* id,
   and `MarkSent`/`MarkFailed` update the delivery. `notifications` no longer has
   channel/status/scheduled_for/sent_at columns. `NotificationItem` API dropped `status` (an event
-  has no single delivery status).
+  has no single delivery status). **Dead targets**: when a channel returns
+  `notify.UnregisteredTargetError` (APNs 410/Unregistered or FCM 404/UNREGISTERED — NOT APNs
+  `BadDeviceToken`, which usually means an env/topic misconfig and must not mass-wipe), the sender
+  calls `SenderRepo.ClearTarget(channel, target)` to null that token/chat (matched by value) so it
+  stops being retried; the device re-registers on next launch. No automatic re-send of the failed
+  delivery (would need to re-queue on re-registration — deliberately out of scope).
+- **User display name**: `entity.User.DisplayLabel()` (display_name → email local part →
+  `Пользователь #id`) is the single source for the shown name — used by both `displayNameOf` (API
+  responses) and `actorName` (notification payloads) so a user is labelled identically everywhere.
 - **Backfill (`cmd/backfill-notifications`, `usecase/backfill_notifications.go`)**: one-shot,
   idempotent seeder that reserves the scanner's dedupe keys (`release:*`/`finale:*`) for
   already-aired episodes as feed markers with **no deliveries** (and pre-marked read), so turning
