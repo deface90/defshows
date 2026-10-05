@@ -27,7 +27,17 @@ struct FeedList: View {
         List {
             if let error { Text(error).foregroundStyle(.red) }
             if loaded && cards.isEmpty {
-                ContentUnavailableView("Пока пусто", systemImage: "square.stack.3d.up", description: Text(emptyText))
+                if source == .home {
+                    ContentUnavailableView {
+                        Label("Пока пусто", systemImage: "square.stack.3d.up")
+                    } description: {
+                        Text(emptyText)
+                    } actions: {
+                        NavigationLink { UsersView() } label: { Text("Найти людей") }
+                    }
+                } else {
+                    ContentUnavailableView("Пока пусто", systemImage: "square.stack.3d.up", description: Text(emptyText))
+                }
             }
             ForEach(cards) { card in
                 FeedCardRow(card: card)

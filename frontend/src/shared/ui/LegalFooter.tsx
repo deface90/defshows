@@ -18,6 +18,7 @@ export function LegalFooter() {
             <Group gap="md">
               <Anchor component={Link} to="/legal" size="xs">Реквизиты</Anchor>
               <Anchor component={Link} to="/privacy" size="xs">Политика обработки персональных данных</Anchor>
+              <Anchor component={Link} to="/terms" size="xs">Условия использования</Anchor>
               {getMetrikaId() && (
                 <Anchor component="button" type="button" size="xs" onClick={resetConsent}>Настройки cookie</Anchor>
               )}

@@ -5,6 +5,10 @@ import Combine
 final class Session: ObservableObject {
     @Published private(set) var signedIn = false
     @Published private(set) var collectionRevision = 0
+    // Drives the toolbar bell badge on the library screen.
+    @Published private(set) var unreadNotifications = 0
+    // Drives the "Люди" tab badge — incoming follow requests awaiting approval.
+    @Published private(set) var pendingFollowRequests = 0
     // Public API prefix from the deployed web client configuration.
     private let server = "https://shows.deface.dev/api"
     private var tokens: Tokens?
@@ -68,6 +72,32 @@ final class Session: ObservableObject {
     }
 
     func collectionDidChange() { collectionRevision += 1 }
+
+    /// Best-effort refresh of the unread-notification count behind the bell badge.
+    /// Errors are swallowed — a stale badge is better than surfacing noise on a screen
+    /// whose primary job is the collection.
+    func refreshUnreadCount() async {
+        guard signedIn else { return }
+        do {
+            let feed: NotificationFeed = try await get("me/notifications")
+            unreadNotifications = feed.notifications.filter { !$0.read }.count
+        } catch { }
+    }
+
+    /// Lets NotificationsView keep the badge in sync after it loads or marks items read,
+    /// without a second network round-trip.
+    func noteUnreadNotifications(_ count: Int) { unreadNotifications = count }
+
+    /// Best-effort refresh of the pending follow-request count behind the "Люди" tab badge.
+    /// Errors are swallowed, mirroring refreshUnreadCount — a stale badge beats surfacing noise.
+    func refreshPendingRequests() async {
+        guard signedIn else { return }
+        if let list = try? await incomingRequests() { pendingFollowRequests = list.users.count }
+    }
+
+    /// Lets the requests list keep the tab badge in sync after approve/reject, without a
+    /// second network round-trip.
+    func notePendingRequests(_ count: Int) { pendingFollowRequests = count }
 
     /// Sets (1...10) or clears (nil) the user's own rating for a show.
     func setRating(showID: Int, rating: Int?) async throws {

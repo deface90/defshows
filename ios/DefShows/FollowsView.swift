@@ -124,6 +124,7 @@ private struct RequestsList: View {
     private func load() async {
         do {
             users = try await session.incomingRequests().users
+            session.notePendingRequests(users.count)
             loaded = true
             error = nil
         } catch { self.error = error.localizedDescription }

@@ -76,7 +76,7 @@ struct CatalogBrowseView: View {
                 Button("Показать ещё") { Task { await load(reset: false) } }.disabled(busy)
             }
         }
-        .navigationTitle(discover ? "Подбор" : "Поиск")
+        // Title/mode switching is owned by BrowseView's segmented control.
         .refreshable { await load(reset: true) }
         .task {
             guard discover, !loaded else { return }

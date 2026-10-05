@@ -27,6 +27,7 @@ struct LibraryView: View {
     @State private var sort: LibrarySort = .progress
     @State private var reversed = false
     @State private var showingStats = false
+    @State private var showingNotifications = false
     @State private var loading = false
     @State private var loaded = false
     @State private var error: String?
@@ -116,12 +117,31 @@ struct LibraryView: View {
                     .accessibilityLabel("Статистика")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingNotifications = true } label: {
+                        Image(systemName: session.unreadNotifications > 0 ? "bell.badge" : "bell")
+                    }
+                    .accessibilityLabel(session.unreadNotifications > 0 ? "Уведомления, есть новые" : "Уведомления")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     filterMenu
                 }
             }
             .sheet(isPresented: $showingStats) { StatsSheet() }
+            .sheet(isPresented: $showingNotifications, onDismiss: { Task { await session.refreshUnreadCount() } }) {
+                NavigationStack {
+                    NotificationsView()
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button("Готово") { showingNotifications = false }
+                            }
+                        }
+                }
+            }
             .refreshable { await load() }
-            .onAppear { Task { await load() } }
+            .onAppear {
+                Task { await load() }
+                Task { await session.refreshUnreadCount() }
+            }
             .onChange(of: session.collectionRevision) { _, _ in Task { await load() } }
         }
     }

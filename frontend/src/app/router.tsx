@@ -10,6 +10,7 @@ import { OAuthCallbackPage } from '@/pages/OAuthCallbackPage'
 import { HomePage } from '@/pages/HomePage'
 import { LegalPage } from '@/pages/LegalPage'
 import { PrivacyPage } from '@/pages/PrivacyPage'
+import { TermsPage } from '@/pages/TermsPage'
 import { MyShowsPage } from '@/pages/MyShowsPage'
 import { FollowsPage } from '@/pages/FollowsPage'
 import { FeedPage } from '@/pages/FeedPage'
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
           // Legal pages must be publicly reachable (required for vc.ru etc.).
           { path: 'legal', element: <LegalPage /> },
           { path: 'privacy', element: <PrivacyPage /> },
+          { path: 'terms', element: <TermsPage /> },
           // Private routes: everything bound to a user's account.
           {
             element: <RequireAuth />,

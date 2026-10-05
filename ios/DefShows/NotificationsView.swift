@@ -49,6 +49,7 @@ struct NotificationsView: View {
         do {
             let result: NotificationFeed = try await session.get("me/notifications")
             items = result.notifications
+            session.noteUnreadNotifications(items.filter { !$0.read }.count)
             loaded = true
             error = nil
         } catch { self.error = error.localizedDescription }
@@ -62,6 +63,7 @@ struct NotificationsView: View {
             let path = id.map { "me/notifications/\($0)/read" } ?? "me/notifications/read-all"
             try await session.mutate(path)
             for index in items.indices where id == nil || items[index].id == id { items[index].read = true }
+            session.noteUnreadNotifications(items.filter { !$0.read }.count)
             error = nil
         } catch { self.error = error.localizedDescription }
     }
