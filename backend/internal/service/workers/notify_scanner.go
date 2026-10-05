@@ -16,7 +16,7 @@ type ScannerRepo interface {
 	SeasonFinaleCandidates(ctx context.Context, since time.Time) ([]repository.EventCandidate, error)
 	EpisodeUpcomingCandidates(ctx context.Context, now time.Time) ([]repository.EventCandidate, error)
 	SeasonUpcomingCandidates(ctx context.Context, now time.Time) ([]repository.EventCandidate, error)
-	CreateNotificationIfAbsent(ctx context.Context, n *entity.Notification) (bool, error)
+	EnqueueNotification(ctx context.Context, n *entity.Notification, channels []string) (bool, error)
 }
 
 // NotifyScanner creates notifications for newly-aired, unwatched episodes and
@@ -110,43 +110,47 @@ func (s *NotifyScanner) RunOnce(ctx context.Context) (created int, err error) {
 	return created, nil
 }
 
-// enqueue creates one notification per channel available for the candidate
-// (telegram and/or apns and/or fcm), returning how many rows were newly created.
+// enqueue creates one notification (feed event) for the candidate, delivered to every
+// channel available for the user (telegram and/or apns and/or fcm). Returns 1 if the event
+// was newly created, 0 on a dedupe hit or if the user has no delivery channel.
 func (s *NotifyScanner) enqueue(ctx context.Context, kind eventKind, c repository.EventCandidate) int {
-	created := 0
-	targets := []string{}
-	if c.TelegramChatID != nil {
-		targets = append(targets, "telegram")
-	}
-	if c.APNsToken != nil {
-		targets = append(targets, "apns")
-	}
-	if c.FCMToken != nil {
-		targets = append(targets, "fcm")
+	channels := candidateChannels(c)
+	if len(channels) == 0 {
+		return 0
 	}
 	showID, episodeID := c.ShowID, c.EpisodeID
-	for _, channel := range targets {
-		n := &entity.Notification{
-			UserID:       c.UserID,
-			Type:         kind.notifyType,
-			ShowID:       &showID,
-			EpisodeID:    &episodeID,
-			Channel:      channel,
-			Status:       entity.NotifyPending,
-			ScheduledFor: time.Now(),
-			DedupeKey:    fmt.Sprintf("%s:%d:%d:%s", kind.dedupeTag, c.UserID, c.EpisodeID, channel),
-			Payload:      kind.payload(c),
-		}
-		ok, err := s.repo.CreateNotificationIfAbsent(ctx, n)
-		if err != nil {
-			s.logger.Warn("create notification failed", "user_id", c.UserID, "episode_id", c.EpisodeID, "channel", channel, "err", err)
-			continue
-		}
-		if ok {
-			created++
-		}
+	n := &entity.Notification{
+		UserID:    c.UserID,
+		Type:      kind.notifyType,
+		ShowID:    &showID,
+		EpisodeID: &episodeID,
+		DedupeKey: fmt.Sprintf("%s:%d:%d", kind.dedupeTag, c.UserID, c.EpisodeID),
+		Payload:   kind.payload(c),
 	}
-	return created
+	created, err := s.repo.EnqueueNotification(ctx, n, channels)
+	if err != nil {
+		s.logger.Warn("enqueue notification failed", "user_id", c.UserID, "episode_id", c.EpisodeID, "err", err)
+		return 0
+	}
+	if created {
+		return 1
+	}
+	return 0
+}
+
+// candidateChannels lists the delivery channels currently linked for the candidate's user.
+func candidateChannels(c repository.EventCandidate) []string {
+	channels := []string{}
+	if c.TelegramChatID != nil {
+		channels = append(channels, "telegram")
+	}
+	if c.APNsToken != nil {
+		channels = append(channels, "apns")
+	}
+	if c.FCMToken != nil {
+		channels = append(channels, "fcm")
+	}
+	return channels
 }
 
 // Run scans on an interval until the context is cancelled.

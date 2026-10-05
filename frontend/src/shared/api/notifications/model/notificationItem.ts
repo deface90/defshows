@@ -8,10 +8,9 @@
 export interface NotificationItem {
   id: number;
   type: string;
-  status: string;
   read: boolean;
   payload: string;
   created_at: string;
-  /** User who triggered the notification (e.g. the follower for follow_request/follow_accepted) */
+  /** User who triggered the notification (e.g. the follower for follow_request/follow_new/follow_accepted) */
   actor_id?: number;
 }

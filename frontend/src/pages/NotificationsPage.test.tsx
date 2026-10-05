@@ -17,7 +17,6 @@ describe('NotificationsPage', () => {
             {
               id: 1,
               type: 'episode_released',
-              status: 'sent',
               read: false,
               payload: 'Вышел новый эпизод «Foo»',
               created_at: '2026-09-16T10:00:00Z',
@@ -49,7 +48,6 @@ describe('NotificationsPage', () => {
             {
               id: 7,
               type: 'episode_released',
-              status: 'sent',
               read,
               payload: 'Эпизод вышел',
               created_at: '2026-09-16T10:00:00Z',
@@ -81,8 +79,8 @@ describe('NotificationsPage', () => {
       http.get(`${base}/me/notifications`, () =>
         HttpResponse.json({
           notifications: [
-            { id: 1, type: 'episode_released', status: 'sent', read: allMarked, payload: 'a', created_at: '2026-09-16' },
-            { id: 2, type: 'season_upcoming', status: 'sent', read: allMarked, payload: 'b', created_at: '2026-09-16' },
+            { id: 1, type: 'episode_released', read: allMarked, payload: 'a', created_at: '2026-09-16' },
+            { id: 2, type: 'season_upcoming', read: allMarked, payload: 'b', created_at: '2026-09-16' },
           ],
         }),
       ),

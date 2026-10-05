@@ -223,16 +223,16 @@ func TestNotificationUsecase_UpdatePrefs(t *testing.T) {
 
 	off := false
 	lead := 48
-	p, err := uc.UpdatePrefs(ctx, 5, &off, nil, &off, nil, &lead)
+	p, err := uc.UpdatePrefs(ctx, 5, &off, nil, &off, nil, &off, &lead)
 	if err != nil {
 		t.Fatalf("update prefs: %v", err)
 	}
-	if p.EpisodeRelease != false || p.SeasonFinale != false || p.LeadTimeHours != 48 {
+	if p.EpisodeRelease != false || p.SeasonFinale != false || p.SocialFollows != false || p.LeadTimeHours != 48 {
 		t.Fatalf("prefs not applied: %+v", p)
 	}
 	// Persisted.
 	got, _ := uc.GetPrefs(ctx, 5)
-	if got.EpisodeRelease != false || got.SeasonFinale != false || got.LeadTimeHours != 48 {
+	if got.EpisodeRelease != false || got.SeasonFinale != false || got.SocialFollows != false || got.LeadTimeHours != 48 {
 		t.Fatalf("prefs not persisted: %+v", got)
 	}
 }

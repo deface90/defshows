@@ -45,12 +45,15 @@ type SocialUserRepo interface {
 	FindUserByID(ctx context.Context, id int64) (*entity.User, error)
 }
 
-// FollowNotifier emits (and clears) the in-app follow notifications. It is the
-// notification repository in production; follow notifications use the in_app channel,
-// which no outbox sender polls, so they surface only in the in-app feed.
+// FollowNotifier enqueues (and clears) follow notifications, and reads the recipient's
+// prefs to honour their social-follows toggle. It is the notification repository in
+// production. A follow notification is one feed event delivered to every channel the
+// recipient has linked (telegram/apns/fcm); with none linked it is feed-only. Either way
+// it surfaces in the in-app feed.
 type FollowNotifier interface {
-	CreateNotificationIfAbsent(ctx context.Context, n *entity.Notification) (bool, error)
+	EnqueueNotification(ctx context.Context, n *entity.Notification, channels []string) (bool, error)
 	DeleteByDedupeKeys(ctx context.Context, keys ...string) error
+	GetPrefs(ctx context.Context, userID int64) (*entity.NotificationPref, error)
 }
 
 // SocialUsecase implements follows, follow-gated visibility, and (later) feeds.
@@ -73,6 +76,29 @@ func followAcceptedDedupe(follower, followee int64) string {
 	return fmt.Sprintf("follow_accepted:%d:%d", follower, followee)
 }
 
+func followNewDedupe(follower, followee int64) string {
+	return fmt.Sprintf("follow_new:%d:%d", follower, followee)
+}
+
+// followChannels lists every delivery channel the recipient has linked. An empty result
+// means the notification is feed-only (it still surfaces in the in-app feed).
+func followChannels(u *entity.User) []string {
+	if u == nil {
+		return nil
+	}
+	channels := []string{}
+	if u.TelegramChatID != nil {
+		channels = append(channels, "telegram")
+	}
+	if u.APNsDeviceToken != nil {
+		channels = append(channels, "apns")
+	}
+	if u.FCMDeviceToken != nil {
+		channels = append(channels, "fcm")
+	}
+	return channels
+}
+
 // actorName returns a label for a user to embed in a notification payload.
 func actorName(u *entity.User) string {
 	if u != nil && u.DisplayName != "" {
@@ -84,41 +110,50 @@ func actorName(u *entity.User) string {
 	return "Пользователь"
 }
 
-// emitFollowRequest notifies the followee that someone requested to follow them.
-// Best-effort: the follow is already persisted, so a notification error is swallowed.
-func (uc *SocialUsecase) emitFollowRequest(ctx context.Context, followerID, followeeID int64) {
+// emitFollow enqueues a follow notification for recipientID triggered by actorID.
+// Best-effort (the follow edge is already persisted): errors are swallowed. It honours
+// the recipient's social-follows toggle and routes the row to their linked channel.
+func (uc *SocialUsecase) emitFollow(ctx context.Context, recipientID, actorID int64, notifyType, dedupe, payload string) {
 	if uc.notifier == nil {
 		return
 	}
-	actor, _ := uc.users.FindUserByID(ctx, followerID)
-	n := &entity.Notification{
-		UserID:    followeeID,
-		Type:      entity.NotifyFollowRequest,
-		ActorID:   &followerID,
-		Channel:   entity.ChannelInApp,
-		Status:    entity.NotifySent,
-		DedupeKey: followRequestDedupe(followerID, followeeID),
-		Payload:   fmt.Sprintf("%s хочет на вас подписаться", actorName(actor)),
+	if prefs, err := uc.notifier.GetPrefs(ctx, recipientID); err == nil && prefs != nil && !prefs.SocialFollows {
+		return
 	}
-	_, _ = uc.notifier.CreateNotificationIfAbsent(ctx, n)
+	recipient, _ := uc.users.FindUserByID(ctx, recipientID)
+	n := &entity.Notification{
+		UserID:    recipientID,
+		Type:      notifyType,
+		ActorID:   &actorID,
+		DedupeKey: dedupe,
+		Payload:   payload,
+	}
+	_, _ = uc.notifier.EnqueueNotification(ctx, n, followChannels(recipient))
+}
+
+// emitFollowRequest notifies the followee that someone requested to follow them.
+func (uc *SocialUsecase) emitFollowRequest(ctx context.Context, followerID, followeeID int64) {
+	actor, _ := uc.users.FindUserByID(ctx, followerID)
+	uc.emitFollow(ctx, followeeID, followerID, entity.NotifyFollowRequest,
+		followRequestDedupe(followerID, followeeID),
+		fmt.Sprintf("%s хочет на вас подписаться", actorName(actor)))
+}
+
+// emitFollowNew notifies the followee that someone (a public follow is accepted
+// immediately, so there is no request to approve) started following them.
+func (uc *SocialUsecase) emitFollowNew(ctx context.Context, followerID, followeeID int64) {
+	actor, _ := uc.users.FindUserByID(ctx, followerID)
+	uc.emitFollow(ctx, followeeID, followerID, entity.NotifyFollowNew,
+		followNewDedupe(followerID, followeeID),
+		fmt.Sprintf("%s подписался на вас", actorName(actor)))
 }
 
 // emitFollowAccepted notifies the follower that their request was accepted.
 func (uc *SocialUsecase) emitFollowAccepted(ctx context.Context, followerID, followeeID int64) {
-	if uc.notifier == nil {
-		return
-	}
 	actor, _ := uc.users.FindUserByID(ctx, followeeID)
-	n := &entity.Notification{
-		UserID:    followerID,
-		Type:      entity.NotifyFollowAccepted,
-		ActorID:   &followeeID,
-		Channel:   entity.ChannelInApp,
-		Status:    entity.NotifySent,
-		DedupeKey: followAcceptedDedupe(followerID, followeeID),
-		Payload:   fmt.Sprintf("%s принял вашу заявку на подписку", actorName(actor)),
-	}
-	_, _ = uc.notifier.CreateNotificationIfAbsent(ctx, n)
+	uc.emitFollow(ctx, followerID, followeeID, entity.NotifyFollowAccepted,
+		followAcceptedDedupe(followerID, followeeID),
+		fmt.Sprintf("%s принял вашу заявку на подписку", actorName(actor)))
 }
 
 // clearFollowNotifications removes both follow notifications for a pair so a later
@@ -129,6 +164,7 @@ func (uc *SocialUsecase) clearFollowNotifications(ctx context.Context, followerI
 	}
 	_ = uc.notifier.DeleteByDedupeKeys(ctx,
 		followRequestDedupe(followerID, followeeID),
+		followNewDedupe(followerID, followeeID),
 		followAcceptedDedupe(followerID, followeeID))
 }
 
@@ -178,6 +214,8 @@ func (uc *SocialUsecase) Follow(ctx context.Context, followerID, followeeID int6
 	}
 	if status == entity.FollowPending {
 		uc.emitFollowRequest(ctx, followerID, followeeID)
+	} else {
+		uc.emitFollowNew(ctx, followerID, followeeID)
 	}
 	return f, nil
 }

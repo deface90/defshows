@@ -105,10 +105,33 @@ deploy/                          docker-compose, Dockerfile, .env.example
   `created_at|id` cursor, `created_at DESC, id DESC`); `eventIter` fetches further pages so a
   long binge still fills a page. Home feed = accepted followees; profile feed gated by
   `CanViewProfile`.
-- **In-app notifications**: follow_request/follow_accepted use the `in_app` channel, which is
-  deliberately absent from `pendingQueries` so **no outbox sender ever dispatches them**
-  (they surface only in the in-app feed). `DedupeKey`+`Payload` are set explicitly; unfollow/
-  reject clear the rows (`DeleteByDedupeKeys`) so a re-follow re-fires.
+- **Notifications = event + deliveries** (migration `0028_notification_deliveries`): a
+  `notifications` row is ONE logical event and the in-app feed entry (`ListForUser` shows it
+  once); per-channel outbox delivery lives in `notification_deliveries` (channel, status,
+  scheduled_for, sent_at, `UNIQUE(notification_id, channel)`, `ON DELETE CASCADE`).
+  `EnqueueNotification(ctx, n, channels)` inserts the event (deduped by `dedupe_key`) and, when
+  newly created, one pending delivery per channel — all in one tx; **no channels → feed-only**
+  (still in the feed, never dispatched). This removed the old per-channel feed dupes (the scanner
+  used to write one `notifications` row per channel). The sender's `pendingQueries` now join
+  `notification_deliveries → notifications → users`; `PendingNotification.ID` is a *delivery* id,
+  and `MarkSent`/`MarkFailed` update the delivery. `notifications` no longer has
+  channel/status/scheduled_for/sent_at columns. `NotificationItem` API dropped `status` (an event
+  has no single delivery status).
+- **Backfill (`cmd/backfill-notifications`, `usecase/backfill_notifications.go`)**: one-shot,
+  idempotent seeder that reserves the scanner's dedupe keys (`release:*`/`finale:*`) for
+  already-aired episodes as feed markers with **no deliveries** (and pre-marked read), so turning
+  on a previously-broken channel (APNs tokens existed but the `apns_token` column tag was wrong →
+  no apns rows were ever created) doesn't fire a catch-up push burst on first run. Run once before
+  enabling; window = `NOTIFIER_LOOKBACK` (the scanner never looks back further). Mirrors
+  `cmd/backfill-activity`.
+- **Follow notifications**: three types — `follow_request` (→ followee, on a pending request),
+  `follow_new` (→ followee, when a public profile is followed and accepted instantly), and
+  `follow_accepted` (→ follower, on approval). All go through `SocialUsecase.emitFollow`, which
+  (1) honours the recipient's `social_follows` pref (one toggle gates all three — skip if off) and
+  (2) delivers to every channel the recipient has linked (`followChannels`: telegram+apns+fcm),
+  feed-only if none. `DedupeKey`+`Payload` set explicitly; unfollow/reject/block/remove-follower
+  clear the rows (`DeleteByDedupeKeys`, all three dedupe bases, deliveries cascade) so a re-follow
+  re-fires.
 
 ## Commands
 

@@ -105,7 +105,7 @@ func (h *NotificationsHandler) UpdatePrefs(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
-	p, err := h.uc.UpdatePrefs(c.Request().Context(), uid, req.EpisodeRelease, req.SeasonStart, req.SeasonFinale, req.WeeklyDigest, req.LeadTimeHours)
+	p, err := h.uc.UpdatePrefs(c.Request().Context(), uid, req.EpisodeRelease, req.SeasonStart, req.SeasonFinale, req.WeeklyDigest, req.SocialFollows, req.LeadTimeHours)
 	if err != nil {
 		return err
 	}
@@ -162,6 +162,7 @@ func toAPIPrefs(p *entity.NotificationPref) notificationsapi.Prefs {
 		SeasonStart:    p.SeasonStart,
 		SeasonFinale:   p.SeasonFinale,
 		WeeklyDigest:   p.WeeklyDigest,
+		SocialFollows:  p.SocialFollows,
 		Channel:        p.Channel,
 		LeadTimeHours:  p.LeadTimeHours,
 	}
@@ -171,7 +172,6 @@ func toAPINotification(n *entity.Notification) notificationsapi.NotificationItem
 	return notificationsapi.NotificationItem{
 		Id:        n.ID,
 		Type:      n.Type,
-		Status:    n.Status,
 		Read:      n.ReadAt != nil,
 		Payload:   n.Payload,
 		CreatedAt: n.CreatedAt.Format(time.RFC3339),

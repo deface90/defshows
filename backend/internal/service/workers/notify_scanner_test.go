@@ -14,6 +14,7 @@ type fakeScannerRepo struct {
 	released []repository.EventCandidate
 	finales  []repository.EventCandidate
 	seen     map[string]bool
+	channels map[string][]string
 }
 
 func (f *fakeScannerRepo) ReleasedEpisodeCandidates(context.Context, time.Time) ([]repository.EventCandidate, error) {
@@ -32,14 +33,16 @@ func (f *fakeScannerRepo) SeasonUpcomingCandidates(context.Context, time.Time) (
 	return nil, nil
 }
 
-func (f *fakeScannerRepo) CreateNotificationIfAbsent(_ context.Context, n *entity.Notification) (bool, error) {
+func (f *fakeScannerRepo) EnqueueNotification(_ context.Context, n *entity.Notification, channels []string) (bool, error) {
 	if f.seen == nil {
 		f.seen = map[string]bool{}
+		f.channels = map[string][]string{}
 	}
 	if f.seen[n.DedupeKey] {
 		return false, nil
 	}
 	f.seen[n.DedupeKey] = true
+	f.channels[n.DedupeKey] = channels
 	return true, nil
 }
 
@@ -61,7 +64,7 @@ func TestNotifyScanner_DedupesAcrossRuns(t *testing.T) {
 	}
 }
 
-func TestNotifyScanner_FansOutAcrossChannels(t *testing.T) {
+func TestNotifyScanner_OneEventDeliveredToAllChannels(t *testing.T) {
 	chat := int64(1)
 	apnsToken := "apns-device-token"
 	fcmToken := "fcm-device-token"
@@ -71,8 +74,12 @@ func TestNotifyScanner_FansOutAcrossChannels(t *testing.T) {
 	s := workers.NewNotifyScanner(repo, quietLogger(), 7*24*time.Hour)
 
 	created, err := s.RunOnce(context.Background())
-	if err != nil || created != 3 {
-		t.Fatalf("want 3 (telegram+apns+fcm), got created=%d err=%v", created, err)
+	// One feed event (no per-channel dupes) delivered to all three channels.
+	if err != nil || created != 1 {
+		t.Fatalf("want 1 event, got created=%d err=%v", created, err)
+	}
+	if ch := repo.channels["release:1:100"]; len(ch) != 3 {
+		t.Fatalf("want delivery to telegram+apns+fcm, got %v", ch)
 	}
 }
 
@@ -87,7 +94,7 @@ func TestNotifyScanner_SeasonFinale(t *testing.T) {
 	if err != nil || created != 1 {
 		t.Fatalf("first run: created=%d err=%v", created, err)
 	}
-	if !repo.seen["finale:1:108:telegram"] {
+	if !repo.seen["finale:1:108"] {
 		t.Fatalf("expected a season-finale notification with the finale dedupe tag, seen=%v", repo.seen)
 	}
 	// A re-scan must not duplicate the finale notification.

@@ -24,30 +24,30 @@ func TestNotificationRepository_PrefsAndDedup(t *testing.T) {
 
 	// Defaults when unset.
 	p, err := repo.GetPrefs(ctx, user.ID)
-	if err != nil || !p.EpisodeRelease {
+	if err != nil || p.EpisodeRelease || !p.SeasonStart || p.SeasonFinale || p.WeeklyDigest || !p.SocialFollows {
 		t.Fatalf("default prefs: %v (%+v)", err, p)
 	}
 	// Upsert then read.
-	p.EpisodeRelease = false
+	p.EpisodeRelease = true
 	p.LeadTimeHours = 48
 	if err := repo.UpsertPrefs(ctx, p); err != nil {
 		t.Fatalf("upsert prefs: %v", err)
 	}
 	got, _ := repo.GetPrefs(ctx, user.ID)
-	if got.EpisodeRelease || got.LeadTimeHours != 48 {
+	if !got.EpisodeRelease || got.LeadTimeHours != 48 {
 		t.Fatalf("prefs not persisted: %+v", got)
 	}
 
-	// Dedup by dedupe_key.
-	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, Channel: "telegram", Status: entity.NotifyPending, ScheduledFor: time.Now(), DedupeKey: "k1", Payload: "hi"}
-	created, err := repo.CreateNotificationIfAbsent(ctx, n)
+	// Dedup by dedupe_key; a telegram channel enqueues a pending delivery.
+	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, DedupeKey: "k1", Payload: "hi"}
+	created, err := repo.EnqueueNotification(ctx, n, []string{"telegram"})
 	if err != nil || !created {
-		t.Fatalf("first create: %v created=%v", err, created)
+		t.Fatalf("first enqueue: %v created=%v", err, created)
 	}
-	n2 := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, Channel: "telegram", Status: entity.NotifyPending, ScheduledFor: time.Now(), DedupeKey: "k1", Payload: "hi again"}
-	created, err = repo.CreateNotificationIfAbsent(ctx, n2)
+	n2 := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, DedupeKey: "k1", Payload: "hi again"}
+	created, err = repo.EnqueueNotification(ctx, n2, []string{"telegram"})
 	if err != nil || created {
-		t.Fatalf("dup create: %v created=%v", err, created)
+		t.Fatalf("dup enqueue: %v created=%v", err, created)
 	}
 
 	// Pending telegram requires a linked chat.
@@ -71,7 +71,7 @@ func TestNotificationRepository_PrefsAndDedup(t *testing.T) {
 	}
 }
 
-func TestNotificationRepository_InAppNotDispatched(t *testing.T) {
+func TestNotificationRepository_FeedOnlyNotDispatched(t *testing.T) {
 	gdb := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, gdb, "users", "shows")
 	repo := repository.NewNotificationRepository(gdb)
@@ -84,29 +84,25 @@ func TestNotificationRepository_InAppNotDispatched(t *testing.T) {
 			t.Fatalf("seed user: %v", err)
 		}
 	}
-	// The target is Telegram-linked, so a telegram notification WOULD dispatch — proving
-	// the in_app notification is withheld by channel, not by a missing chat.
+	// The target is Telegram-linked, so a telegram delivery WOULD dispatch — proving the
+	// feed-only notification is withheld by having no delivery, not by a missing chat.
 	if err := repository.NewUserRepository(gdb).SetTelegramChatID(ctx, target.ID, 777); err != nil {
 		t.Fatalf("set chat: %v", err)
 	}
 
+	// Enqueue with no channels → feed-only (no deliveries).
 	n := &entity.Notification{
 		UserID: target.ID, Type: entity.NotifyFollowRequest, ActorID: &actor.ID,
-		Channel: entity.ChannelInApp, Status: entity.NotifyPending, ScheduledFor: time.Now(),
 		DedupeKey: "follow_request:1:2", Payload: "кто-то хочет подписаться",
 	}
-	if created, err := repo.CreateNotificationIfAbsent(ctx, n); err != nil || !created {
-		t.Fatalf("create in_app: %v created=%v", err, created)
+	if created, err := repo.EnqueueNotification(ctx, n, nil); err != nil || !created {
+		t.Fatalf("enqueue feed-only: %v created=%v", err, created)
 	}
 
-	// No outbox sender polls the in_app channel: it isn't a known channel at all.
-	if _, err := repo.Pending(ctx, entity.ChannelInApp, 10); err == nil {
-		t.Fatal("Pending(in_app) should error — no sender queries it")
-	}
-	// And a real sender's query never returns the in_app row.
+	// No sender picks it up — there is no delivery row on any channel.
 	for _, ch := range []string{"telegram", "apns", "fcm"} {
 		if pend, _ := repo.Pending(ctx, ch, 10); len(pend) != 0 {
-			t.Fatalf("%s sender must not pick up the in_app notification, got %d", ch, len(pend))
+			t.Fatalf("%s sender must not pick up the feed-only notification, got %d", ch, len(pend))
 		}
 	}
 
@@ -157,6 +153,15 @@ func TestNotificationRepository_ReleaseCandidatesAndLinkTokens(t *testing.T) {
 	}
 
 	since := time.Now().AddDate(0, 0, -7)
+	if candidates, err := repo.ReleasedEpisodeCandidates(ctx, since); err != nil || len(candidates) != 0 {
+		t.Fatalf("want no candidates with default prefs, got %+v, err=%v", candidates, err)
+	}
+	prefs := entity.DefaultNotificationPref(user.ID)
+	prefs.EpisodeRelease = true
+	if err := repo.UpsertPrefs(ctx, &prefs); err != nil {
+		t.Fatalf("enable notifications: %v", err)
+	}
+
 	cands, err := repo.ReleasedEpisodeCandidates(ctx, since)
 	if err != nil {
 		t.Fatalf("candidates: %v", err)
@@ -234,6 +239,15 @@ func TestNotificationRepository_SeasonFinaleCandidates(t *testing.T) {
 	}
 
 	since := time.Now().AddDate(0, 0, -7)
+	if candidates, err := repo.SeasonFinaleCandidates(ctx, since); err != nil || len(candidates) != 0 {
+		t.Fatalf("want no candidates with default prefs, got %+v, err=%v", candidates, err)
+	}
+	prefs := entity.DefaultNotificationPref(user.ID)
+	prefs.SeasonFinale = true
+	if err := repo.UpsertPrefs(ctx, &prefs); err != nil {
+		t.Fatalf("enable notifications: %v", err)
+	}
+
 	cands, err := repo.SeasonFinaleCandidates(ctx, since)
 	if err != nil {
 		t.Fatalf("candidates: %v", err)
@@ -272,9 +286,9 @@ func TestNotificationRepository_APNsChannel(t *testing.T) {
 		t.Fatalf("set apns token: %v", err)
 	}
 
-	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, Channel: "apns", Status: entity.NotifyPending, ScheduledFor: time.Now(), DedupeKey: "apns-k1", Payload: "hi"}
-	if _, err := repo.CreateNotificationIfAbsent(ctx, n); err != nil {
-		t.Fatalf("create notification: %v", err)
+	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, DedupeKey: "apns-k1", Payload: "hi"}
+	if _, err := repo.EnqueueNotification(ctx, n, []string{"apns"}); err != nil {
+		t.Fatalf("enqueue notification: %v", err)
 	}
 	pend, _ := repo.Pending(ctx, "apns", 10)
 	if len(pend) != 1 || pend[0].Target != "device-token-1" || pend[0].Body != "hi" {
@@ -318,9 +332,9 @@ func TestNotificationRepository_FCMChannel(t *testing.T) {
 		t.Fatalf("set fcm token: %v", err)
 	}
 
-	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, Channel: "fcm", Status: entity.NotifyPending, ScheduledFor: time.Now(), DedupeKey: "fcm-k1", Payload: "hi"}
-	if _, err := repo.CreateNotificationIfAbsent(ctx, n); err != nil {
-		t.Fatalf("create notification: %v", err)
+	n := &entity.Notification{UserID: user.ID, Type: entity.NotifyEpisodeReleased, DedupeKey: "fcm-k1", Payload: "hi"}
+	if _, err := repo.EnqueueNotification(ctx, n, []string{"fcm"}); err != nil {
+		t.Fatalf("enqueue notification: %v", err)
 	}
 	pend, _ := repo.Pending(ctx, "fcm", 10)
 	if len(pend) != 1 || pend[0].Target != "fcm-device-token-1" || pend[0].Body != "hi" {
@@ -358,6 +372,15 @@ func TestNotificationRepository_UpcomingCandidates(t *testing.T) {
 	us := &entity.UserShow{UserID: user.ID, ShowID: show.ID, Status: entity.StatusWatching}
 	if err := trackingRepo.AddUserShow(ctx, us); err != nil {
 		t.Fatalf("add user show: %v", err)
+	}
+
+	if candidates, err := repo.EpisodeUpcomingCandidates(ctx, now); err != nil || len(candidates) != 0 {
+		t.Fatalf("want no candidates with default prefs, got %+v, err=%v", candidates, err)
+	}
+	prefs := entity.DefaultNotificationPref(user.ID)
+	prefs.EpisodeRelease = true
+	if err := repo.UpsertPrefs(ctx, &prefs); err != nil {
+		t.Fatalf("enable notifications: %v", err)
 	}
 
 	epCands, err := repo.EpisodeUpcomingCandidates(ctx, now)

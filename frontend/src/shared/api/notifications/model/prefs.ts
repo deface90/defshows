@@ -11,6 +11,8 @@ export interface Prefs {
   /** Notify when a season's finale airs. Not affected by lead_time_hours. */
   season_finale: boolean;
   weekly_digest: boolean;
+  /** Notify about new followers, follow requests, and accepted requests. */
+  social_follows: boolean;
   channel: string;
   lead_time_hours: number;
 }

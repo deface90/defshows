@@ -20,7 +20,7 @@ const prefsSchema = z.object({
   episode_release: z.boolean(),
   season_start: z.boolean(),
   season_finale: z.boolean(),
-  weekly_digest: z.boolean(),
+  social_follows: z.boolean(),
   lead_time_hours: z.number().int().min(0).max(168),
   timezone: z.string().trim().min(1, 'Укажите таймзону'),
 })
@@ -45,7 +45,7 @@ export function PrefsForm() {
             episode_release: prefsQuery.data.episode_release,
             season_start: prefsQuery.data.season_start,
             season_finale: prefsQuery.data.season_finale,
-            weekly_digest: prefsQuery.data.weekly_digest,
+            social_follows: prefsQuery.data.social_follows,
             lead_time_hours: prefsQuery.data.lead_time_hours,
             timezone: settingsQuery.data.timezone,
           }
@@ -59,7 +59,7 @@ export function PrefsForm() {
           episode_release: input.episode_release,
           season_start: input.season_start,
           season_finale: input.season_finale,
-          weekly_digest: input.weekly_digest,
+          social_follows: input.social_follows,
           lead_time_hours: input.lead_time_hours,
         }),
         updateSettings({ timezone: input.timezone }),
@@ -116,10 +116,11 @@ export function PrefsForm() {
         />
         <Controller
           control={control}
-          name="weekly_digest"
+          name="social_follows"
           render={({ field }) => (
             <Switch
-              label="Недельный дайджест"
+              label="Подписки"
+              description="Новый подписчик, запрос на подписку и принятие вашей заявки"
               checked={field.value}
               onChange={(e) => field.onChange(e.currentTarget.checked)}
             />

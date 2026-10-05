@@ -30,18 +30,18 @@ func TestNotificationsHandler_PrefsAndLink(t *testing.T) {
 	}
 	var prefs notificationsapi.Prefs
 	_ = json.Unmarshal(rec.Body.Bytes(), &prefs)
-	if !prefs.EpisodeRelease {
-		t.Fatalf("expected default episode_release=true: %+v", prefs)
+	if prefs.EpisodeRelease {
+		t.Fatalf("expected default episode_release=false: %+v", prefs)
 	}
 
 	// Update prefs.
 	rec = doJSON(t, e, http.MethodPatch, "/me/notifications/prefs", token,
-		map[string]any{"episode_release": false, "lead_time_hours": 48})
+		map[string]any{"episode_release": true, "lead_time_hours": 48})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("patch prefs: %d", rec.Code)
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &prefs)
-	if prefs.EpisodeRelease || prefs.LeadTimeHours != 48 {
+	if !prefs.EpisodeRelease || prefs.LeadTimeHours != 48 {
 		t.Fatalf("prefs not updated: %+v", prefs)
 	}
 

@@ -10,5 +10,6 @@ export interface UpdatePrefsRequest {
   season_start?: boolean;
   season_finale?: boolean;
   weekly_digest?: boolean;
+  social_follows?: boolean;
   lead_time_hours?: number;
 }

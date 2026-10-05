@@ -113,18 +113,17 @@ components:
         message: { type: string }
     NotificationItem:
       type: object
-      required: [id, type, status, read, payload, created_at]
+      required: [id, type, read, payload, created_at]
       properties:
         id: { type: integer, format: int64 }
         type: { type: string }
-        status: { type: string }
         read: { type: boolean }
         payload: { type: string }
         created_at: { type: string }
         actor_id:
           type: integer
           format: int64
-          description: User who triggered the notification (e.g. the follower for follow_request/follow_accepted)
+          description: "User who triggered the notification (e.g. the follower for follow_request/follow_new/follow_accepted)"
     NotificationFeed:
       type: object
       required: [notifications]
@@ -134,12 +133,13 @@ components:
           items: { $ref: '#/components/schemas/NotificationItem' }
     Prefs:
       type: object
-      required: [episode_release, season_start, season_finale, weekly_digest, channel, lead_time_hours]
+      required: [episode_release, season_start, season_finale, weekly_digest, social_follows, channel, lead_time_hours]
       properties:
         episode_release: { type: boolean }
         season_start: { type: boolean }
         season_finale: { type: boolean, description: Notify when a season's finale airs. Not affected by lead_time_hours. }
         weekly_digest: { type: boolean }
+        social_follows: { type: boolean, description: "Notify about new followers, follow requests, and accepted requests." }
         channel: { type: string }
         lead_time_hours: { type: integer }
     UpdatePrefsRequest:
@@ -149,6 +149,7 @@ components:
         season_start: { type: boolean }
         season_finale: { type: boolean }
         weekly_digest: { type: boolean }
+        social_follows: { type: boolean }
         lead_time_hours: { type: integer }
     RegisterDeviceTokenRequest:
       type: object

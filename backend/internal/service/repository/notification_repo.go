@@ -40,21 +40,41 @@ func (r *NotificationRepository) GetPrefs(ctx context.Context, userID int64) (*e
 func (r *NotificationRepository) UpsertPrefs(ctx context.Context, p *entity.NotificationPref) error {
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"episode_release", "season_start", "season_finale", "weekly_digest", "channel", "lead_time_hours"}),
+		DoUpdates: clause.AssignmentColumns([]string{"episode_release", "season_start", "season_finale", "weekly_digest", "social_follows", "channel", "lead_time_hours"}),
 	}).Create(p).Error
 }
 
-// CreateNotificationIfAbsent inserts a notification, ignoring duplicates by
-// dedupe_key. Returns true if a row was created.
-func (r *NotificationRepository) CreateNotificationIfAbsent(ctx context.Context, n *entity.Notification) (bool, error) {
-	res := r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "dedupe_key"}},
-		DoNothing: true,
-	}).Create(n)
-	if res.Error != nil {
-		return false, res.Error
-	}
-	return res.RowsAffected > 0, nil
+// EnqueueNotification inserts the notification (deduped by dedupe_key) and, when it is
+// newly created, a pending delivery row per channel (in one transaction). With no channels
+// the notification is feed-only. On a dedupe hit nothing is inserted (the deliveries were
+// already enqueued on first insert). Returns true if the notification row was created.
+func (r *NotificationRepository) EnqueueNotification(ctx context.Context, n *entity.Notification, channels []string) (bool, error) {
+	created := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "dedupe_key"}},
+			DoNothing: true,
+		}).Create(n)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return nil // dedupe hit
+		}
+		created = true
+		if len(channels) == 0 {
+			return nil
+		}
+		now := time.Now()
+		deliveries := make([]entity.NotificationDelivery, 0, len(channels))
+		for _, ch := range channels {
+			deliveries = append(deliveries, entity.NotificationDelivery{
+				NotificationID: n.ID, Channel: ch, Status: entity.NotifyPending, ScheduledFor: now,
+			})
+		}
+		return tx.Create(&deliveries).Error
+	})
+	return created, err
 }
 
 // DeleteByDedupeKeys removes notifications by their dedupe keys. Used to clear stale
@@ -99,9 +119,10 @@ func (r *NotificationRepository) MarkAllRead(ctx context.Context, userID int64) 
 		Update("read_at", time.Now()).Error
 }
 
-// PendingNotification is a pending row joined with its delivery target.
-// Target is the chat id (as text) for telegram, or the device token for
-// apns; ShowID is only populated for apns (used for the push's deep link).
+// PendingNotification is a pending delivery joined with its event and target.
+// ID is the notification_deliveries row id (marked sent/failed by the sender). Target is
+// the chat id (as text) for telegram, or the device token for apns/fcm; ShowID feeds the
+// push's deep link.
 type PendingNotification struct {
 	ID     int64
 	Target string
@@ -110,38 +131,41 @@ type PendingNotification struct {
 	ShowID *int64
 }
 
-// pendingQueries maps a channel name to the SQL that finds its pending,
-// deliverable notifications.
+// pendingQueries maps a channel name to the SQL that finds its pending, deliverable rows.
+// Each joins notification_deliveries → notifications (payload/show) → users (target).
 var pendingQueries = map[string]string{
 	"telegram": `
-		SELECT n.id AS id, u.telegram_chat_id::text AS target, '' AS title, n.payload AS body, n.show_id AS show_id
-		FROM notifications n
+		SELECT d.id AS id, u.telegram_chat_id::text AS target, '' AS title, n.payload AS body, n.show_id AS show_id
+		FROM notification_deliveries d
+		JOIN notifications n ON n.id = d.notification_id
 		JOIN users u ON u.id = n.user_id
-		WHERE n.status = 'pending'
-		  AND n.channel = 'telegram'
-		  AND n.scheduled_for <= now()
+		WHERE d.status = 'pending'
+		  AND d.channel = 'telegram'
+		  AND d.scheduled_for <= now()
 		  AND u.telegram_chat_id IS NOT NULL
-		ORDER BY n.scheduled_for
+		ORDER BY d.scheduled_for
 		LIMIT ?`,
 	"apns": `
-		SELECT n.id AS id, u.apns_device_token AS target, 'defShows' AS title, n.payload AS body, n.show_id AS show_id
-		FROM notifications n
+		SELECT d.id AS id, u.apns_device_token AS target, 'defShows' AS title, n.payload AS body, n.show_id AS show_id
+		FROM notification_deliveries d
+		JOIN notifications n ON n.id = d.notification_id
 		JOIN users u ON u.id = n.user_id
-		WHERE n.status = 'pending'
-		  AND n.channel = 'apns'
-		  AND n.scheduled_for <= now()
+		WHERE d.status = 'pending'
+		  AND d.channel = 'apns'
+		  AND d.scheduled_for <= now()
 		  AND u.apns_device_token IS NOT NULL
-		ORDER BY n.scheduled_for
+		ORDER BY d.scheduled_for
 		LIMIT ?`,
 	"fcm": `
-		SELECT n.id AS id, u.fcm_device_token AS target, 'defShows' AS title, n.payload AS body, n.show_id AS show_id
-		FROM notifications n
+		SELECT d.id AS id, u.fcm_device_token AS target, 'defShows' AS title, n.payload AS body, n.show_id AS show_id
+		FROM notification_deliveries d
+		JOIN notifications n ON n.id = d.notification_id
 		JOIN users u ON u.id = n.user_id
-		WHERE n.status = 'pending'
-		  AND n.channel = 'fcm'
-		  AND n.scheduled_for <= now()
+		WHERE d.status = 'pending'
+		  AND d.channel = 'fcm'
+		  AND d.scheduled_for <= now()
 		  AND u.fcm_device_token IS NOT NULL
-		ORDER BY n.scheduled_for
+		ORDER BY d.scheduled_for
 		LIMIT ?`,
 }
 
@@ -160,16 +184,16 @@ func (r *NotificationRepository) Pending(ctx context.Context, channel string, li
 	return out, err
 }
 
-// MarkSent marks a notification sent.
+// MarkSent marks a delivery sent (id is a notification_deliveries row id).
 func (r *NotificationRepository) MarkSent(ctx context.Context, id int64) error {
 	now := time.Now()
-	return r.db.WithContext(ctx).Model(&entity.Notification{}).Where("id = ?", id).
+	return r.db.WithContext(ctx).Model(&entity.NotificationDelivery{}).Where("id = ?", id).
 		Updates(map[string]any{"status": entity.NotifySent, "sent_at": now}).Error
 }
 
-// MarkFailed marks a notification failed.
+// MarkFailed marks a delivery failed (id is a notification_deliveries row id).
 func (r *NotificationRepository) MarkFailed(ctx context.Context, id int64) error {
-	return r.db.WithContext(ctx).Model(&entity.Notification{}).Where("id = ?", id).
+	return r.db.WithContext(ctx).Model(&entity.NotificationDelivery{}).Where("id = ?", id).
 		Update("status", entity.NotifyFailed).Error
 }
 
@@ -183,7 +207,7 @@ type EventCandidate struct {
 	SeasonNumber   int
 	EpisodeNumber  int
 	TelegramChatID *int64
-	APNsToken      *string
+	APNsToken      *string `gorm:"column:apns_token"`
 	FCMToken       *string
 }
 
@@ -211,7 +235,7 @@ func (r *NotificationRepository) ReleasedEpisodeCandidates(ctx context.Context, 
 		WHERE e.air_date IS NOT NULL
 		  AND e.air_date <= now()::date
 		  AND e.air_date >= ?
-		  AND COALESCE(p.episode_release, true) = true
+		  AND COALESCE(p.episode_release, false) = true
 		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL OR u.fcm_device_token IS NOT NULL)
 		  AND ue.id IS NULL`, since).Scan(&out).Error
 	return out, err
@@ -239,7 +263,7 @@ func (r *NotificationRepository) EpisodeUpcomingCandidates(ctx context.Context, 
 		WHERE e.air_date IS NOT NULL
 		  AND e.air_date::timestamptz > ?::timestamptz
 		  AND e.air_date::timestamptz <= (?::timestamptz + (COALESCE(p.lead_time_hours, 24) || ' hours')::interval)
-		  AND COALESCE(p.episode_release, true) = true
+		  AND COALESCE(p.episode_release, false) = true
 		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL OR u.fcm_device_token IS NOT NULL)`, now, now).Scan(&out).Error
 	return out, err
 }
@@ -299,7 +323,7 @@ func (r *NotificationRepository) SeasonFinaleCandidates(ctx context.Context, sin
 		  AND e.air_date <= now()::date
 		  AND e.air_date >= ?
 		  AND e.season_number > 0
-		  AND COALESCE(p.season_finale, true) = true
+		  AND COALESCE(p.season_finale, false) = true
 		  AND (u.telegram_chat_id IS NOT NULL OR u.apns_device_token IS NOT NULL OR u.fcm_device_token IS NOT NULL)
 		  AND NOT EXISTS (
 		        SELECT 1 FROM episodes e2

@@ -8,7 +8,8 @@ const typeLabels: Record<string, string> = {
   season_upcoming: 'Скоро сезон',
   season_finale: 'Финал сезона',
   follow_request: 'Запрос на подписку',
-  follow_accepted: 'Новый подписчик',
+  follow_new: 'Новый подписчик',
+  follow_accepted: 'Заявка принята',
 }
 
 interface NotificationItemProps {

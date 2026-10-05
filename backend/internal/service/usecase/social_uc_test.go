@@ -189,16 +189,34 @@ func (u fakeSocialUsers) FindUserByID(_ context.Context, id int64) (*entity.User
 	return nil, repository.ErrNotFound
 }
 
-// fakeFollowNotifier records emitted in-app notifications and honours dedupe + delete.
-type fakeFollowNotifier struct{ created []entity.Notification }
+// fakeFollowNotifier records enqueued notifications (and their delivery channels) and
+// honours dedupe + delete. prefs overrides a recipient's notification prefs; absent users
+// default to SocialFollows on.
+type fakeFollowNotifier struct {
+	created  []entity.Notification
+	channels map[string][]string
+	prefs    map[int64]*entity.NotificationPref
+}
 
-func (f *fakeFollowNotifier) CreateNotificationIfAbsent(_ context.Context, n *entity.Notification) (bool, error) {
+func (f *fakeFollowNotifier) GetPrefs(_ context.Context, userID int64) (*entity.NotificationPref, error) {
+	if p, ok := f.prefs[userID]; ok {
+		return p, nil
+	}
+	def := entity.DefaultNotificationPref(userID)
+	return &def, nil
+}
+
+func (f *fakeFollowNotifier) EnqueueNotification(_ context.Context, n *entity.Notification, channels []string) (bool, error) {
 	for i := range f.created {
 		if f.created[i].DedupeKey == n.DedupeKey {
 			return false, nil
 		}
 	}
 	f.created = append(f.created, *n)
+	if f.channels == nil {
+		f.channels = map[string][]string{}
+	}
+	f.channels[n.DedupeKey] = channels
 	return true, nil
 }
 
@@ -326,12 +344,29 @@ func TestSocialUsecase_FollowNotifications(t *testing.T) {
 	const pub, priv = int64(2), int64(3)
 	uc, notifier := newSocialUC(pub, priv)
 
-	// Following the public user accepts instantly and emits NO request notification.
+	// Following the public user accepts instantly and emits a follow_new to the followee.
 	if _, err := uc.Follow(ctx, priv, pub); err != nil {
 		t.Fatalf("follow public: %v", err)
 	}
+	if len(notifier.created) != 1 {
+		t.Fatalf("public follow should emit one follow_new, got %+v", notifier.created)
+	}
+	fnew := notifier.created[0]
+	if fnew.Type != entity.NotifyFollowNew || fnew.UserID != pub ||
+		fnew.ActorID == nil || *fnew.ActorID != priv ||
+		fnew.DedupeKey == "" || fnew.Payload == "" {
+		t.Fatalf("unexpected follow_new notification: %+v", fnew)
+	}
+	// pub has no linked channel → feed-only (no deliveries).
+	if ch := notifier.channels[fnew.DedupeKey]; len(ch) != 0 {
+		t.Fatalf("follow_new for a channel-less user should be feed-only, got channels %v", ch)
+	}
+	// Unfollowing the public user clears it so a later re-follow re-fires.
+	if err := uc.Unfollow(ctx, priv, pub); err != nil {
+		t.Fatalf("unfollow public: %v", err)
+	}
 	if len(notifier.created) != 0 {
-		t.Fatalf("public follow should not notify, got %+v", notifier.created)
+		t.Fatalf("unfollow should clear follow_new, got %+v", notifier.created)
 	}
 
 	// Following the private user is pending → a follow_request to the followee.
@@ -343,7 +378,7 @@ func TestSocialUsecase_FollowNotifications(t *testing.T) {
 	}
 	req := notifier.created[0]
 	if req.Type != entity.NotifyFollowRequest || req.UserID != priv ||
-		req.ActorID == nil || *req.ActorID != pub || req.Channel != entity.ChannelInApp ||
+		req.ActorID == nil || *req.ActorID != pub ||
 		req.DedupeKey == "" || req.Payload == "" {
 		t.Fatalf("unexpected follow_request notification: %+v", req)
 	}
@@ -367,7 +402,7 @@ func TestSocialUsecase_FollowNotifications(t *testing.T) {
 		}
 	}
 	if accepted == nil || accepted.UserID != pub || accepted.ActorID == nil || *accepted.ActorID != priv ||
-		accepted.Channel != entity.ChannelInApp || accepted.Payload == "" {
+		accepted.Payload == "" {
 		t.Fatalf("unexpected follow_accepted notification: %+v", accepted)
 	}
 
@@ -383,6 +418,42 @@ func TestSocialUsecase_FollowNotifications(t *testing.T) {
 	}
 	if len(notifier.created) != 1 {
 		t.Fatalf("re-follow after unfollow should re-fire, got %d", len(notifier.created))
+	}
+}
+
+func TestSocialUsecase_FollowNotification_ChannelAndPrefGate(t *testing.T) {
+	ctx := context.Background()
+	const follower, followee = int64(2), int64(3)
+	chat := int64(555)
+	users := fakeSocialUsers{users: map[int64]*entity.User{
+		follower: {ID: follower, IsPublic: true},
+		followee: {ID: followee, IsPublic: true, TelegramChatID: &chat},
+	}}
+
+	// A telegram-linked followee → the follow_new is delivered on the telegram channel
+	// (as well as surfacing once in the in-app feed).
+	notifier := &fakeFollowNotifier{}
+	uc := usecase.NewSocialUsecase(newFakeSocialRepo(), users, notifier)
+	if _, err := uc.Follow(ctx, follower, followee); err != nil {
+		t.Fatalf("follow: %v", err)
+	}
+	if len(notifier.created) != 1 {
+		t.Fatalf("want one notification, got %+v", notifier.created)
+	}
+	if ch := notifier.channels[notifier.created[0].DedupeKey]; len(ch) != 1 || ch[0] != "telegram" {
+		t.Fatalf("telegram-linked recipient wants delivery to [telegram], got %v", ch)
+	}
+
+	// With social_follows disabled on the recipient, nothing is emitted.
+	off := &fakeFollowNotifier{prefs: map[int64]*entity.NotificationPref{
+		followee: {UserID: followee, SocialFollows: false},
+	}}
+	ucOff := usecase.NewSocialUsecase(newFakeSocialRepo(), users, off)
+	if _, err := ucOff.Follow(ctx, follower, followee); err != nil {
+		t.Fatalf("follow (prefs off): %v", err)
+	}
+	if len(off.created) != 0 {
+		t.Fatalf("social_follows=false should suppress the notification, got %+v", off.created)
 	}
 }
 

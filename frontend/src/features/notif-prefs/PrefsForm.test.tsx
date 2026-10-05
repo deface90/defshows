@@ -13,6 +13,7 @@ const prefs = {
   season_start: false,
   season_finale: true,
   weekly_digest: false,
+  social_follows: true,
   channel: 'telegram',
   lead_time_hours: 24,
 }
@@ -26,7 +27,7 @@ describe('PrefsForm', () => {
       http.get(`${base}/me/settings`, () => HttpResponse.json({ timezone: 'Europe/Moscow' })),
       http.patch(`${base}/me/notifications/prefs`, async ({ request }) => {
         prefsBody = await request.json()
-        return HttpResponse.json({ ...prefs, weekly_digest: true })
+        return HttpResponse.json({ ...prefs, social_follows: false })
       }),
       http.patch(`${base}/me/settings`, async ({ request }) => {
         settingsBody = await request.json()
@@ -38,13 +39,13 @@ describe('PrefsForm', () => {
     // Wait for the loaded value to hydrate the form.
     await waitFor(() => expect((screen.getByLabelText('Таймзона (IANA)') as HTMLInputElement).value).toBe('Europe/Moscow'))
 
-    await userEvent.click(screen.getByLabelText('Недельный дайджест'))
+    await userEvent.click(screen.getByLabelText(/Подписки/))
     const tz = screen.getByLabelText('Таймзона (IANA)')
     await userEvent.clear(tz)
     await userEvent.type(tz, 'Europe/Berlin')
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
 
-    await waitFor(() => expect(prefsBody).toMatchObject({ weekly_digest: true, lead_time_hours: 24 }))
+    await waitFor(() => expect(prefsBody).toMatchObject({ social_follows: false, lead_time_hours: 24 }))
     expect(settingsBody).toEqual({ timezone: 'Europe/Berlin' })
     expect(await screen.findByText('Настройки сохранены')).toBeInTheDocument()
   })

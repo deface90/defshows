@@ -10,14 +10,10 @@ const (
 	NotifySeasonFinale    = "season_finale"
 	NotifyFollowRequest   = "follow_request"
 	NotifyFollowAccepted  = "follow_accepted"
+	NotifyFollowNew       = "follow_new"
 )
 
-// ChannelInApp is a delivery channel with no outbox sender: notifications on this
-// channel are surfaced only in the in-app feed (follow_request/follow_accepted).
-// It is deliberately absent from the sender's pendingQueries, so nothing dispatches it.
-const ChannelInApp = "in_app"
-
-// Notification statuses.
+// Delivery statuses (per NotificationDelivery row).
 const (
 	NotifyPending = "pending"
 	NotifySent    = "sent"
@@ -32,6 +28,7 @@ type NotificationPref struct {
 	SeasonStart    bool
 	SeasonFinale   bool
 	WeeklyDigest   bool
+	SocialFollows  bool
 	Channel        string
 	LeadTimeHours  int
 }
@@ -43,16 +40,19 @@ func (NotificationPref) TableName() string { return "notification_prefs" }
 func DefaultNotificationPref(userID int64) NotificationPref {
 	return NotificationPref{
 		UserID:         userID,
-		EpisodeRelease: true,
+		EpisodeRelease: false,
 		SeasonStart:    true,
-		SeasonFinale:   true,
+		SeasonFinale:   false,
 		WeeklyDigest:   false,
+		SocialFollows:  true,
 		Channel:        "telegram",
 		LeadTimeHours:  24,
 	}
 }
 
-// Notification is an outbox entry that also serves as the in-app feed.
+// Notification is one logical event and the in-app feed entry (shown once in the feed,
+// regardless of how many channels deliver it). Per-channel outbox delivery is tracked
+// separately in NotificationDelivery.
 type Notification struct {
 	ID        int64 `gorm:"primaryKey"`
 	UserID    int64
@@ -60,20 +60,31 @@ type Notification struct {
 	ShowID    *int64
 	EpisodeID *int64
 	// ActorID references the user who triggered the notification (e.g. the follower
-	// for follow_request/follow_accepted); nil for catalog/episode notifications.
-	ActorID      *int64
-	Channel      string
-	Status       string
-	ScheduledFor time.Time
-	SentAt       *time.Time
-	DedupeKey    string
-	Payload      string
-	ReadAt       *time.Time
-	CreatedAt    time.Time
+	// for follow_request/follow_new/follow_accepted); nil for catalog/episode notifications.
+	ActorID   *int64
+	DedupeKey string
+	Payload   string
+	ReadAt    *time.Time
+	CreatedAt time.Time
 }
 
 // TableName maps Notification to the notifications table.
 func (Notification) TableName() string { return "notifications" }
+
+// NotificationDelivery is a per-channel outbox entry for a Notification. The sender polls
+// pending rows by channel and marks them sent/failed. A notification with no deliveries is
+// feed-only (e.g. a follow notification for a user with no linked Telegram/push channel).
+type NotificationDelivery struct {
+	ID             int64 `gorm:"primaryKey"`
+	NotificationID int64
+	Channel        string
+	Status         string
+	ScheduledFor   time.Time
+	SentAt         *time.Time
+}
+
+// TableName maps NotificationDelivery to the notification_deliveries table.
+func (NotificationDelivery) TableName() string { return "notification_deliveries" }
 
 // TelegramLinkToken is a one-time token linking a Telegram chat to a user.
 type TelegramLinkToken struct {

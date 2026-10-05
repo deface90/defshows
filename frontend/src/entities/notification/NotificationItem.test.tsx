@@ -7,7 +7,6 @@ import { NotificationItem } from './NotificationItem'
 const base: NotificationItemModel = {
   id: 1,
   type: 'episode_released',
-  status: 'sent',
   read: false,
   payload: 'Вышел новый эпизод',
   created_at: '2026-05-01T10:00:00Z',
@@ -27,11 +26,18 @@ describe('NotificationItem', () => {
     )
   })
 
+  it('labels a new follower', () => {
+    renderWithProviders(
+      <NotificationItem item={{ ...base, type: 'follow_new', payload: 'Петя подписался на вас', actor_id: 7 }} />,
+    )
+    expect(screen.getByText('Новый подписчик')).toBeInTheDocument()
+  })
+
   it('labels a follow acceptance', () => {
     renderWithProviders(
       <NotificationItem item={{ ...base, type: 'follow_accepted', payload: 'Петя принял вашу заявку', actor_id: 7 }} />,
     )
-    expect(screen.getByText('Новый подписчик')).toBeInTheDocument()
+    expect(screen.getByText('Заявка принята')).toBeInTheDocument()
   })
 
   it('renders a non-follow notification as plain text', () => {
