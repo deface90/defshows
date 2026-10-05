@@ -10,6 +10,10 @@ struct UsersView: View {
     @State private var busy = false
     @State private var loaded = false
     @State private var error: String?
+    // Optimistic per-user follow state, overriding the directory's is_following until the
+    // next reset reload. followBusy disables a row's button while its request is in flight.
+    @State private var followState: [Int: String] = [:]
+    @State private var followBusy: Set<Int> = []
 
     var body: some View {
         List {
@@ -39,6 +43,10 @@ struct UsersView: View {
                             Text(user.isPublic ? "Сериалов: \(user.showsCount)" : "Закрытый профиль")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
+                        if session.currentUserID != user.id {
+                            Spacer(minLength: 8)
+                            followButton(for: user)
+                        }
                     }
                 }
             }
@@ -49,6 +57,45 @@ struct UsersView: View {
         .navigationTitle("Пользователи")
         .task { if !loaded { await load(reset: true) } }
         .refreshable { await load(reset: true) }
+    }
+
+    /// A borderless follow/unfollow button for a directory row. Borderless so it stays
+    /// independently tappable inside the row's NavigationLink (a tap toggles the follow,
+    /// it does not open the profile). State comes from the optimistic override, else the
+    /// directory's is_following, else "none".
+    @ViewBuilder
+    private func followButton(for user: PublicUser) -> some View {
+        let state = followState[user.id] ?? user.isFollowing ?? "none"
+        Button {
+            Task { await toggleFollow(user, from: state) }
+        } label: {
+            switch state {
+            case "accepted": Text("Вы подписаны")
+            case "pending": Text("Запрос отправлен")
+            default: Text("Подписаться")
+            }
+        }
+        .buttonStyle(.borderless)
+        .font(.caption)
+        .disabled(followBusy.contains(user.id))
+    }
+
+    /// Follows (from "none") or cancels/unfollows (from "pending"/"accepted"), then stores
+    /// the resulting state optimistically so the row updates without a reload.
+    private func toggleFollow(_ user: PublicUser, from state: String) async {
+        guard !followBusy.contains(user.id) else { return }
+        followBusy.insert(user.id)
+        defer { followBusy.remove(user.id) }
+        do {
+            if state == "none" {
+                let result = try await session.follow(userID: user.id)
+                followState[user.id] = result.status
+            } else {
+                try await session.unfollow(userID: user.id)
+                followState[user.id] = "none"
+            }
+            error = nil
+        } catch { self.error = error.localizedDescription }
     }
 
     private func load(reset: Bool) async {
@@ -64,6 +111,7 @@ struct UsersView: View {
             ])
             let existing = reset ? Set<Int>() : Set(users.map(\.id))
             users = (reset ? [] : users) + result.users.filter { !existing.contains($0.id) }
+            if reset { followState.removeAll() }
             page = result.page
             total = result.total
             appliedQuery = term

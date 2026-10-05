@@ -87,7 +87,7 @@ func TestSocial_FollowFlow(t *testing.T) {
 	rec = doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(bID, 10), aTok, nil)
 	var prof usersapi.UserProfile
 	_ = json.Unmarshal(rec.Body.Bytes(), &prof)
-	if prof.IsFollowing != usersapi.Accepted || prof.FollowersCount != 1 {
+	if prof.IsFollowing != usersapi.UserProfileIsFollowingAccepted || prof.FollowersCount != 1 {
 		t.Fatalf("profile: following=%s followers=%d", prof.IsFollowing, prof.FollowersCount)
 	}
 
@@ -102,7 +102,7 @@ func TestSocial_FollowFlow(t *testing.T) {
 	}
 	rec = doJSON(t, e, http.MethodGet, "/users/"+strconv.FormatInt(bID, 10), aTok, nil)
 	_ = json.Unmarshal(rec.Body.Bytes(), &prof)
-	if prof.IsFollowing != usersapi.None {
+	if prof.IsFollowing != usersapi.UserProfileIsFollowingNone {
 		t.Fatalf("after unfollow: following=%s", prof.IsFollowing)
 	}
 }

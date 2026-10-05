@@ -19,3 +19,4 @@ export * from './userProfileIsFollowing';
 export * from './userShow';
 export * from './userShowStatus';
 export * from './userSummary';
+export * from './userSummaryIsFollowing';

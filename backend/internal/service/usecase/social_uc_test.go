@@ -100,6 +100,15 @@ func (r *fakeSocialRepo) GetFollow(_ context.Context, follower, followee int64) 
 	}
 	return nil, repository.ErrNotFound
 }
+func (r *fakeSocialRepo) FollowStatesFor(_ context.Context, follower int64, targetIDs []int64) (map[int64]entity.FollowStatus, error) {
+	out := map[int64]entity.FollowStatus{}
+	for _, t := range targetIDs {
+		if f, ok := r.edges[[2]int64{follower, t}]; ok {
+			out[t] = f.Status
+		}
+	}
+	return out, nil
+}
 func (r *fakeSocialRepo) DeleteFollow(_ context.Context, follower, followee int64) error {
 	k := [2]int64{follower, followee}
 	if _, ok := r.edges[k]; !ok {
@@ -271,6 +280,44 @@ func TestSocialUsecase_Follow(t *testing.T) {
 	}
 	if state, _ := uc.FollowState(ctx, pub, priv); state != "none" {
 		t.Fatalf("state after unfollow: %s", state)
+	}
+}
+
+func TestSocialUsecase_FollowStates(t *testing.T) {
+	ctx := context.Background()
+	const viewer, pub, priv = int64(1), int64(2), int64(3)
+	uc, _ := newSocialUC(pub, priv)
+
+	// viewer → pub resolves to accepted (public target); viewer → priv stays pending.
+	if _, err := uc.Follow(ctx, viewer, pub); err != nil {
+		t.Fatalf("follow pub: %v", err)
+	}
+	if _, err := uc.Follow(ctx, viewer, priv); err != nil {
+		t.Fatalf("follow priv: %v", err)
+	}
+
+	states, err := uc.FollowStates(ctx, viewer, []int64{pub, priv, 999, viewer})
+	if err != nil {
+		t.Fatalf("FollowStates: %v", err)
+	}
+	// Every requested id is present; edges reflect status, no-edge/self default to none.
+	if states[pub] != "accepted" || states[priv] != "pending" {
+		t.Fatalf("edges: pub=%s priv=%s", states[pub], states[priv])
+	}
+	if states[999] != "none" || states[viewer] != "none" {
+		t.Fatalf("defaults: 999=%s self=%s", states[999], states[viewer])
+	}
+	if len(states) != 4 {
+		t.Fatalf("want 4 entries, got %d", len(states))
+	}
+
+	// A guest viewer (0) sees everyone as none without touching the repo.
+	guest, err := uc.FollowStates(ctx, 0, []int64{pub, priv})
+	if err != nil {
+		t.Fatalf("guest FollowStates: %v", err)
+	}
+	if guest[pub] != "none" || guest[priv] != "none" {
+		t.Fatalf("guest should see none: pub=%s priv=%s", guest[pub], guest[priv])
 	}
 }
 

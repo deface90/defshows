@@ -44,19 +44,19 @@ func (e ShowRefAiringStatus) Valid() bool {
 
 // Defines values for UserProfileIsFollowing.
 const (
-	Accepted UserProfileIsFollowing = "accepted"
-	None     UserProfileIsFollowing = "none"
-	Pending  UserProfileIsFollowing = "pending"
+	UserProfileIsFollowingAccepted UserProfileIsFollowing = "accepted"
+	UserProfileIsFollowingNone     UserProfileIsFollowing = "none"
+	UserProfileIsFollowingPending  UserProfileIsFollowing = "pending"
 )
 
 // Valid indicates whether the value is a known member of the UserProfileIsFollowing enum.
 func (e UserProfileIsFollowing) Valid() bool {
 	switch e {
-	case Accepted:
+	case UserProfileIsFollowingAccepted:
 		return true
-	case None:
+	case UserProfileIsFollowingNone:
 		return true
-	case Pending:
+	case UserProfileIsFollowingPending:
 		return true
 	default:
 		return false
@@ -84,6 +84,27 @@ func (e UserShowStatus) Valid() bool {
 	case PlanToWatch:
 		return true
 	case Watching:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserSummaryIsFollowing.
+const (
+	UserSummaryIsFollowingAccepted UserSummaryIsFollowing = "accepted"
+	UserSummaryIsFollowingNone     UserSummaryIsFollowing = "none"
+	UserSummaryIsFollowingPending  UserSummaryIsFollowing = "pending"
+)
+
+// Valid indicates whether the value is a known member of the UserSummaryIsFollowing enum.
+func (e UserSummaryIsFollowing) Valid() bool {
+	switch e {
+	case UserSummaryIsFollowingAccepted:
+		return true
+	case UserSummaryIsFollowingNone:
+		return true
+	case UserSummaryIsFollowingPending:
 		return true
 	default:
 		return false
@@ -178,9 +199,15 @@ type UserSummary struct {
 	DisplayName string  `json:"display_name"`
 	Email       *string `json:"email,omitempty"`
 	Id          int64   `json:"id"`
-	IsPublic    bool    `json:"is_public"`
-	ShowsCount  int     `json:"shows_count"`
+
+	// IsFollowing The viewer's follow relationship to this user (none for yourself)
+	IsFollowing UserSummaryIsFollowing `json:"is_following"`
+	IsPublic    bool                   `json:"is_public"`
+	ShowsCount  int                    `json:"shows_count"`
 }
+
+// UserSummaryIsFollowing The viewer's follow relationship to this user (none for yourself)
+type UserSummaryIsFollowing string
 
 // UserId defines model for UserId.
 type UserId = int64
@@ -332,27 +359,27 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

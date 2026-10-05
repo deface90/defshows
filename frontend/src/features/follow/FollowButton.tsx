@@ -1,6 +1,6 @@
 import { Button } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { followUser, unfollowUser } from '@/shared/api/social/endpoints'
 import { getGetUserProfileQueryKey } from '@/shared/api/users/endpoints'
 import type { UserProfileIsFollowing } from '@/shared/api/users/model'
@@ -9,11 +9,25 @@ import type { UserProfileIsFollowing } from '@/shared/api/users/model'
  * FollowButton renders the viewer's follow relationship to a user and toggles it.
  * Four states: none → «Подписаться», pending → «Запрос отправлен» (click cancels),
  * accepted → «Вы подписаны» (click unfollows).
+ *
+ * The user profile query is always invalidated on change; `extraInvalidateKeys` lets a
+ * host like the user directory also refresh its own list (whose rows carry is_following).
  */
-export function FollowButton({ userId, state }: { userId: number; state: UserProfileIsFollowing }) {
+export function FollowButton({
+  userId,
+  state,
+  extraInvalidateKeys,
+}: {
+  userId: number
+  state: UserProfileIsFollowing
+  extraInvalidateKeys?: QueryKey[]
+}) {
   const queryClient = useQueryClient()
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: getGetUserProfileQueryKey(userId) })
+  const invalidate = () => {
+    for (const queryKey of [getGetUserProfileQueryKey(userId), ...(extraInvalidateKeys ?? [])]) {
+      queryClient.invalidateQueries({ queryKey })
+    }
+  }
 
   const follow = useMutation({
     mutationFn: () => followUser(userId),

@@ -50,7 +50,9 @@ func (h *UsersHandler) ListUsers(c echo.Context, params usersapi.ListUsersParams
 	}
 	ctx := c.Request().Context()
 	var excludeIDs []int64
+	viewerID := int64(0)
 	if claims, ok := auth.ClaimsFromContext(c); ok && claims.UserID != 0 {
+		viewerID = claims.UserID
 		excl, err := h.social.BlockedIDs(ctx, claims.UserID)
 		if err != nil {
 			return err
@@ -69,6 +71,10 @@ func (h *UsersHandler) ListUsers(c echo.Context, params usersapi.ListUsersParams
 	if err != nil {
 		return err
 	}
+	states, err := h.social.FollowStates(ctx, viewerID, ids)
+	if err != nil {
+		return err
+	}
 	out := make([]usersapi.UserSummary, 0, len(users))
 	for i := range users {
 		u := users[i]
@@ -78,6 +84,7 @@ func (h *UsersHandler) ListUsers(c echo.Context, params usersapi.ListUsersParams
 			Email:       u.Email,
 			IsPublic:    u.IsPublic,
 			ShowsCount:  counts[u.ID],
+			IsFollowing: usersapi.UserSummaryIsFollowing(states[u.ID]),
 		})
 	}
 	return c.JSON(http.StatusOK, usersapi.UserList{Users: out, Total: total, Page: page, PageSize: pageSize})

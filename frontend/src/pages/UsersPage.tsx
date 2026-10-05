@@ -1,7 +1,8 @@
 import { Badge, Box, Button, Card, Group, Pagination, Stack, Text, TextInput, Title } from '@mantine/core'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { useListUsers } from '@/shared/api/users/endpoints'
+import { getListUsersQueryKey, useListUsers } from '@/shared/api/users/endpoints'
+import { FollowButton } from '@/features/follow/FollowButton'
 import { useAuthStore } from '@/shared/auth/authStore'
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
@@ -17,7 +18,8 @@ export function UsersPage() {
   const [draft, setDraft] = useState(search)
   useEffect(() => setDraft(search), [search])
   const pageSize = 20
-  const query = useListUsers({ q: search || undefined, page, page_size: pageSize })
+  const listParams = { q: search || undefined, page, page_size: pageSize }
+  const query = useListUsers(listParams)
   const total = query.data?.total ?? 0
   const totalPages = Math.ceil(total / pageSize)
   const changePage = (next: number) => {
@@ -79,39 +81,46 @@ export function UsersPage() {
           </Stack>
         )}
         {users.map((u, i) => (
-          <Box
+          <Group
             key={u.id}
-            component={Link}
-            to={`/users/${u.id}`}
-            state={{ directoryFrom: `${location.pathname}${location.search}` }}
-            style={{
-              display: 'block',
-              color: 'inherit',
-              textDecoration: 'none',
-              borderTop: i > 0 ? '1px solid var(--mantine-color-default-border)' : undefined,
-            }}
+            wrap="nowrap"
+            justify="space-between"
+            p="md"
+            style={{ borderTop: i > 0 ? '1px solid var(--mantine-color-default-border)' : undefined }}
           >
-            <Group wrap="nowrap" justify="space-between" p="md">
-              <Stack gap={2} style={{ minWidth: 0 }}>
-                <Group gap={8} wrap="nowrap">
-                  <Text fw={600} truncate>
-                    {u.display_name}
-                  </Text>
-                  {me?.id === u.id && (
-                    <Text span c="dimmed" size="sm">
-                      (вы)
-                    </Text>
-                  )}
-                </Group>
-                <Text c="dimmed" size="sm">
-                  {u.shows_count} сериалов
+            <Box
+              component={Link}
+              to={`/users/${u.id}`}
+              state={{ directoryFrom: `${location.pathname}${location.search}` }}
+              style={{ display: 'block', color: 'inherit', textDecoration: 'none', flex: 1, minWidth: 0 }}
+            >
+              <Group gap={8} wrap="nowrap">
+                <Text fw={600} truncate>
+                  {u.display_name}
                 </Text>
-              </Stack>
-              <Badge variant="light" color={u.is_public ? 'brand' : 'gray'} style={{ flexShrink: 0 }}>
+                {me?.id === u.id && (
+                  <Text span c="dimmed" size="sm">
+                    (вы)
+                  </Text>
+                )}
+              </Group>
+              <Text c="dimmed" size="sm">
+                {u.shows_count} сериалов
+              </Text>
+            </Box>
+            <Group gap="sm" wrap="nowrap" style={{ flexShrink: 0 }}>
+              <Badge variant="light" color={u.is_public ? 'brand' : 'gray'}>
                 {u.is_public ? 'Публичный' : 'Приватный'}
               </Badge>
+              {me?.id !== u.id && (
+                <FollowButton
+                  userId={u.id}
+                  state={u.is_following}
+                  extraInvalidateKeys={[getListUsersQueryKey(listParams)]}
+                />
+              )}
             </Group>
-          </Box>
+          </Group>
         ))}
       </Card>
       {query.isSuccess && totalPages > 1 && page <= totalPages && (

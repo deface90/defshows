@@ -73,6 +73,27 @@ func (r *SocialRepository) GetFollow(ctx context.Context, followerID, followeeID
 	return &f, nil
 }
 
+// FollowStatesFor returns followerID's edge status to each target that has an edge
+// (follower_id = followerID AND followee_id IN targetIDs). Targets with no edge are
+// absent from the map. A zero follower or empty target list yields an empty map with
+// no query (gorm would otherwise emit `IN (NULL)`).
+func (r *SocialRepository) FollowStatesFor(ctx context.Context, followerID int64, targetIDs []int64) (map[int64]entity.FollowStatus, error) {
+	out := make(map[int64]entity.FollowStatus, len(targetIDs))
+	if followerID == 0 || len(targetIDs) == 0 {
+		return out, nil
+	}
+	var edges []entity.Follow
+	if err := r.db.WithContext(ctx).
+		Where("follower_id = ? AND followee_id IN ?", followerID, targetIDs).
+		Find(&edges).Error; err != nil {
+		return nil, err
+	}
+	for i := range edges {
+		out[edges[i].FolloweeID] = edges[i].Status
+	}
+	return out, nil
+}
+
 // DeleteFollow removes the follow edge. Returns ErrNotFound if there was none.
 func (r *SocialRepository) DeleteFollow(ctx context.Context, followerID, followeeID int64) error {
 	res := r.db.WithContext(ctx).

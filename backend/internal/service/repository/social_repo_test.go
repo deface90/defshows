@@ -97,6 +97,54 @@ func TestSocialRepository_Follows(t *testing.T) {
 	}
 }
 
+func TestSocialRepository_FollowStatesFor(t *testing.T) {
+	gdb := testutil.MigratedPostgresDB(t)
+	testutil.Truncate(t, gdb, "follows", "users")
+	userRepo := repository.NewUserRepository(gdb)
+	repo := repository.NewSocialRepository(gdb)
+	ctx := context.Background()
+
+	mkUser := func(email string) *entity.User {
+		u := newUser(email)
+		if err := userRepo.CreateUser(ctx, u); err != nil {
+			t.Fatalf("create user %s: %v", email, err)
+		}
+		return u
+	}
+	alice := mkUser("alice@fs.com")
+	bob := mkUser("bob@fs.com")
+	carol := mkUser("carol@fs.com")
+	dave := mkUser("dave@fs.com")
+
+	// alice → bob accepted, alice → carol pending, no edge to dave.
+	if err := repo.CreateFollow(ctx, &entity.Follow{FollowerID: alice.ID, FolloweeID: bob.ID, Status: entity.FollowAccepted}); err != nil {
+		t.Fatalf("follow bob: %v", err)
+	}
+	if err := repo.CreateFollow(ctx, &entity.Follow{FollowerID: alice.ID, FolloweeID: carol.ID, Status: entity.FollowPending}); err != nil {
+		t.Fatalf("follow carol: %v", err)
+	}
+
+	states, err := repo.FollowStatesFor(ctx, alice.ID, []int64{bob.ID, carol.ID, dave.ID})
+	if err != nil {
+		t.Fatalf("FollowStatesFor: %v", err)
+	}
+	if states[bob.ID] != entity.FollowAccepted || states[carol.ID] != entity.FollowPending {
+		t.Fatalf("states: bob=%s carol=%s", states[bob.ID], states[carol.ID])
+	}
+	// A target with no edge (dave) is absent from the map, not defaulted.
+	if _, ok := states[dave.ID]; ok {
+		t.Fatalf("dave should have no edge, got %s", states[dave.ID])
+	}
+
+	// Empty target list and a zero follower short-circuit to an empty map (no query).
+	if m, err := repo.FollowStatesFor(ctx, alice.ID, nil); err != nil || len(m) != 0 {
+		t.Fatalf("empty targets: %v len=%d", err, len(m))
+	}
+	if m, err := repo.FollowStatesFor(ctx, 0, []int64{bob.ID}); err != nil || len(m) != 0 {
+		t.Fatalf("zero follower: %v len=%d", err, len(m))
+	}
+}
+
 func TestSocialRepository_Blocks(t *testing.T) {
 	gdb := testutil.MigratedPostgresDB(t)
 	testutil.Truncate(t, gdb, "blocks", "follows", "users")

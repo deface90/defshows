@@ -1,7 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { UserProfilePage } from './UserProfilePage'
 import userEvent from '@testing-library/user-event'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { server } from '@/shared/testing/mswServer'
@@ -29,6 +29,25 @@ describe('UsersPage', () => {
     expect(screen.getByText('Bob')).toBeInTheDocument()
     expect(screen.getByText('Публичный')).toBeInTheDocument()
     expect(screen.getByText('Приватный')).toBeInTheDocument()
+  })
+
+  it('follows a user straight from the directory', async () => {
+    let followed = false
+    server.use(
+      http.get(`${base}/users`, () =>
+        HttpResponse.json({
+          total: 1, page: 1, page_size: 20,
+          users: [{ id: 5, display_name: 'Carol', is_public: true, shows_count: 2, is_following: 'none' }],
+        }),
+      ),
+      http.post(`${base}/me/follows/5`, () => {
+        followed = true
+        return HttpResponse.json({ status: 'accepted' })
+      }),
+    )
+    renderWithProviders(<UsersPage />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Подписаться' }))
+    await waitFor(() => expect(followed).toBe(true))
   })
 })
 

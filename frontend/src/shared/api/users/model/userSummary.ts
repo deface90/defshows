@@ -4,6 +4,7 @@
  * defShows Users API
  * OpenAPI spec version: 0.1.0
  */
+import type { UserSummaryIsFollowing } from './userSummaryIsFollowing';
 
 export interface UserSummary {
   id: number;
@@ -11,4 +12,6 @@ export interface UserSummary {
   email?: string;
   is_public: boolean;
   shows_count: number;
+  /** The viewer's follow relationship to this user (none for yourself) */
+  is_following: UserSummaryIsFollowing;
 }

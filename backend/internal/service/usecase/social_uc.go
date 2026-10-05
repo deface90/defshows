@@ -22,6 +22,7 @@ type SocialRepo interface {
 	CreateFollow(ctx context.Context, f *entity.Follow) error
 	CreateFollowGuarded(ctx context.Context, f *entity.Follow) error
 	GetFollow(ctx context.Context, followerID, followeeID int64) (*entity.Follow, error)
+	FollowStatesFor(ctx context.Context, followerID int64, targetIDs []int64) (map[int64]entity.FollowStatus, error)
 	DeleteFollow(ctx context.Context, followerID, followeeID int64) error
 	SetFollowStatus(ctx context.Context, followerID, followeeID int64, status entity.FollowStatus) error
 	AcceptAllPending(ctx context.Context, followeeID int64) error
@@ -276,6 +277,27 @@ func (uc *SocialUsecase) FollowState(ctx context.Context, viewerID, targetID int
 		return "", err
 	}
 	return string(f.Status), nil
+}
+
+// FollowStates reports the viewer's relationship ("none"/"pending"/"accepted") to each
+// target id, batched to a single lookup. Targets with no edge (and the viewer's own id,
+// or a guest viewer) map to "none".
+func (uc *SocialUsecase) FollowStates(ctx context.Context, viewerID int64, targetIDs []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(targetIDs))
+	for _, id := range targetIDs {
+		out[id] = "none"
+	}
+	if viewerID == 0 || len(targetIDs) == 0 {
+		return out, nil
+	}
+	edges, err := uc.repo.FollowStatesFor(ctx, viewerID, targetIDs)
+	if err != nil {
+		return nil, err
+	}
+	for id, status := range edges {
+		out[id] = string(status)
+	}
+	return out, nil
 }
 
 // CanViewProfile reports whether viewer may see target's collection and activity:

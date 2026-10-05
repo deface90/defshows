@@ -77,13 +77,14 @@ components:
         message: { type: string }
     UserSummary:
       type: object
-      required: [id, display_name, is_public, shows_count]
+      required: [id, display_name, is_public, shows_count, is_following]
       properties:
         id: { type: integer, format: int64 }
         display_name: { type: string }
         email: { type: string }
         is_public: { type: boolean }
         shows_count: { type: integer }
+        is_following: { type: string, enum: [none, pending, accepted], description: The viewer's follow relationship to this user (none for yourself) }
     UserList:
       type: object
       required: [users, total, page, page_size]
